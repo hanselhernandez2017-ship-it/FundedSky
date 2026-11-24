@@ -191,7 +191,6 @@ function startBoard(root) {
     const q = S.gq || ''; const res = q.length > 1 && APP.search ? APP.search(q) : null;
     root.innerHTML = `<div class="tb">${APP.home ? '' : `<a class="pill bk" href="AdminHome.dc.html" aria-label="Back to Admin">←<span class="lg"> Back to Admin</span></a>`}<span class="tb-t">${APP.title}</span>
       ${st.length ? `<div class="tb-mid hm"><div class="tb-stats">${st.map(([l, v, c]) => `<div><span>${l}</span><b class="${c || ''}">${v}</b></div>`).join('')}</div></div>` : '<div class="tb-mid"></div>'}
-      ${APP.search ? `<div class="gs hm"><input type="search" placeholder="${APP.searchPh || 'Search'}" value="${esc(q)}" data-live="gq" data-key="gq" aria-label="${APP.searchPh || 'Search'}">${res ? `<div class="gsd">${res.map(([t, s, act, id, k]) => `<button data-act="${act}" data-id="${esc(id || '')}" data-k="${esc(k || '')}"><b>${esc(t)}</b><span class="hint">${esc(s)}</span></button>`).join('') || '<div class="empty">Nothing found.</div>'}</div>` : ''}</div>` : ''}
       ${APP.right ? APP.right() : ''}</div>
     ${APP.banner ? APP.banner() : ''}
     <div class="body"><div class="mnav"><select id="mnavsel" aria-label="Go to section">${mnavHtml()}</select></div><nav class="nav" aria-label="${esc(APP.title)}">${navHtml()}</nav><main class="main">${subtabs()}${APP.views[S.view]()}</main></div>
