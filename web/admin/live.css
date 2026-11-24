@@ -1,0 +1,3 @@
+.fsbo .dots i.off{background:var(--fa)!important}
+.fsbo .upb i:not([class]),.fsbo .upb i[class=""]{background:var(--ln)}
+.fsbo .upb i.none{background:var(--ln)!important;opacity:.5}

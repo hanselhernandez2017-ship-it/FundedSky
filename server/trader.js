@@ -135,7 +135,7 @@ async function boot(user, sessToken, host) {
 
   const C = await content.all();
   const prog = (user.settings && user.settings.courses) || {};
-  const COURSES = C.courses.map((c) => ({ ...c, done: Math.min(c.l, prog[c.id] || 0) }));
+  const COURSES = C.courses.filter((c) => c.status !== 'Draft').map((c) => ({ ...c, done: Math.min(c.l, prog[c.id] || 0) }));
   const fmt = (v) => '$' + Number(v).toLocaleString('en-US');
   const sizes = [25000, 50000, 100000, 150000];
   const PLANRULES = [['Profit Target', ...sizes.map((z) => fmt(cat.evalRules[z].target))], ['Daily Loss Limit', ...sizes.map((z) => fmt(cat.evalRules[z].dll))], ['Max Loss (trailing, end of day)', ...sizes.map((z) => fmt(cat.evalRules[z].maxLoss))], ['Max Position Size', ...sizes.map((z) => cat.evalRules[z].contracts + ' contracts')], ['Minimum Trading Days', ...sizes.map(() => String(cat.evalCommon.minDays))], ['Consistency to Pass', ...sizes.map(() => cat.evalCommon.consistency + '%')], ['Consistency for Payouts', ...sizes.map(() => cat.fundedCommon.consistency + '%')], ['Payout Split', ...sizes.map(() => cat.fundedCommon.split + '%')], ['Payout Cap, payouts 1 to 3', ...sizes.map((z) => fmt(cat.fundedCaps[z].first))], ['Payout Cap, payouts 4 to 6', ...sizes.map((z) => fmt(cat.fundedCaps[z].later))], ['Lifetime Payouts per Account', ...sizes.map((z) => fmt(cat.fundedCaps[z].lifetime))], ['Minimum Payout', ...sizes.map(() => fmt(cat.fundedCommon.payoutMin))]];

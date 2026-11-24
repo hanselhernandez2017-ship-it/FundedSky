@@ -1,0 +1,142 @@
+{
+ "affiliates": {
+  "boot": "startBoard(root); startGlobal(root, 'affiliates');",
+  "links": [
+   "<link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css2?family=Mona+Sans:wdth,wght@100..125,400..700&amp;display=swap\">"
+  ],
+  "title": "Funded Sky admin: affiliates"
+ },
+ "analytics": {
+  "boot": "startAnalytics(root); startGlobal(root, 'an');",
+  "links": [
+   "<link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css2?family=Mona+Sans:wdth,wght@100..125,400..700&amp;display=swap\">"
+  ],
+  "title": "Funded Sky admin: analytics"
+ },
+ "catalog": {
+  "boot": "startCatalog(root);",
+  "links": [
+   "<link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css2?family=Mona+Sans:wdth,wght@100..125,400..700&amp;display=swap\">"
+  ],
+  "title": "Funded Sky admin: checkout catalog"
+ },
+ "competitions": {
+  "boot": "startBoard(root); startGlobal(root, 'competitions');",
+  "links": [
+   "<link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css2?family=Mona+Sans:wdth,wght@100..125,400..700&amp;display=swap\">"
+  ],
+  "title": "Funded Sky admin: competitions"
+ },
+ "compliance": {
+  "boot": "startBoard(root); startGlobal(root, 'compliance');",
+  "links": [
+   "<link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css2?family=Mona+Sans:wdth,wght@100..125,400..700&amp;display=swap\">"
+  ],
+  "title": "Funded Sky admin: compliance and tax"
+ },
+ "content": {
+  "boot": "startBoard(root); startGlobal(root, 'content');",
+  "links": [
+   "<link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css2?family=Mona+Sans:wdth,wght@100..125,400..700&amp;display=swap\">"
+  ],
+  "title": "Funded Sky admin: announcements and content"
+ },
+ "disputes": {
+  "boot": "startBoard(root); startGlobal(root, 'disputes');",
+  "links": [
+   "<link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css2?family=Mona+Sans:wdth,wght@100..125,400..700&amp;display=swap\">"
+  ],
+  "title": "Funded Sky admin: chargebacks and disputes"
+ },
+ "emails": {
+  "boot": "startEmails(root); startGlobal(root, 'em');",
+  "links": [
+   "<link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css2?family=Mona+Sans:wdth,wght@100..125,400..700&amp;display=swap\">"
+  ],
+  "title": "Funded Sky admin: emails"
+ },
+ "finance": {
+  "boot": "startBoard(root); startGlobal(root, 'finance');",
+  "links": [
+   "<link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css2?family=Mona+Sans:wdth,wght@100..125,400..700&amp;display=swap\">"
+  ],
+  "title": "Funded Sky admin: finance and payouts"
+ },
+ "fraud": {
+  "boot": "startBoard(root); startGlobal(root, 'fraud');",
+  "links": [
+   "<link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css2?family=Mona+Sans:wdth,wght@100..125,400..700&amp;display=swap\">"
+  ],
+  "title": "Funded Sky admin: fraud and multi-accounting"
+ },
+ "health": {
+  "boot": "startBoard(root); startGlobal(root, 'health');",
+  "links": [
+   "<link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css2?family=Mona+Sans:wdth,wght@100..125,400..700&amp;display=swap\">"
+  ],
+  "title": "Funded Sky admin: system health"
+ },
+ "home": {
+  "boot": "startBoard(root); startGlobal(root, 'home');",
+  "links": [
+   "<link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css2?family=Mona+Sans:wdth,wght@100..125,400..700&amp;display=swap\">"
+  ],
+  "title": "Funded Sky admin: home"
+ },
+ "insights": {
+  "boot": "startInsights(root);",
+  "links": [
+   "<link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css2?family=Mona+Sans:wdth,wght@100..125,400..700&amp;display=swap\">"
+  ],
+  "title": "Funded Sky admin: plan insights"
+ },
+ "platforms": {
+  "boot": "startBoard(root); startGlobal(root, 'platforms');",
+  "links": [
+   "<link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css2?family=Mona+Sans:wdth,wght@100..125,400..700&amp;display=swap\">"
+  ],
+  "title": "Funded Sky admin: trading platforms"
+ },
+ "rewards": {
+  "boot": "startBoard(root); startGlobal(root, 'rewards');",
+  "links": [
+   "<link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css2?family=Mona+Sans:wdth,wght@100..125,400..700&amp;display=swap\">"
+  ],
+  "title": "Funded Sky admin: certificates and rewards"
+ },
+ "risk": {
+  "boot": "startRisk(root); startGlobal(root, 'rk');",
+  "links": [
+   "<link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css2?family=Mona+Sans:wdth,wght@100..125,400..700&amp;display=swap\">"
+  ],
+  "title": "Funded Sky admin: risk"
+ },
+ "settings": {
+  "boot": "startBoard(root); startGlobal(root, 'settings');",
+  "links": [
+   "<link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css2?family=Mona+Sans:wdth,wght@100..125,400..700&amp;display=swap\">"
+  ],
+  "title": "Funded Sky admin: settings"
+ },
+ "support": {
+  "boot": "startSupport(root); startGlobal(root, 'sp');",
+  "links": [
+   "<link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css2?family=Mona+Sans:wdth,wght@100..125,400..700&amp;display=swap\">"
+  ],
+  "title": "Funded Sky admin: support"
+ },
+ "team": {
+  "boot": "startBoard(root); startGlobal(root, 'team');",
+  "links": [
+   "<link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css2?family=Mona+Sans:wdth,wght@100..125,400..700&amp;display=swap\">"
+  ],
+  "title": "Funded Sky admin: team and approvals"
+ },
+ "users": {
+  "boot": "startUsers(root); startGlobal(root, 'us');",
+  "links": [
+   "<link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css2?family=Mona+Sans:wdth,wght@100..125,400..700&amp;display=swap\">"
+  ],
+  "title": "Funded Sky admin: users"
+ }
+}

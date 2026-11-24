@@ -152,6 +152,13 @@ function start() {
   if (timer || process.env.SIM_FEED === 'off') return;
   const run = () => tick().then((n) => db.q('INSERT INTO jobs_log(job,ok,detail) VALUES($1,true,$2)', ['feed.tick', n + ' trades'])).catch((e) => { console.error('sim tick', e.message); db.q('INSERT INTO jobs_log(job,ok,detail) VALUES($1,false,$2)', ['feed.tick', e.message]).catch(() => {}); });
   timer = setInterval(run, 60000);
+  // Daily service status for the System Health uptime bars (worst status seen each day)
+  const healthDay = async () => { try { const I = require('./integrations'); const list = await I.list(); const d = new Date().toISOString().slice(0, 10); const row = await db.one("SELECT v FROM kv WHERE k='store.health.days'"); const v = (row && row.v) || {};
+    const lastTick = await db.one("SELECT created_at, ok FROM jobs_log WHERE job='feed.tick' ORDER BY id DESC LIMIT 1"); const day = v[d] = v[d] || {}; const worse = (k, st) => { const o = { ok: 0, w: 1, d: 2 }; if (day[k] === undefined || o[st] > o[day[k]]) day[k] = st; };
+    ['Website and Checkout', 'Trader Dashboard', 'Back Office', 'Public API'].forEach((k) => worse(k, 'ok')); worse('Simulated Trade Feed', lastTick && lastTick.ok && Date.now() - new Date(lastTick.created_at) < 5 * 60000 ? 'ok' : 'w');
+    list.filter((x) => x.enabled).forEach((x) => worse(x.name, x.status === 'live' ? 'ok' : x.lastError ? 'w' : 'ok'));
+    Object.keys(v).sort().slice(0, -90).forEach((k) => delete v[k]); await db.q("INSERT INTO kv(k,v) VALUES('store.health.days',$1) ON CONFLICT (k) DO UPDATE SET v=$1, updated_at=now()", [JSON.stringify(v)]); } catch (e) { console.error('health day', e.message); } };
+  setInterval(healthDay, 5 * 60000); setTimeout(healthDay, 15000);
   setInterval(() => db.q("DELETE FROM jobs_log WHERE created_at < now() - interval '3 days'").catch(() => {}), 3600000);
   setTimeout(() => tick().catch((e) => console.error('sim tick', e.message)), 3000);
 }

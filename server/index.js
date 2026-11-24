@@ -23,6 +23,11 @@ app.post(['/api/stripe/webhook', '/api/hooks/stripe'], raw, (req, res) => pay.we
 app.post('/api/hooks/confirmo', raw, (req, res) => pay.confirmoHook(req, res).catch((e) => { console.error(e); res.status(500).end(); }));
 app.post('/api/hooks/sumsub', raw, (req, res) => flows.sumsubHook(req, res).catch((e) => { console.error(e); res.status(500).end(); }));
 app.post('/api/hooks/rise', raw, (req, res) => flows.riseHook(req, res).catch((e) => { console.error(e); res.status(500).end(); }));
+// Request timings for System Health: last 24 hours in hourly buckets, kept in memory
+const REQSTAT = global.FS_REQSTAT = { hours: {}, routes: {} };
+app.use((req, res, next) => { if (!req.path.startsWith('/api')) return next(); const t0 = process.hrtime.bigint(); res.on('finish', () => { const ms = Number(process.hrtime.bigint() - t0) / 1e6; const hk = new Date().toISOString().slice(0, 13); const hb = REQSTAT.hours[hk] = REQSTAT.hours[hk] || { n: 0, fail: 0, ms: [] }; hb.n++; if (res.statusCode >= 500) hb.fail++; if (hb.ms.length < 2000) hb.ms.push(ms);
+  const rk = req.path.replace(/\/[A-Za-z0-9_-]*\d[A-Za-z0-9_-]*/g, '/:id').split('/').slice(0, 4).join('/'); if (res.statusCode >= 400) { const r2 = REQSTAT.routes[rk] = REQSTAT.routes[rk] || {}; r2[hk] = (r2[hk] || 0) + 1; }
+  const keys = Object.keys(REQSTAT.hours).sort(); while (keys.length > 25) delete REQSTAT.hours[keys.shift()]; }); next(); });
 app.use(express.json({ limit: '200kb' }));
 app.use((req, res, next) => auth.loadUser(req, res, next).catch(next));
 
@@ -42,7 +47,7 @@ app.get('/api/catalog', h(async () => { const c = await core.catalog(); return {
 app.get('/api/public-config', h(async () => { const m = await pay.refreshMode(); const crisp = await I.cfg('crisp'); const ph = await I.cfg('posthog'); const ss = await I.cfg('sumsub');
   const kv2 = await db.all("SELECT k, v FROM kv WHERE k IN ('settings.flags','settings.maint')"); const g = (k) => (kv2.find((r) => r.k === k) || {}).v || {};
   const ann = await db.one("SELECT v FROM kv WHERE k='list.announcements'"); const now = new Date().toISOString().slice(0, 10);
-  return { announcements: ((ann && ann.v) || []).filter((a) => a.live && (!a.ends || a.ends >= now)), flags: g('settings.flags'), maint: g('settings.maint').on ? g('settings.maint').msg : '', card: m.card, stripeBackup: m.stripe && m.card !== 'stripe', crypto: m.crypto, live: m.live, tokenizationKey: m.tokenizationKey || '', gatewayUrl: m.gatewayUrl || '', crisp: crisp ? crisp.websiteId : '', posthog: ph ? { key: ph.projectKey, host: ph.host } : null, sumsub: !!ss }; }));
+  return { announcements: ((ann && ann.v) || []).filter((a) => a.live && (!a.ends || a.ends >= now) && (!a.starts || a.starts <= new Date().toISOString())), flags: g('settings.flags'), maint: g('settings.maint').on ? g('settings.maint').msg : '', card: m.card, stripeBackup: m.stripe && m.card !== 'stripe', crypto: m.crypto, live: m.live, tokenizationKey: m.tokenizationKey || '', gatewayUrl: m.gatewayUrl || '', crisp: crisp ? crisp.websiteId : '', posthog: ph ? { key: ph.projectKey, host: ph.host } : null, sumsub: !!ss }; }));
 app.get('/api/me', h(async (req) => (req.user ? { user: { email: req.user.email, first: req.user.first, last: req.user.last, role: req.user.role, verified: req.user.verified, country: req.user.country } } : { user: null })));
 app.post('/api/auth/signup', limit(8, 60000), h((req, res) => auth.signup(req, res)));
 app.post('/api/auth/login', limit(10, 60000), h((req, res) => auth.login(req, res)));
@@ -57,7 +62,7 @@ app.post('/api/cart/price', h(async (req) => core.priceCart(req.body.items, { pr
 const T = express.Router(); T.use(auth.needUser);
 T.get('/trader/boot', h(async (req) => { const host = (process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`).replace(/^https?:\/\//, ''); return trader.boot(req.user, req.sess, host); }));
 const maintOn = async () => { const r = await db.one("SELECT v FROM kv WHERE k='settings.maint'"); return r && r.v.on ? r.v.msg : ''; };
-T.post('/orders', h(async (req) => { const m = await maintOn(); if (m) bad(m, 503); return pay.createOrder(req.user, req.body); }));
+T.post('/orders', h(async (req) => { const m = await maintOn(); if (m) bad(m, 503); if (await auth.blockedReq(req, req.user.email)) bad('This purchase could not be completed. Contact support.', 403); return pay.createOrder(req.user, req.body); }));
 T.post('/orders/reset', h((req) => pay.createResetOrder(req.user, req.body)));
 T.post('/orders/activation', h((req) => pay.createActivationOrder(req.user, req.body)));
 T.get('/orders/:code', h((req) => pay.getOrder(req.user, req.params.code, req.query.session_id)));
@@ -66,7 +71,7 @@ T.get('/orders/:code/receipt', async (req, res) => { try { res.type('html').send
 T.post('/accounts/:id/agreement', h(async (req) => { const r = await core.signAgreement(req.user.id, req.params.id); if (r.activation) { const o = await pay.createActivationOrder(req.user, { account: req.params.id }); return { checkout: '/checkout/payment?order=' + o.code }; } return r; }));
 T.post('/payouts', h((req) => core.requestPayout(req.user.id, clean(req.body.account, 40), req.body.amount, parseInt(req.body.method, 10))));
 T.post('/payout-methods', h(async (req) => {
-  const rail = ['Rise', 'USDC'].includes(req.body.rail) ? req.body.rail : 'Rise'; const raw = clean(req.body.label, 120); if (raw.length < 4) bad('Enter your account or wallet details');
+  const rail = ['Rise', 'USDC'].includes(req.body.rail) ? req.body.rail : 'Rise'; const railsOff = ((await db.one("SELECT v FROM kv WHERE k='store.finance.rails'")) || {}).v || {}; if (railsOff[rail.toLowerCase()] === false) bad(rail + ' payouts are not offered right now. Pick another method.'); const raw = clean(req.body.label, 120); if (raw.length < 4) bad('Enter your account or wallet details');
   if (rail === 'USDC' && !/^0x[a-fA-F0-9]{40}$/.test(raw)) bad('Enter a full wallet address that starts with 0x');
   const label = rail === 'USDC' ? `USDC · Wallet ${raw.slice(0, 6)}…${raw.slice(-4)}` : `Rise · Bank •••• ${raw.replace(/\D/g, '').slice(-4) || raw.slice(-4)}`;
   const n = (await db.one('SELECT count(*)::int n FROM payout_methods WHERE user_id=$1', [req.user.id])).n; if (n >= 5) bad('You can keep up to 5 payout methods');
@@ -125,11 +130,15 @@ T.post('/kyc', h(async (req) => {
   if (!k.name || !k.dob) bad('Fill in every field');
   await db.q("UPDATE users SET kyc=$2, kyc_status='submitted' WHERE id=$1 AND kyc_status<>'verified'", [req.user.id, k]);
 }));
-T.post('/affiliate/apply', h(async (req) => { await db.q("UPDATE users SET settings = settings || '{\"affApplied\":true}' WHERE id=$1", [req.user.id]); }));
+T.post('/affiliate/apply', h(async (req) => { const b = req.body || {}; await db.q("UPDATE users SET settings = settings || $2 WHERE id=$1", [req.user.id, JSON.stringify({ affApplied: true, affAt: new Date().toISOString(), affWhere: clean(b.where, 120), affAudience: clean(b.audience, 200) })]); }));
 app.use('/api', T);
 
 // ---------- back office ----------
-app.use('/api/admin', auth.needStaff, admin.router(h));
+// Read-only API keys made in Settings: they can download the CSV exports
+app.use('/api/admin/export', async (req, res, next) => { const m = /^Bearer (fsk_[A-Za-z0-9]+)$/.exec(req.headers.authorization || ''); if (!m || req.method !== 'GET') return next();
+  try { const hsh = require('crypto').createHash('sha256').update(m[1]).digest('hex'); const row = await db.one("SELECT v FROM kv WHERE k='store.apikeys'"); const keys = (row && row.v) || []; const k = keys.find((x) => x.hash === hsh && !x.revoked); if (!k) return res.status(401).json({ error: 'Unknown API key' });
+    k.last = new Date().toISOString(); await db.q("UPDATE kv SET v=$1 WHERE k='store.apikeys'", [JSON.stringify(keys)]); req.user = { id: 0, role: 'finance', first: 'API key', last: k.name, email: '' }; next(); } catch (e) { next(e); } });
+app.use('/api/admin', (req, res, next) => (req.user && req.user.id === 0 ? next() : auth.needStaff(req, res, next)), admin.router(h));
 
 // ---------- pages ----------
 const DIST = path.join(__dirname, '..', 'web', 'dist');
@@ -140,7 +149,7 @@ app.get('/', async (req, res) => {
   if (req.query.ref) {
     const code = clean(req.query.ref, 40); res.setHeader('Set-Cookie', `fs_ref=${encodeURIComponent(code)}; Path=/; Max-Age=${30 * 86400}; SameSite=Lax`);
     const d = new Date().toISOString().slice(0, 10);
-    if (/^t\d+$/.test(code)) await db.q("INSERT INTO kv(k,v) VALUES($1, jsonb_build_object($2::text, 1)) ON CONFLICT (k) DO UPDATE SET v = kv.v || jsonb_build_object($2::text, COALESCE((kv.v->>$2)::int,0)+1), updated_at=now()", ['refclicks.' + code, d]).catch(() => {});
+    if (/^[A-Za-z0-9_-]{2,40}$/.test(code)) await db.q("INSERT INTO kv(k,v) VALUES($1, jsonb_build_object($2::text, 1)) ON CONFLICT (k) DO UPDATE SET v = kv.v || jsonb_build_object($2::text, COALESCE((kv.v->>$2)::int,0)+1), updated_at=now()", ['refclicks.' + code, d]).catch(() => {});
     return res.redirect(req.user ? '/app' : '/signup?ref=' + encodeURIComponent(code));
   }
   res.redirect(req.user ? '/app' : '/checkout');
@@ -150,9 +159,26 @@ app.get('/checkout/payment', (req, res) => res.sendFile(path.join(DIST, req.user
 app.get('/checkout/confirmed', page('confirmed.html'));
 app.get('/login', (req, res, next) => (req.user && !req.query.next ? res.redirect(auth.STAFF.includes(req.user.role) && req.query.admin ? '/admin' : '/app') : next()), page('login.html'));
 app.get('/signup', page('signup.html'));
-app.get('/terms', page('terms.html'));
-app.get('/privacy', page('privacy.html'));
-app.get('/refund-policy', page('refund-policy.html'));
+const editable = (slug, f) => async (req, res) => {
+  const pg = ((await db.one("SELECT v FROM kv WHERE k='content.pages'").catch(() => null)) || {}).v || {}; const p = pg[slug];
+  if (!p || p.status !== 'Published' || !p.txt) return res.sendFile(path.join(DIST, f));
+  const e = (x) => String(x || '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const body = String(p.txt).split(/\n\n+/).map((para) => (/^#+\s/.test(para) ? `<h2>${e(para.replace(/^#+\s*/, ''))}</h2>` : `<p>${e(para).replace(/\n/g, '<br>')}</p>`)).join('');
+  res.send(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Funded Sky: ${e(p.title)}</title><style>body{margin:0;background:#08080A;color:#D4CFCD;font-family:"Mona Sans",system-ui;line-height:1.6}main{max-width:720px;margin:0 auto;padding:56px 24px}h1{color:#F4F2F1;font-size:32px;margin:0 0 6px}h2{color:#F4F2F1;font-size:18px;margin:28px 0 6px}a{color:#7CC4FF}.n{color:#9C9693;font-size:14px}</style></head><body><main><p><a href="/">← Funded Sky</a></p><h1>${e(p.title)}</h1><p class="n">Last updated ${e(new Date(p.at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }))}</p>${body}</main></body></html>`);
+};
+app.get('/status', async (req, res) => {
+  const e = (x) => String(x || '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const inc = (((await db.one("SELECT v FROM kv WHERE k='list.incidents'").catch(() => null)) || {}).v || []).filter((x) => x.pub !== false).slice(0, 10);
+  const list = (await require('./integrations').list()).filter((x) => x.enabled);
+  const open = inc.filter((x) => x.st !== 'resolved');
+  const rows = [['Website and Checkout', 'ok'], ['Trader Dashboard', 'ok']].concat(list.filter((x) => ['tailoredpay', 'stripe', 'confirmo', 'rise', 'sumsub', 'resend'].includes(x.id)).map((x) => [x.name, x.status === 'live' ? 'ok' : 'w']));
+  res.send(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Funded Sky Status</title><meta http-equiv="refresh" content="60"><style>body{margin:0;background:#08080A;color:#D4CFCD;font-family:"Mona Sans",system-ui;line-height:1.5}main{max-width:720px;margin:0 auto;padding:56px 24px}h1{color:#F4F2F1;font-size:28px;margin:0 0 18px}.bar{padding:14px 18px;border-radius:12px;background:${open.length ? '#2A2113' : '#10241A'};color:${open.length ? '#F2C46D' : '#5FD39A'};font-weight:600;margin-bottom:22px}.r{display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid #26262A}.ok{color:#5FD39A}.w{color:#F2C46D}h2{color:#F4F2F1;font-size:17px;margin:30px 0 8px}.i{padding:12px 0;border-bottom:1px solid #26262A}.n{color:#9C9693;font-size:13px}a{color:#7CC4FF}</style></head><body><main><p><a href="/">← Funded Sky</a></p><h1>System Status</h1><div class="bar">${open.length ? e(open[0].t) : 'Everything is working'}</div>${rows.map(([n, st]) => `<div class="r"><span>${e(n)}</span><span class="${st}">${st === 'ok' ? 'Normal' : 'Slower than usual'}</span></div>`).join('')}<h2>Recent Incidents</h2>${inc.map((x) => `<div class="i"><b>${e(x.t)}</b> <span class="n">· ${x.st === 'resolved' ? 'Resolved' : 'Ongoing'} · ${e(new Date(x.at).toUTCString().slice(0, 22))} UTC</span>${(x.upd || []).slice(-1).map((u) => `<div class="n">${e(typeof u === 'string' ? u : u.text)}</div>`).join('')}</div>`).join('') || '<p class="n">No incidents reported.</p>'}</main></body></html>`);
+});
+app.get('/terms', editable('terms', 'terms.html'));
+app.get('/privacy', editable('privacy', 'privacy.html'));
+app.get('/refund-policy', editable('refund-policy', 'refund-policy.html'));
+app.get('/rules', editable('rules', 'terms.html'));
+app.get('/faq', editable('faq', 'terms.html'));
 app.get('/logout', async (req, res) => { await auth.logout(req, res); const n = String(req.query.next || '/login'); res.redirect(n.startsWith('/') && !n.startsWith('//') ? n : '/login'); });
 app.get('/forgot-password', page('forgot.html'));
 app.get('/reset-password', page('reset-password.html'));

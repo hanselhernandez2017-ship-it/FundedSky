@@ -35,6 +35,10 @@ async function makeToken(userId, kind, hours) {
   await db.q(`INSERT INTO tokens(token,user_id,kind,expires_at) VALUES($1,$2,$3, now() + ($4 || ' hours')::interval)`, [t, userId, kind, String(hours)]);
   return t;
 }
+async function blockedReq(req, email) {
+  const bl = ((await db.one("SELECT v FROM kv WHERE k='list.blocklist'")) || {}).v || []; const ip = String(req.ip || '').replace(/^::ffff:/, ''); const em = String(email || '').toLowerCase();
+  return bl.some((x) => x && x.type !== 'watch' && x.value && ((x.type === 'ip' && String(x.value).replace(/^::ffff:/, '') === ip) || (x.type === 'email' && (em === String(x.value).toLowerCase() || (String(x.value).startsWith('@') && em.endsWith(String(x.value).toLowerCase()))))));
+}
 async function signup(req, res) {
   const email = clean(req.body.email, 200).toLowerCase(); const pass = String(req.body.password || '');
   const first = clean(req.body.first, 60), last = clean(req.body.last, 60), country = clean(req.body.country, 60);
@@ -42,11 +46,15 @@ async function signup(req, res) {
   if (pass.length < 8) bad('Use at least 8 characters for your password');
   if (!first || !last) bad('Enter your first and last name');
   const rc = await db.one("SELECT v FROM kv WHERE k='list.countries'"); if (rc && (rc.v || []).some((c) => c.blocked && c.name === country)) bad('Funded Sky is not available in ' + country + ' yet.');
+  if (await blockedReq(req, email)) bad('We could not create an account. Contact support if you think this is a mistake.');
   if (await db.one('SELECT 1 FROM users WHERE email=$1', [email])) bad('An account with this email already exists. Log in instead.');
   const n = (await db.one("SELECT nextval('seq_tid') n")).n;
-  let ref = null; const refCode = req.body.ref || parseCookies(req.headers.cookie).fs_ref; if (refCode) { const r = await db.one('SELECT id FROM users WHERE ref_code=$1', [clean(refCode, 40)]); ref = r ? r.id : null; }
+  let ref = null; const refCode = req.body.ref || parseCookies(req.headers.cookie).fs_ref; if (refCode) { const r = await db.one('SELECT id FROM users WHERE ref_code=$1', [clean(refCode, 40)]); ref = r ? r.id : null; if (!ref) { const al = ((await db.one("SELECT v FROM kv WHERE k='list.affiliates'")) || {}).v || []; const m = al.find((x) => x.code && String(x.code).toUpperCase() === String(refCode).toUpperCase() && x.status === 'active'); if (m) ref = m.user; } }
   const adminEmails = (process.env.ADMIN_EMAILS || '').toLowerCase().split(',').map((x) => x.trim()).filter(Boolean);
-  const role = adminEmails.includes(email) ? 'admin' : 'trader';
+  const invs = ((await db.one("SELECT v FROM kv WHERE k='store.team.invites'")) || {}).v || []; const inv = invs.find((x) => String(x.email).toLowerCase() === email && new Date(x.at) > new Date(Date.now() - 7 * 864e5));
+  const role = adminEmails.includes(email) ? 'admin' : inv && ['admin', 'support', 'risk', 'finance'].includes(inv.role) ? inv.role : 'trader';
+  require('./integrations').alert('user', `New sign-up: ${first} ${last} from ${country || 'unknown country'}`);
+  if (inv) await db.q("UPDATE kv SET v=$1 WHERE k='store.team.invites'", [JSON.stringify(invs.filter((x) => x !== inv))]);
   const u = await db.one(`INSERT INTO users(tid,email,pass_hash,first,last,country,role,ref_code,referred_by,settings,agreements) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
     ['T-' + n, email, await bcrypt.hash(pass, 10), first, last, country, role, 't' + n, ref,
       { nEmail: true, nSms: false, nPush: true, nNews: true, nMkt: false, nComp: true, mfaPay: true },
@@ -109,4 +117,4 @@ async function changePassword(req) {
   await db.q('DELETE FROM sessions WHERE user_id=$1 AND token<>$2', [u.id, req.sess]);
   return { ok: true };
 }
-module.exports = { loadUser, needUser, needStaff, needAdmin, signup, login, logout, forgot, resetPassword, verifyEmail, resendVerify, changePassword, STAFF, BASE };
+module.exports = { blockedReq, loadUser, needUser, needStaff, needAdmin, signup, login, logout, forgot, resetPassword, verifyEmail, resendVerify, changePassword, STAFF, BASE };

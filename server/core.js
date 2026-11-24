@@ -210,7 +210,7 @@ async function requestPayout(userId, accountId, amount, methodId) {
   });
 }
 
-async function reviewPayout(actorId, code, action, note) {
+async function reviewPayout(actorId, code, action, note, batchId) {
   return db.tx(async (c) => {
     const p = await c.one('SELECT * FROM payouts WHERE code=$1 FOR UPDATE', [code]);
     if (!p) bad('Payout not found', 404);
@@ -224,7 +224,7 @@ async function reviewPayout(actorId, code, action, note) {
       await notify(c, p.user_id, `Payout ${p.code} approved`, `${money(p.amount)} is being sent to ${p.method}.`, 'payouts');
     } else if (action === 'pay') {
       if (p.status !== 'approved') bad('Approve the payout first');
-      const batch = 'PB-' + new Date().toISOString().slice(2, 10).replace(/-/g, '');
+      const batch = batchId || ('PB-' + new Date().toISOString().slice(2, 10).replace(/-/g, ''));
       await c.q("UPDATE payouts SET status='paid', paid_at=now(), batch=$2 WHERE id=$1", [p.id, batch]);
       const r = R.rulesFor(cat, a);
       const count = a.payout_count + 1;
@@ -233,8 +233,15 @@ async function reviewPayout(actorId, code, action, note) {
       await points(c, p.user_id, 250, 'Payout ' + p.code);
       await notify(c, p.user_id, `Payout ${p.code} sent`, `${money(p.amount)} sent to ${p.method}.`, 'payouts');
       const I2 = require('./integrations'); I2.alert('payout', `:white_check_mark: Payout ${p.code} sent: ${money(p.amount)}`); I2.announce(`Another payout sent: ${money(p.amount)} to a ${a.size / 1000}K ${a.plan === 'instant' ? 'Instant' : 'funded'} trader. Congrats!`);
+    } else if (action === 'fail') {
+      if (p.status !== 'approved') bad('Only payouts ready to send can be marked failed');
+      await c.q("UPDATE payouts SET status='failed', note=$2 WHERE id=$1", [p.id, note || 'Sending failed']);
+      await notify(c, p.user_id, `Payout ${p.code} could not be sent`, (note || 'The payment provider sent it back.') + ' Check your payout details, then contact support.', 'payouts');
+    } else if (action === 'retry') {
+      if (p.status !== 'failed') bad('Only failed payouts can be retried');
+      await c.q("UPDATE payouts SET status='approved', note='' WHERE id=$1", [p.id]);
     } else if (action === 'deny') {
-      if (!['requested', 'approved'].includes(p.status)) bad('This payout can no longer be denied');
+      if (!['requested', 'approved', 'failed'].includes(p.status)) bad('This payout can no longer be denied');
       await c.q("UPDATE payouts SET status='denied', denied_at=now(), reviewed_by=$2, note=$3 WHERE id=$1", [p.id, actorId, note || '']);
       await c.q('UPDATE accounts SET balance=balance+$2 WHERE id=$1', [a.id, p.gross]);
       await notify(c, p.user_id, `Payout ${p.code} was not approved`, note || 'Support will contact you with details.', 'payouts');
