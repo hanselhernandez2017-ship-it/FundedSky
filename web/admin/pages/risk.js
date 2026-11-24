@@ -373,7 +373,7 @@ function startRisk(root) {
 
   // ---------- overview ----------
   function findings() {
-    const cs = cells().sort((a, b) => a.e.margin - b.e.margin); const out = [];
+    const cs = cells().filter((c) => c.z.sold > 0).sort((a, b) => a.e.margin - b.e.margin); const out = []; if (!cs.length) return [['plain', 'No sales in this period yet', 'Findings appear once evaluations sell.', null]];
     cs.filter((c) => c.e.margin < 0.1).forEach((c) => out.push(['bad', `${c.p.name} ${K(c.z.size)} ${c.e.margin < 0 ? 'loses' : 'barely makes'} ${money(Math.abs(c.e.perSold))} per evaluation sold`, `Payouts take ${pct(c.e.payRatio)} of its revenue. ${c.p.billing === 'Monthly' ? 'Traders pay for fewer months than the funded payouts cost.' : 'The price is low for the payouts this size produces.'}`, c]));
     const best = cs[cs.length - 1]; out.push(['good', `${best.p.name} ${K(best.z.size)} is the most profitable size`, `${pct(best.e.margin)} margin, ${money(best.e.perSold)} profit per evaluation sold.`, best]);
     const resetShare = cells().reduce((s, c) => s + c.e.resetRev, 0) / allTotal().revenue; out.push(['info', `Resets bring in ${pct(resetShare)} of revenue`, 'They cost almost nothing to provide. Keeping the Reset After Breach discount moderate protects this.', null]);
@@ -392,7 +392,7 @@ function startRisk(root) {
   }
   // ---------- matrix ----------
   function vMatrix() {
-    const sizes = [25000, 50000, 100000, 150000]; const metric = IS.metric || 'margin';
+    const sizes = [...new Set(PLANS.flatMap((p) => p.sizes.map((z) => z.size)))].sort((a, b) => a - b); const metric = IS.metric || 'margin';
     const val = (e) => metric === 'margin' ? pct(e.margin) : metric === 'per' ? money(e.perSold) : metric === 'pay' ? pct(e.payRatio) : pct(e.paidN / e.sold, 1);
     return `<div class="ph"><div><h1>Plans and Sizes</h1><p>Every size of every plan side by side. Green makes money, amber is thin, red loses money. Click a cell for the full breakdown.</p></div><div class="act">${rangeSeg()}</div></div>
       <div class="card"><div class="ch"><h3>Heat Map</h3><div class="r"><div class="seg">${[['margin', 'Margin'], ['per', 'Profit per Sale'], ['pay', 'Payouts / Revenue'], ['reach', 'Reached a Payout']].map(([k, l]) => `<button class="${metric === k ? 'on' : ''}" data-act="piMetric" data-k="${k}">${l}</button>`).join('')}</div></div></div>
