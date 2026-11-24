@@ -64,168 +64,102 @@ function startUsers(root) {
       return `<div class="vzbub" style="height:${H}px"><div class="ar">${y0 < 0 ? `<div class="zero" style="top:${(y1 / (y1 - y0) * 100).toFixed(1)}%"></div>` : ''}${items.map((i) => { const s = 18 + Math.sqrt(i.v / mv) * 54; return `<div class="bb ${i.c || ''}" style="left:${((i.x - x0) / (x1 - x0) * 100).toFixed(1)}%;top:${((y1 - i.y) / (y1 - y0) * 100).toFixed(1)}%;width:${s.toFixed(0)}px;height:${s.toFixed(0)}px" title="${E(i.n)}: ${fx(i.x)} · ${fy(i.y)}"><span>${E(i.n)}</span></div>`; }).join('')}${[y1, 0, y0].filter((t, i) => i !== 2 || y0 < 0).map((t) => `<span class="yt" style="top:${((y1 - t) / (y1 - y0) * 100).toFixed(1)}%">${fy(t)}</span>`).join('')}${[0, 0.5, 1].map((f) => `<span class="xt" style="left:${(f * 100).toFixed(0)}%">${fx(x0 + (x1 - x0) * f)}</span>`).join('')}</div><div class="xl">${E(xl)}</div><div class="yl">${E(yl)}</div></div>`; }
     return { map, spark, heat, gauge, ring, flow, funnel, graph, bubbles, CC };
   })();
-  const ME = '[Your Name]';
-  const RV2 = '[Second Reviewer]';
+  /*LIVE*/ const F = window.FSG; const BO = F.BO;
+  const ME = F.me();
+  const RV2 = 'Second Reviewer';
   const PROV = 'Sumsub';
   const rng = (seed) => { let h = 2166136261; for (const ch of String(seed)) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return () => { h ^= h << 13; h ^= h >>> 17; h ^= h << 5; return ((h >>> 0) % 10000) / 10000; }; };
   const pick = (r, a) => a[Math.floor(r() * a.length)];
-  const FULL = ['Jane Dalton', 'Marcus Torres', 'Priya Shah', 'Diego Romero', 'Amara Okafor', 'Kenji Mori', 'Sofia Lopez', 'Liam Keller', 'Noah Brooks', 'Elena Volkova', 'Omar Haddad', 'Chen Wang', 'Lucas Pereira', 'Hana Kim', 'Ivan Petrov', 'Zoe Adler', 'Mateo Garcia', 'Aisha Nwosu', 'Felix Bauer', 'Grace Taylor', 'Arjun Rao', 'Nina Schulz', 'Theo Martin', 'Yara Farah', 'Jonas Eriksson', 'Maya Cruz',
-    'Ethan Cole', 'Lina Haddou', 'Ravi Menon', 'Clara Novak', 'Tomas Silva', 'Mei Tanaka', 'Samuel Osei', 'Freya Lund', 'Pablo Ortiz', 'Ines Duarte', 'Kofi Mensah', 'Anya Ivanova'];
-  const CTRY = ['United States', 'United Kingdom', 'India', 'Mexico', 'Nigeria', 'Japan', 'Spain', 'Canada', 'Australia', 'Germany', 'UAE', 'Singapore', 'Brazil', 'South Korea', 'Poland', 'Poland', 'Argentina', 'Kenya', 'Netherlands', 'Philippines', 'India', 'Italy', 'Ireland', 'Turkey', 'Sweden', 'Chile',
-    'United States', 'France', 'India', 'Czechia', 'Portugal', 'Japan', 'Ghana', 'Norway', 'Colombia', 'Portugal', 'Ghana', 'Cyprus'];
-  const CITY = { 'United States': 'Austin', 'United Kingdom': 'Manchester', India: 'Pune', Mexico: 'Guadalajara', Nigeria: 'Lagos', Japan: 'Osaka', Spain: 'Valencia', Canada: 'Toronto', Australia: 'Brisbane', Germany: 'Hamburg', UAE: 'Dubai', Singapore: 'Singapore', Brazil: 'São Paulo', 'South Korea': 'Busan', Poland: 'Kraków', Argentina: 'Córdoba', Kenya: 'Nairobi', Netherlands: 'Utrecht', Philippines: 'Cebu', Italy: 'Turin', Ireland: 'Cork', Turkey: 'Izmir', Sweden: 'Gothenburg', Chile: 'Santiago', France: 'Lyon', Czechia: 'Brno', Portugal: 'Porto', Ghana: 'Accra', Norway: 'Bergen', Colombia: 'Medellín', Cyprus: 'Limassol' };
-  const TZ = { 'United States': 'Central Time', 'United Kingdom': 'London', India: 'India Time', Mexico: 'Central Time', Japan: 'Tokyo', Australia: 'Brisbane', Canada: 'Eastern Time', UAE: 'Dubai', Singapore: 'Singapore', Brazil: 'São Paulo', 'South Korea': 'Seoul', Argentina: 'Buenos Aires', Philippines: 'Manila', Chile: 'Santiago', Colombia: 'Bogotá' };
-  const PLANS = [['[Plan A Name]', [25000, 50000]], ['[Plan B Name]', [50000, 100000, 150000]], ['[Plan C Name]', [25000, 50000, 100000]]];
-  const PRICE = { 25000: 99, 50000: 149, 100000: 249, 150000: 349 };
-  const PLATS = ['Tradovate', 'NinjaTrader', 'TradingView', 'Rithmic'];
+  const PLATS = [...new Set([].concat(...BO.catalog.plans.map((p) => p.platforms || [])))];
   const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const dnum = (w) => { if (!w || /Today|Just now/.test(w)) return 9e12; const p = w.replace(',', '').split(' '); return new Date(/\d{4}$/.test(w) ? +w.slice(-4) : 2026, MON.indexOf(p[0]), +p[1]).getTime(); };
-  const day = (ago) => { const d = new Date(2026, 10, 22 - ago); return `${MON[d.getMonth()]} ${d.getDate()}${d.getFullYear() !== 2026 ? ', ' + d.getFullYear() : ''}`; };
-
-  // KYC stories: uid index -> details
-  const KYC_STORY = {
-    14: { st: 'pending', why: 'Face Match Below Threshold', sev: 'md', wait: 3, fail: ['face'], face: 71 },
-    15: { st: 'pending', why: 'Name on Document Differs', sev: 'md', wait: 5, warn: ['name'], docName: 'Zoë Adler-Brandt' },
-    10: { st: 'pending', why: 'Possible Sanctions Match', sev: 'hi', wait: 1, fail: ['sanctions'] },
-    16: { st: 'pending', why: 'Document Used on Another Account', sev: 'hi', wait: 2, fail: ['dup'], dupOf: 'U-10431' },
-    12: { st: 'pending', why: 'Document Expires in 9 Days', sev: 'lo', wait: 7, warn: ['expiry'] },
-    13: { st: 'pending', why: 'Review Asked For by Risk', sev: 'md', wait: 11, warn: ['manual'] },
-    27: { st: 'pending', why: 'Address Could Not Be Matched', sev: 'lo', wait: 14, warn: ['address'] },
-    19: { st: 'resubmit', why: 'Proof of Address Older Than 90 Days', sev: 'lo', wait: 26, fail: ['address'] },
-    31: { st: 'resubmit', why: 'Photo of ID Too Blurry', sev: 'lo', wait: 30, fail: ['doc'] },
-    37: { st: 'rejected', why: 'Document Looks Edited', sev: 'hi', wait: 0, fail: ['doc', 'face'] },
-    33: { st: 'none' }, 34: { st: 'none' }, 35: { st: 'started' }, 30: { st: 'none' }
-  };
-
-  const USERS = FULL.map((name, i) => {
-    const r = rng('u' + i); const ctry = CTRY[i]; const [f, l] = name.split(' ');
-    const ks = KYC_STORY[i] || { st: 'verified' };
-    const joined = Math.floor(20 + r() * 380); const nAcc = ks.st === 'none' ? (r() < 0.5 ? 0 : 1) : 1 + Math.floor(r() * 4);
-    const funded = ks.st === 'verified' ? Math.min(nAcc, Math.floor(r() * 3)) : 0;
-    const spent = nAcc * 149 + Math.floor(r() * 6) * 79; const paid = funded ? Math.round((800 + r() * 9000) / 10) * 10 : 0;
-    return {
-      id: 'U-' + (10400 + i * 3 + (i > 9 ? 1 : 0)), i, name, short: `${f} ${l[0]}.`, email: `${f.toLowerCase()}.${l.toLowerCase().replace(/[^a-z]/g, '')}@example.com`,
-      phone: '+' + ({ 'United States': 1, Canada: 1, 'United Kingdom': 44, India: 91, Mexico: 52, Nigeria: 234, Japan: 81, Spain: 34, Australia: 61, Germany: 49, UAE: 971, Singapore: 65, Brazil: 55, 'South Korea': 82, Poland: 48, Argentina: 54, Kenya: 254, Netherlands: 31, Philippines: 63, Italy: 39, Ireland: 353, Turkey: 90, Sweden: 46, Chile: 56, France: 33, Czechia: 420, Portugal: 351, Ghana: 233, Norway: 47, Colombia: 57, Cyprus: 357 }[ctry] || 1) + ' ••• ••• ' + String(1000 + Math.floor(r() * 8999)),
-      dob: `${MON[Math.floor(r() * 12)]} ${1 + Math.floor(r() * 27)}, ${1972 + Math.floor(r() * 30)}`,
-      ctry, city: CITY[ctry] || '—', tz: TZ[ctry] || ctry, joinedAgo: joined, joined: day(joined), lastAgo: i === 37 ? 34 : Math.floor(r() * (i % 5 === 0 ? 20 : 3)),
-      st: i === 37 ? 'Banned' : i === 22 ? 'Locked' : i === 29 ? 'Closed' : 'Active',
-      kyc: ks.st, ks, spent, paid, nAcc, funded, risk: Math.round(8 + r() * 50 + (ks.sev === 'hi' ? 35 : 0)),
-      via: pick(r, ['Email', 'Email', 'Google', 'Apple']), aff: r() < 0.35 ? pick(r, ['TRADEWITHSAM', 'FUTURESDAILY', 'NQKING', 'SKYHIGH']) : '', twofa: r() < 0.62, mkt: r() < 0.55,
-      lang: pick(r, ['English', 'English', 'English', 'Spanish', 'Portuguese']),
-      tags: i === 0 ? ['VIP'] : i === 7 ? ['Watchlist'] : i === 37 ? ['Fraud'] : i === 11 ? ['Copy Trading Alert'] : i === 4 ? ['Affiliate'] : [],
-      notes: i === 7 ? [['[Risk Reviewer]', 'Nov 20', 'Hedging alert RK-1182 open. Hold payouts until it is closed.']] : i === 0 ? [['[Support Agent]', 'Nov 3', 'Long-time customer. Has bought 9 evaluations. Be generous with resets.']] : [],
-      locked: i === 22 ? { why: 'Too many failed sign-ins', when: 'Nov 22, 9:14 AM' } : null
-    };
+  const dnum = (w) => { if (!w || /Today|Just now/.test(w)) return 9e12; const p = w.replace(',', '').split(' '); return new Date(/\d{4}$/.test(w) ? +w.slice(-4) : new Date().getFullYear(), MON.indexOf(p[0]), +p[1]).getTime(); };
+  const day = (ago) => { const d = new Date(Date.now() - ago * 864e5); return `${MON[d.getMonth()]} ${d.getDate()}${d.getFullYear() !== new Date().getFullYear() ? ', ' + d.getFullYear() : ''}`; };
+  const agoD = (d) => (d ? Math.max(0, Math.floor((Date.now() - new Date(d)) / 864e5)) : 0);
+  const lbl = (d) => (d ? F.dayLabel(d) : '');
+  const KMETA = F.st('users.kycmeta', {});
+  const TAGS = F.st('users.tags', {});
+  const LINKOK = F.st('users.linkok', {});
+  const kycOf = (u) => { const m = KMETA[u.id] || {}; if (m.st === 'resubmit' && u.kyc_status !== 'verified' && u.kyc_status !== 'submitted') return 'resubmit'; return { none: 'none', submitted: 'pending', verified: 'verified', rejected: 'rejected' }[u.kyc_status] || 'none'; };
+  const stOf = (u) => (/@deleted\.fundedsky\.invalid$/.test(u.email) ? 'Closed' : u.status === 'banned' ? 'Banned' : u.status === 'suspended' ? 'Locked' : 'Active');
+  const affCode = (u) => { if (!u.referred_by) return ''; const ref = BO.users.find((x) => x.id === u.referred_by || x.ref_code === u.referred_by); if (!ref) return ''; const a = ((BO.lists && BO.lists.affiliates) || []).find((x) => x.user === ref.id && x.status !== 'declined'); return a ? (a.code || ref.ref_code || '').toUpperCase() : ''; };
+  const USERS = BO.users.filter((x) => x.role === 'trader').map((x, i) => {
+    const kyc = kycOf(x); const acc = BO.accounts.filter((a) => a.user === x.id); const pend = kyc === 'pending';
+    const ks = { st: kyc, why: (KMETA[x.id] || {}).why || (pend ? 'Waiting for Review' : kyc === 'rejected' ? 'Rejected' : ''), sev: pend ? ((x.kyc && x.kyc.country && x.country && x.kyc.country !== x.country) ? 'hi' : 'md') : 'lo', wait: pend ? Math.round(F.hoursSince(x.kyc && x.kyc.at)) : 0, fail: kyc === 'rejected' ? ['doc'] : [], warn: pend && x.kyc && x.kyc.country && x.kyc.country !== x.country ? ['country'] : pend ? ['manual'] : [] };
+    const refunds = BO.orders.filter((o) => o.user === x.id && o.status === 'refunded').length; const cbs = (BO.disputes || []).filter((d) => d.user === x.id).length; const br = acc.filter((a) => a.phase === 'breached').length;
+    const risk = Math.max(0, Math.min(100, Math.round(8 + br * 4 + refunds * 8 + cbs * 25 + (x.status !== 'active' ? 20 : 0) + (ks.sev === 'hi' ? 20 : 0))));
+    return { id: x.tid, uid: x.id, i, name: F.full(x), short: F.short(x), email: x.email, phone: x.phone || '—', dob: (x.kyc && x.kyc.dob) || '—', ctry: x.country || '—', city: '—', tz: '—', joinedAgo: agoD(x.created_at), joined: lbl(x.created_at), lastAgo: agoD(x.last_login || x.created_at),
+      st: stOf(x), kyc, ks, spent: 0, paid: 0, nAcc: acc.length, funded: acc.filter((a) => a.kind === 'funded').length, risk, via: 'Email', aff: affCode(x), twofa: false, mkt: !!(x.settings && x.settings.nMkt), lang: 'English', tags: (TAGS[x.id] || []).slice(), notes: [], locked: x.status === 'suspended' ? { why: 'Locked by staff', when: '' } : null, raw: x, demo: !!x.demo };
   });
-  // linked dup account
-  const DUPID = 'U-10431';
-
-  const uById = (id) => USERS.find((u) => u.id === id);
-
-  // lazily built detail
+  const DUPID = '';
+  const uById = (id) => USERS.find((u) => u.id === id || String(u.uid) === String(id));
+  const X = {}; const loadX = (u) => { if (X[u.uid] || X[u.uid + 'l']) return; X[u.uid + 'l'] = true; F.api('/users/' + u.uid + '/extra').then((d) => { X[u.uid] = d; u.notes = (d.notes || []).slice().reverse().map((n) => [n.by, F.dayLabel(n.at), n.body]); u.d = null; if (typeof render === 'function') render(); }).catch(() => {}); };
+  const TYPE = (o) => (o.lines || []).map((l) => l.label).join(', ') || o.kind;
+  const devName = (s) => { s = s || ''; const br = /Edg/.test(s) ? 'Edge' : /Chrome/.test(s) ? 'Chrome' : /Firefox/.test(s) ? 'Firefox' : /Safari/.test(s) ? 'Safari' : 'Browser'; const os = /iPhone/.test(s) ? 'iPhone' : /Android/.test(s) ? 'Android' : /Mac/.test(s) ? 'Mac' : /Windows/.test(s) ? 'Windows' : /Linux/.test(s) ? 'Linux' : 'Computer'; return `${br} on ${os}`; };
   function detail(u) {
-    if (u.d) return u.d; const r = rng('d' + u.id); const d = {};
-    const j = u.joinedAgo; const T = { fe: Math.max(0, j - 3) }; T.pass = Math.round(T.fe * 0.55); T.kyc = Math.max(0, T.pass - 2); T.fund = Math.max(0, T.kyc - 1); T.pay = Math.max(0, T.fund - 9); d.T = T;
-    d.accts = Array.from({ length: u.nAcc }, (_, k) => { const [pn, sz] = pick(r, PLANS); const size = pick(r, sz); const isF = k < u.funded; const st = isF ? 'Funded' : pick(r, ['Active', 'Active', 'Passed', 'Breached', 'Expired']);
-      return { id: `FS-${isF ? 'F-' : ''}${size / 1000}K-${10300 + Math.floor(r() * 140)}`, plan: pn, size, plat: pick(r, PLATS), st, bal: size + Math.round((r() - 0.4) * size * 0.05), started: day(isF ? T.fund : Math.round(T.fe * (1 - k / Math.max(1, u.nAcc)))), bought: day(Math.round(T.fe * (1 - k / Math.max(1, u.nAcc)))) }; });
-    let ago = u.joinedAgo;
-    d.orders = d.accts.map((a, k) => ({ id: 'ORD-' + (58200 + Math.floor(r() * 900)), when: a.bought, item: `${a.plan} ${a.size / 1000}K Evaluation`, amt: PRICE[a.size], method: k % 3 === 2 ? 'PayPal' : `${pick(r, ['Visa', 'Mastercard', 'Amex'])} •• ${4000 + Math.floor(r() * 5999)}`, st: 'Paid' }));
-    if (u.spent > d.orders.reduce((s, o) => s + o.amt, 0)) d.orders.push({ id: 'ORD-' + (58200 + Math.floor(r() * 900)), when: day(Math.round(T.fe * 0.4)), item: 'Reset After Breach', amt: 79, method: d.orders[0] ? d.orders[0].method : 'Visa •• 4242', st: 'Paid' });
-    if (u.i === 11) d.orders.push({ id: 'ORD-58911', when: day(9), item: '[Plan B Name] 100K Evaluation', amt: 249, method: 'Visa •• 8841', st: 'Chargeback' });
-    if (u.i === 3) { const o = d.orders[0]; if (o) o.st = 'Refunded'; }
-    d.orders.sort((a, b) => dnum(b.when) - dnum(a.when));
+    if (u.d) return u.d; const x = u.raw; const ex = X[u.uid]; if (!ex) loadX(u); const d = {};
+    const acc = BO.accounts.filter((a) => a.user === u.uid); const ords = BO.orders.filter((o) => o.user === u.uid); const pays = BO.payouts.filter((p) => p.user === u.uid);
+    const first = (arr) => arr.filter(Boolean).sort()[0];
+    d.T = { fe: agoD(first(ords.map((o) => o.paid))), pass: agoD(first(acc.map((a) => a.passed))), kyc: agoD(x.kyc && x.kyc.at), fund: agoD(first(acc.filter((a) => a.kind === 'funded').map((a) => a.created))), pay: agoD(first(pays.filter((p) => p.status === 'paid').map((p) => p.paid))) };
+    d.accts = acc.map((a) => ({ id: a.id, plan: F.plan(a.plan).short, size: a.size, plat: a.platform, st: a.kind === 'funded' && ['active', 'review'].includes(a.phase) ? 'Funded' : a.phase === 'active' ? 'Active' : a.phase === 'passed' ? 'Passed' : a.phase === 'breached' ? 'Breached' : 'Closed', bal: a.bal, started: lbl(a.created), bought: lbl(a.created), raw: a }));
+    d.orders = ords.filter((o) => o.status !== 'pending' || F.hoursSince(o.created) < 24).map((o) => ({ id: o.code, when: lbl(o.paid || o.created), item: TYPE(o), amt: o.total, method: o.method || o.provider || '—', st: (BO.disputes || []).some((c) => c.order === o.code) ? 'Chargeback' : o.status === 'paid' ? 'Paid' : o.status === 'refunded' ? 'Refunded' : 'Not Paid', at: o.paid || o.created }));
+    d.orders.sort((a, b) => new Date(b.at) - new Date(a.at));
     d.methods = [...new Set(d.orders.map((o) => o.method))];
-    d.payouts = u.funded ? Array.from({ length: Math.max(1, Math.min(4, Math.floor(T.pay / 14) + 1)) }, (_, k) => ({ id: 'PO-' + (3200 + Math.floor(r() * 120)), when: day(Math.max(0, T.pay - (Math.max(1, Math.min(4, Math.floor(T.pay / 14) + 1)) - 1 - k) * 14)), amt: Math.round((300 + r() * 2600) / 10) * 10, st: k === 0 && u.i === 7 ? 'On Hold' : 'Paid', to: u.i % 2 ? 'USDC Wallet 0x7a…c41e' : 'Bank •• 6620' })) : [];
-    d.payoutMethod = u.funded ? (u.i % 2 ? 'USDC Wallet 0x7a…c41e' : 'Bank •• 6620') : '';
-    d.tax = u.funded ? (u.ctry === 'United States' ? 'W-9 on File' : 'W-8BEN on File') : 'Not Needed Yet';
-    const cities = [u.city, u.city, u.city, u.i === 7 ? 'Amsterdam (VPN)' : u.city];
-    d.sessions = Array.from({ length: 6 }, (_, k) => ({ when: k === 0 ? (u.lastAgo ? day(u.lastAgo) + ', 8:12 PM' : 'Today, ' + (9 + k) + ':' + String(10 + k * 7).padStart(2, '0') + ' AM') : day(u.lastAgo + k * 2) + ', ' + (1 + Math.floor(r() * 11)) + ':' + String(Math.floor(r() * 59)).padStart(2, '0') + ' PM',
-      ip: `${Math.floor(20 + r() * 180)}.${Math.floor(r() * 255)}.${Math.floor(r() * 255)}.${Math.floor(r() * 255)}`, loc: `${cities[k % 4]}, ${u.ctry}`, dev: pick(r, ['Chrome on Windows', 'Safari on iPhone', 'Chrome on Mac', 'Edge on Windows', 'App on Android']), vpn: u.i === 7 && k % 4 === 3, ok: !(u.i === 22 && k < 3), live: k < (u.st === 'Active' ? 2 : 0) }));
-    d.devices = [...new Set(d.sessions.map((s) => s.dev))].map((dv, k) => ({ dev: dv, fp: 'DV-' + (u.id.slice(2) * 7 + k).toString(16).toUpperCase(), first: day(u.joinedAgo - k * 9), shared: (u.i === 11 && k === 0) ? ['Omar Haddad', 'Marcus Torres'] : (u.i === 16 && k === 0) ? ['Unknown Account ' + DUPID] : [] }));
-    d.agree = [['Terms of Service', 'Version 3.2', day(Math.min(u.joinedAgo, 40)), true], ['Privacy Policy', 'Version 2.4', day(Math.min(u.joinedAgo, 40)), true], ['Risk Disclosure', 'Version 1.6', day(u.joinedAgo), true], ['Refund Policy', 'Version 1.3', day(u.joinedAgo), true], ['Funded Trader Agreement', 'Version 2.1', u.funded ? day(T.fund) : '', !!u.funded], ['Marketing Emails', u.mkt ? 'Opted In' : 'Opted Out', day(u.joinedAgo), u.mkt]];
-    d.tickets = Array.from({ length: Math.floor(r() * 4) }, (_, k) => ({ id: 'T-' + (4800 + Math.floor(r() * 400)), subj: pick(r, ['Where Is My Login for Tradovate', 'Reset After Breach Question', 'Payout Timing', 'Change My Email', 'Daily Loss Limit Question', 'Refund Request', 'KYC Document Rejected']), when: day(2 + k * 11), st: k === 0 && r() < 0.5 ? 'Open' : 'Solved' }));
-    d.emails = [['Welcome to Funded Sky', day(u.joinedAgo), 'Opened'], ['Your Evaluation Is Ready', day(T.fe), 'Opened'], ...(u.funded ? [['You Passed', day(T.pass), 'Opened'], ['Payout Sent', day(3), 'Delivered']] : []), ...(u.kyc === 'resubmit' ? [['We Need New Documents', day(u.ks.wait), 'Opened']] : []), ['Weekly Recap', day(1), 'Delivered']];
-    // activity
+    d.payouts = pays.map((p) => ({ id: p.code, when: lbl(p.paid || p.approved || p.requested), amt: p.amount, st: p.status === 'paid' ? 'Paid' : p.status === 'denied' ? 'Denied' : p.status === 'failed' ? 'Failed' : p.status === 'approved' ? 'Approved' : 'Waiting', to: p.method }));
+    d.payoutMethod = (BO.methods.find((m) => m.user === u.uid && m.def) || BO.methods.find((m) => m.user === u.uid) || {}).label || '';
+    d.tax = x.tax_status === 'on_file' ? (/^(US|United States)/.test(x.country || '') ? 'W-9 on File' : 'W-8BEN on File') : x.tax_status === 'requested' ? 'Sent, Not Signed' : u.funded ? 'Missing' : 'Not Needed Yet';
+    const S2 = (ex && ex.sessions) || [];
+    d.sessions = S2.map((s) => ({ when: F.when(s.seen_at), ip: s.ip || '—', loc: u.ctry, dev: devName(s.ua), vpn: false, ok: true, live: new Date(s.expires_at) > new Date() }));
+    if (!d.sessions.length) d.sessions = [{ when: u.lastAgo ? day(u.lastAgo) : 'Today', ip: '—', loc: u.ctry, dev: ex ? 'No sign-ins recorded' : 'Loading…', vpn: false, ok: true, live: false }];
+    d.devices = [...new Set(S2.map((s) => devName(s.ua)))].map((dv, k) => ({ dev: dv, fp: 'DV-' + ((u.uid * 7 + k) >>> 0).toString(16).toUpperCase(), first: lbl(S2.filter((s) => devName(s.ua) === dv).map((s) => s.created_at).sort()[0]), shared: [] }));
+    const ag = x.agreements || {};
+    d.agree = [['Terms of Service', 'Version 1.0', lbl(ag.terms), !!ag.terms], ['Privacy Policy', 'Version 1.0', lbl(ag.privacy), !!ag.privacy], ['Risk Disclosure', 'Version 1.0', lbl(ag.risk), !!ag.risk], ['Refund Policy', 'Version 1.0', lbl(ag.refund), !!ag.refund], ['Funded Trader Agreement', 'Version 1.0', lbl(ag.funded), !!ag.funded], ['Marketing Emails', u.mkt ? 'Opted In' : 'Opted Out', u.joined, u.mkt]];
+    d.tickets = BO.tickets.filter((t) => t.user === u.uid).map((t) => ({ id: 'T-' + t.id, tid: t.id, subj: t.subject, when: lbl(t.created), st: t.status === 'solved' ? 'Solved' : 'Open' }));
+    d.emails = ((ex && ex.emails) || []).map((m) => [m.subject, lbl(m.created_at), m.status === 'sent' ? 'Delivered' : m.status === 'failed' ? 'Failed' : 'Logged']);
     const ev = [];
-    ev.push(['acct', day(u.joinedAgo), `Signed up with ${u.via}`, u.aff ? `Affiliate code ${u.aff}` : 'No affiliate']);
-    d.orders.forEach((o) => ev.push(['money', o.when, `${o.st === 'Paid' ? 'Bought' : o.st} ${o.item}`, `${'$' + o.amt} · ${o.method}`]));
-    d.accts.forEach((a) => { ev.push(['trade', a.started, `Started ${a.id}`, `${a.plan} · ${a.plat}`]); if (a.st === 'Breached') ev.push(['trade', day(Math.max(0, Math.round(T.fe * 0.5))), `${a.id} Breached`, 'Daily loss limit']); if ((a.st === 'Passed' || a.st === 'Funded') && !ev.some((e) => / Passed$/.test(e[2]))) ev.push(['trade', day(T.pass), `Evaluation Passed`, 'Profit target reached in ' + (5 + Math.floor(r() * 12)) + ' days']); });
-    d.payouts.forEach((p) => ev.push(['money', p.when, `Payout ${p.st === 'Paid' ? 'Paid' : p.st}`, `$${p.amt.toLocaleString('en-US')} to ${p.to}`]));
-    if (u.kyc !== 'none') ev.push(['security', day(u.kyc === 'verified' ? T.kyc : Math.floor((u.ks.wait || 0) / 24)), 'Sent KYC Documents', `Passport and selfie through ${PROV}`]);
-    if (u.kyc === 'verified') ev.push(['security', day(T.kyc), 'KYC Verified', 'All checks passed automatically']);
-    if (u.twofa) ev.push(['security', day(Math.max(0, u.joinedAgo - 2)), 'Turned On Two-Factor Sign-In', 'Authenticator app']);
+    ev.push(['acct', u.joined, 'Signed Up', u.aff ? `Affiliate code ${u.aff}` : 'No affiliate']);
+    d.orders.forEach((o) => ev.push(['money', o.when, `${o.st === 'Paid' ? 'Bought' : o.st} ${o.item}`, `${money(o.amt)} · ${o.method}`]));
+    d.accts.forEach((a) => { ev.push(['trade', a.started, `Started ${a.id}`, `${a.plan} · ${a.plat}`]); if (a.raw.breached) ev.push(['trade', lbl(a.raw.breached), `${a.id} Breached`, a.raw.breach || 'Rule broken']); if (a.raw.passed) ev.push(['trade', lbl(a.raw.passed), `${a.id} Passed`, 'Evaluation passed']); });
+    d.payouts.forEach((p) => ev.push(['money', p.when, `Payout ${p.st}`, `${money(p.amt)} to ${p.to}`]));
+    if (x.kyc && x.kyc.at) ev.push(['security', lbl(x.kyc.at), 'Sent KYC Documents', `${x.kyc.idType || 'ID'} through ${PROV}`]);
+    if (u.kyc === 'verified') ev.push(['security', lbl(x.kyc && x.kyc.at), 'KYC Verified', 'Identity confirmed']);
     d.tickets.forEach((t) => ev.push(['support', t.when, `Opened Ticket ${t.id}`, t.subj]));
-    if (u.locked) ev.push(['security', 'Today', 'Account Locked', '5 failed sign-ins in 10 minutes']);
     u.notes.forEach((n) => ev.push(['staff', n[1], 'Note Added by ' + n[0], n[2]]));
-    ev.push(['security', u.lastAgo ? day(u.lastAgo) : 'Today', 'Signed In', d.sessions[0].dev + ' · ' + d.sessions[0].loc]);
-    const ord = (w) => (w === 'Today' ? -Date.UTC(2026, 10, 23) : (() => { const [m, dd] = w.replace(',', '').split(' '); const y = /\d{4}$/.test(w) ? +w.slice(-4) : 2026; return -(new Date(y, MON.indexOf(m), +dd).getTime()); })());
+    if (x.last_login) ev.push(['security', lbl(x.last_login), 'Signed In', d.sessions[0].dev]);
+    const ord = (w) => -dnum(w === 'Yesterday' ? day(1) : w);
     d.act = ev.sort((a, b) => ord(a[1]) - ord(b[1]));
-    d.staffLog = [[day(1), '[Support Agent]', 'Opened Profile', 'From ticket'], [day(u.lastAgo + 4), '[Risk Reviewer]', 'Opened Profile', 'From alert'], ...(u.kyc === 'verified' ? [[day(T.kyc), PROV, 'KYC Approved Automatically', 'All checks passed']] : [])];
-    // KYC
-    const ks = u.ks; const fl = (k) => (ks.fail || []).includes(k) ? 'f' : (ks.warn || []).includes(k) ? 'w' : '';
+    d.staffLog = (BO.audit || []).filter((a) => a.target === u.id || a.target === String(u.uid)).map((a) => [lbl(a.at), a.by, a.action.replace(/[._]/g, ' ').replace(/^./, (c) => c.toUpperCase()), a.target]);
+    const fl = (k) => (u.ks.fail || []).includes(k) ? 'f' : (u.ks.warn || []).includes(k) ? 'w' : '';
+    const ok = u.kyc === 'verified';
     d.kyc = u.kyc === 'none' ? null : {
-      ref: 'KYC-' + (88000 + u.i * 37), level: u.funded || u.kyc !== 'verified' ? 'Full: ID, Selfie and Address' : 'Full: ID, Selfie and Address', when: day(ks.st === 'verified' ? T.kyc : Math.floor((ks.wait || 0) / 24)), docType: pick(r, ['Passport', 'Passport', 'Driver License', 'National ID']),
-      docNo: '•••• ' + (1000 + Math.floor(r() * 8999)), expiry: u.i === 12 ? 'Dec 1, 2026' : `${MON[Math.floor(r() * 12)]} ${1 + Math.floor(r() * 27)}, ${2028 + Math.floor(r() * 6)}`, face: ks.face || 92 + Math.floor(r() * 7), docName: ks.docName || u.name,
-      checks: [
-        ['doc', 'Document Is Real', fl('doc') === 'f' ? (u.i === 37 ? 'Fonts and edges show signs of editing' : 'Too blurry to read the security features') : 'Security features found, no signs of editing'],
-        ['expiry', 'Document Not Expired', fl('expiry') ? 'Expires Dec 1, 2026, in 9 days' : 'Valid for more than 6 months'],
-        ['face', 'Face Matches Document', fl('face') ? `Match score ${ks.face || 58}%, needs 85%` : `Match score ${ks.face || 95}%`],
-        ['live', 'Live Person', 'Head-turn check passed'],
-        ['name', 'Name Matches Account', fl('name') ? `Document says ${ks.docName}` : 'Exact match'],
-        ['age', 'Over 18', 'Born ' + u.dob],
-        ['address', 'Address Verified', fl('address') === 'f' ? 'Bank statement dated 4 months ago' : fl('address') ? 'Utility bill name matches, street not found' : 'Bank statement from the last 90 days'],
-        ['sanctions', 'Sanctions and Politically Exposed Lists', fl('sanctions') ? 'Name is 88% similar to one entry. Date of birth differs.' : 'No matches'],
-        ['media', 'Negative News', 'Nothing found'],
-        ['country', 'Country Allowed', u.ctry + ' is allowed'],
-        ['dup', 'Same Identity on Another Account', fl('dup') ? `Passport number also used on ${ks.dupOf}` : 'No other account']
-      ].map(([k, n, s]) => ({ k, n, s, r: fl(k) || (k === 'manual' ? 'w' : '') })),
-      history: [[day(ks.st === 'verified' ? T.kyc : Math.floor((ks.wait || 0) / 24)), ks.st === 'verified' ? 'Approved Automatically' : ks.st === 'resubmit' ? 'New Documents Asked For' : ks.st === 'rejected' ? 'Rejected' : 'Sent to Manual Review', ks.why || 'All checks passed'], ...(u.i === 19 ? [[day(40), 'First Attempt', 'Approved ID, address failed']] : []), [day(ks.st === 'verified' ? T.kyc : Math.floor((ks.wait || 0) / 24)), 'Documents Sent', 'Through ' + PROV]]
+      ref: 'KYC-' + u.uid, level: 'Full: ID, Selfie and Address', when: lbl(x.kyc && x.kyc.at) || '—', docType: (x.kyc && x.kyc.idType) || 'ID Document', docNo: x.kyc && x.kyc.idLast4 ? '•••• ' + x.kyc.idLast4 : '—', expiry: '—', face: ok ? 'Passed' : '—', docName: (x.kyc && x.kyc.name) || u.name,
+      checks: [['doc', 'Document Is Real', fl('doc') ? 'Rejected by the reviewer' : ok ? 'Passed' : 'Checked by ' + PROV], ['expiry', 'Document Not Expired', ok ? 'Valid' : 'Checked by ' + PROV], ['face', 'Face Matches Document', ok ? 'Passed' : 'Checked by ' + PROV], ['live', 'Live Person', ok ? 'Passed' : 'Checked by ' + PROV],
+        ['name', 'Name Matches Account', x.kyc && x.kyc.name ? (x.kyc.name.toLowerCase() === u.name.toLowerCase() ? 'Exact match' : `Document says ${x.kyc.name}`) : '—'], ['age', 'Over 18', x.kyc && x.kyc.dob ? 'Born ' + x.kyc.dob : '—'], ['address', 'Address Verified', ok ? 'Passed' : 'Checked by ' + PROV], ['sanctions', 'Sanctions and Politically Exposed Lists', ok ? 'No matches' : 'Checked by ' + PROV], ['media', 'Negative News', ok ? 'Nothing found' : '—'],
+        ['country', 'Country Allowed', x.kyc && x.kyc.country && x.kyc.country !== x.country ? `ID from ${x.kyc.country}, signed up from ${x.country}` : u.ctry + ' is allowed'], ['dup', 'Same Identity on Another Account', BO.users.some((y) => y.id !== u.uid && y.kyc && x.kyc && y.kyc.name && y.kyc.name === x.kyc.name && y.kyc.dob === x.kyc.dob) ? 'Same name and date of birth on another account' : 'No other account']
+      ].map(([k, n, s]) => ({ k, n, s, r: fl(k) || (k === 'name' && x.kyc && x.kyc.name && x.kyc.name.toLowerCase() !== u.name.toLowerCase() ? 'w' : '') || (k === 'dup' && /another account/.test(s) ? 'f' : '') })),
+      history: (BO.audit || []).filter((a) => (a.target === u.id) && /user\.update|kyc/.test(a.action)).map((a) => [lbl(a.at), a.action.includes('kyc') ? 'KYC Updated' : 'Updated', a.by]).concat(x.kyc && x.kyc.at ? [[lbl(x.kyc.at), 'Documents Sent', 'Through ' + PROV]] : [])
     };
-    u.d = d; return d;
+    u.spent = d.orders.filter((o) => o.st === 'Paid').reduce((a, o) => a + o.amt, 0); u.paid = d.payouts.filter((p) => p.st === 'Paid').reduce((a, p) => a + p.amt, 0);
+    if (ex) u.d = d; return d;
   }
-
-  const CHANGES = [
-    { id: 'CR-301', uid: USERS[6].id, type: 'Email Change', from: 'sofia.lopez@example.com', to: 'sofia.l.trading@example.com', when: 'Today, 10:42 AM', needs: 'Confirmed on both addresses', st: 'open' },
-    { id: 'CR-300', uid: USERS[15].id, type: 'Name Change', from: 'Zoe Adler', to: 'Zoë Adler-Brandt', when: 'Today, 9:05 AM', needs: 'Matches new KYC document', st: 'open' },
-    { id: 'CR-299', uid: USERS[1].id, type: 'Payout Method Change', from: 'Bank •• 2210', to: 'USDC Wallet 0x19…ab03', when: 'Yesterday', needs: 'Second approver, 48-hour hold', st: 'open', two: true },
-    { id: 'CR-298', uid: USERS[8].id, type: 'Two-Factor Reset', from: 'Authenticator app', to: 'None', when: 'Yesterday', needs: 'Selfie check passed', st: 'open' },
-    { id: 'CR-297', uid: USERS[20].id, type: 'Country Change', from: 'India', to: 'United Arab Emirates', when: 'Nov 20', needs: 'New proof of address', st: 'open' },
-    { id: 'CR-296', uid: USERS[24].id, type: 'Address Change', from: 'Gothenburg', to: 'Stockholm', when: 'Nov 19', needs: 'None', st: 'approved' },
-    { id: 'CR-295', uid: USERS[2].id, type: 'Phone Change', from: '+91 ••• ••• 4410', to: '+91 ••• ••• 9032', when: 'Nov 18', needs: 'Text code confirmed', st: 'approved' },
-    { id: 'CR-294', uid: USERS[17].id, type: 'Name Change', from: 'Aisha Nwosu', to: 'Aisha Bello', when: 'Nov 15', needs: 'Matches new KYC document', st: 'denied' }
-  ];
-  const DATAREQ = [
-    { id: 'DR-41', uid: USERS[29].id, type: 'Delete My Account', when: 'Nov 12', due: 'Dec 12', st: 'open', note: 'Closed account. Trading and payment records are kept 5 years for anti-money-laundering law.' },
-    { id: 'DR-40', uid: USERS[23].id, type: 'Copy of My Data', when: 'Nov 19', due: 'Dec 19', st: 'open', note: '' },
-    { id: 'DR-39', uid: USERS[9].id, type: 'Copy of My Data', when: 'Nov 2', due: 'Dec 2', st: 'done', note: 'Sent as a download link, expires in 7 days.' },
-    { id: 'DR-38', uid: USERS[26].id, type: 'Stop Marketing Emails', when: 'Oct 28', due: 'Nov 27', st: 'done', note: '' }
-  ];
-  const AUDIT = [
-    ['Today, 11:02 AM', '[KYC Reviewer]', 'Viewed Documents', `${USERS[19].name} · reason: KYC review`],
-    ['Today, 10:31 AM', '[Support Agent]', 'Reset Password Link Sent', USERS[5].name],
-    ['Today, 9:14 AM', 'System', 'Account Locked', `${USERS[22].name} · 5 failed sign-ins`],
-    ['Yesterday', '[Risk Reviewer]', 'Logged In As User', `${USERS[7].name} · view only · reason: hedging alert RK-1182`],
-    ['Yesterday', '[KYC Reviewer] and ' + RV2, 'KYC Rejected', `${USERS[37].name} · document looks edited`],
-    ['Nov 20', '[Admin]', 'User Banned', `${USERS[37].name} · two approvals`],
-    ['Nov 20', '[Support Agent]', 'Email Changed', `${USERS[24].name}`],
-    ['Nov 19', '[Admin]', 'Role Changed', '[Support Agent] can now see documents'],
-    ['Nov 18', '[Finance]', 'Exported Users', '1,204 rows · reason: monthly report']
-  ];
-  const ROLES = [
-    ['Owner', [1, 1, 1, 1, 1, 1, 1, 1]], ['Admin', [1, 1, 1, 1, 1, 1, 0, 1]], ['KYC Reviewer', [1, 0, 1, 1, 0, 0, 0, 0]],
-    ['Risk', [1, 0, 1, 0, 1, 1, 0, 0]], ['Support', [1, 1, 0, 0, 1, 1, 0, 0]], ['Finance', [1, 0, 0, 0, 0, 0, 0, 1]]
-  ];
+  const CHG = F.st('users.changes', []);
+  const CHANGES = CHG.map((c) => Object.assign({}, c, { uid: (uById(c.uid) || {}).id || c.uid, when: F.when(c.at) }));
+  const DATAREQ = F.st('users.datareq', []).map((r) => Object.assign({}, r, { uid: (uById(r.uid) || {}).id || r.uid, when: F.md(r.at), due: F.md(new Date(new Date(r.at).getTime() + 30 * 864e5)) }));
+  const AUDIT = (BO.audit || []).filter((a) => /^user|^kyc|^staff|^store\.users|^list\.countries/.test(a.action)).map((a) => { const t = BO.users.find((y) => y.tid === a.target || String(y.id) === a.target); return [F.when(a.at), a.by, a.action.replace(/[._]/g, ' ').replace(/^./, (c) => c.toUpperCase()), t ? F.full(t) : (a.target || '')]; });
+  const ROLES = [['Owner', [1, 1, 1, 1, 1, 1, 1, 1]], ['Admin', [1, 1, 1, 1, 1, 1, 1, 1]], ['Risk', [1, 0, 1, 1, 1, 1, 0, 0]], ['Support', [1, 1, 1, 1, 0, 1, 0, 0]], ['Finance', [1, 0, 0, 0, 0, 0, 0, 1]]];
   const PERMS = ['See Users', 'Edit Details', 'See Documents', 'Approve KYC', 'Log In As User', 'Lock Accounts', 'Ban Users', 'Export Data'];
-  const TEAM = [['[Your Name]', 'Owner', true, 'Today'], ['[Admin]', 'Admin', true, 'Today'], ['[KYC Reviewer]', 'KYC Reviewer', true, 'Today'], ['[Risk Reviewer]', 'Risk', true, 'Yesterday'], ['[Support Agent]', 'Support', true, 'Today'], ['[Support Agent 2]', 'Support', false, 'Nov 18'], ['[Finance]', 'Finance', true, 'Nov 18']];
-  const COUNTRIES_BLOCKED = ['Cuba', 'Iran', 'North Korea', 'Syria', 'Russia', 'Belarus', 'Crimea Region'];
-  const DOCS = [['Passport', true, 'All countries'], ['Driver License', true, 'Most countries'], ['National ID Card', true, 'Most countries'], ['Residence Permit', true, 'With passport'], ['Bank Statement', true, 'Proof of address, last 90 days'], ['Utility Bill', true, 'Proof of address, last 90 days'], ['Tax Letter', false, 'Proof of address'], ['Phone Bill', false, 'Proof of address']];
-  USERS.forEach((u) => { const d = detail(u); u.spent = d.orders.filter((o) => o.st === 'Paid').reduce((a, o) => a + o.amt, 0); u.paid = d.payouts.filter((p) => p.st === 'Paid').reduce((a, p) => a + p.amt, 0); });
-
+  const RN = { admin: 'Admin', risk: 'Risk', support: 'Support', finance: 'Finance' };
+  const TEAM = BO.users.filter((y) => y.role !== 'trader').map((y) => [F.full(y), RN[y.role] || y.role, false, F.dayLabel(y.last_login)]);
+  const CLIST = ((BO.lists && BO.lists.countries) || []);
+  const COUNTRIES_BLOCKED = CLIST.filter((c) => c.blocked).map((c) => c.name);
+  const DOCS = F.st('users.docs', [['Passport', true, 'All countries'], ['Driver License', true, 'Most countries'], ['National ID Card', true, 'Most countries'], ['Residence Permit', true, 'With passport'], ['Bank Statement', true, 'Proof of address, last 90 days'], ['Utility Bill', true, 'Proof of address, last 90 days'], ['Tax Letter', false, 'Proof of address'], ['Phone Bill', false, 'Proof of address']]);
+  USERS.forEach((u) => { const ords = BO.orders.filter((o) => o.user === u.uid && o.status === 'paid'); u.spent = ords.reduce((a, o) => a + o.total, 0); u.paid = BO.payouts.filter((p) => p.user === u.uid && p.status === 'paid').reduce((a, p) => a + p.amount, 0); });
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const XL = (board, hash, label, cls) => `<a class="${cls || 'lnk'}" href="Admin${board}.dc.html${hash ? '#' + hash : ''}">${label}</a>`;
   const money = (v) => (v < 0 ? '−' : '') + '$' + Math.abs(Math.round(v)).toLocaleString('en-US');
   const S = { view: 'overview', uid: null, ptab: 'overview', from: null, drawer: null, uq: '', uf: 'all', us: 'recent', kq: 'pending', af: 'all', reveal: {}, imp: null, menu: false, toast: '', focus: null, gq: '', auf: 'all',
     set: { when: 'payout', auto: true, faceMin: 85, poaDays: 90, ongoing: true, media: true, addr: true, retain: '5', timeout: '30', lockAfter: 5, staff2fa: true, mask: true, reason: true } };
+  Object.assign(S.set, F.st('users.settings', {}));
+  const LV = (p, ok) => p.then(() => { toast(ok); setTimeout(() => location.reload(), 700); }).catch((e) => toast(e.message));
   const KST = { verified: ['Verified', 'live'], pending: ['Waiting for Review', 'sched'], resubmit: ['New Documents Asked', 'draft'], rejected: ['Rejected', 'err'], none: ['Not Started', 'ended'], started: ['In Progress', 'plain'] };
   const UST = { Active: 'live', Locked: 'draft', Banned: 'err', Closed: 'ended' };
   const SEV = { hi: ['High', 'err'], md: ['Medium', 'draft'], lo: ['Low', 'plain'] };
@@ -262,15 +196,18 @@ function startUsers(root) {
   // ---------- overview ----------
   function vOverview() {
     const n = USERS.length; const ver = USERS.filter((u) => u.kyc === 'verified').length;
-    const funnel = [['Signed Up', 1204], ['Bought an Evaluation', 1012], ['Passed an Evaluation', 241], ['Started KYC', 228], ['Verified', 209], ['Got a First Payout', 162]];
-    const sign = [38, 41, 29, 52, 47, 33, 30, 44, 58, 61, 49, 40, 36, 57]; const mx = Math.max(...sign);
+    const P = F.paid(); const buyers = new Set(P.map((o) => o.user)); const passers = new Set(BO.accounts.filter((a) => a.passed).map((a) => a.user)); const started = BO.users.filter((u) => u.role === 'trader' && u.kyc_status !== 'none').length; const paidU = new Set(BO.payouts.filter((p) => p.status === 'paid').map((p) => p.user));
+    const funnel = [['Signed Up', n], ['Bought an Evaluation', buyers.size], ['Passed an Evaluation', passers.size], ['Started KYC', started], ['Verified', ver], ['Got a First Payout', paidU.size]];
+    const sign = F.series(BO.users.filter((u) => u.role === 'trader'), 'created_at', null, 14); const mx = Math.max(1, ...sign);
     const byC = {}; USERS.forEach((u) => { byC[u.ctry] = (byC[u.ctry] || 0) + 1; }); const topC = Object.entries(byC).sort((a, b) => b[1] - a[1]).slice(0, 6);
+    const today = BO.users.filter((u) => u.role === 'trader' && F.today(u.created_at)).length; const wk = F.sum(sign.slice(-7)), pwk = F.sum(sign.slice(0, 7));
+    const k30 = BO.users.filter((u) => u.kyc && u.kyc.at && F.within(u.kyc.at, 30)); const kv2 = k30.filter((u) => u.kyc_status === 'verified').length, kr = k30.filter((u) => u.kyc_status === 'rejected').length, kp = k30.filter((u) => u.kyc_status === 'submitted').length;
     return `<div class="ph"><div><h1>Overview</h1><p>Who your customers are, where they are in the journey, and what is waiting on your team.</p></div></div>
-      <div class="tiles t6">${[['Total Users', '1,204', 'users', '', `${n} shown in this sample`], ['Signed Up Today', '57', 'users', '', '+18% on last week'], ['Verified', '209', 'kycall', '', `${Math.round(ver / n * 100)}% of the sample`], ['Waiting for KYC Review', kycQ().length, 'kycq', 'warn', 'Oldest ' + Math.max(...kycQ().map((u) => u.ks.wait)) + ' hours'], ['Open Requests', openCh().length + openDr().length, 'changes', '', 'Changes and privacy'], ['Locked or Banned', USERS.filter((u) => ['Locked', 'Banned'].includes(u.st)).length, 'users', '', 'Open the list']].map(([l, v, go, c, s]) => `<button class="tile lk" data-act="go" data-v="${go}"><span>${l}</span><b class="${c}">${v}</b><small>${s}</small></button>`).join('')}</div>
+      <div class="tiles t6">${[['Total Users', n.toLocaleString('en-US'), 'users', '', `${buyers.size} have bought`], ['Signed Up Today', today, 'users', '', pwk ? `${wk >= pwk ? '+' : '−'}${Math.abs(Math.round((wk - pwk) / pwk * 100))}% this week vs last` : `${wk} this week`], ['Verified', ver.toLocaleString('en-US'), 'kycall', '', `${n ? Math.round(ver / n * 100) : 0}% of users`], ['Waiting for KYC Review', kycQ().length, 'kycq', kycQ().length ? 'warn' : '', kycQ().length ? 'Oldest ' + Math.max(...kycQ().map((u) => u.ks.wait)) + ' hours' : 'Nobody waiting'], ['Open Requests', openCh().length + openDr().length, 'changes', '', 'Changes and privacy'], ['Locked or Banned', USERS.filter((u) => ['Locked', 'Banned'].includes(u.st)).length, 'users', '', 'Open the list']].map(([l, v, go, c, s]) => `<button class="tile lk" data-act="go" data-v="${go}"><span>${l}</span><b class="${c}">${v}</b><small>${s}</small></button>`).join('')}</div>
       <div class="two"><div class="card m0"><div class="ch"><h3>Customer Journey</h3><span class="lab">All Time</span></div><div class="cb fg">${funnel.map(([l, v], i) => `<div><div class="rowl"><span>${l}</span><b>${v.toLocaleString('en-US')}${i ? `<em class="hint"> · ${Math.round(v / funnel[i - 1][1] * 100)}% of the step before</em>` : ''}</b></div><div class="split"><i style="width:${v / funnel[0][1] * 100}%"></i></div></div>`).join('')}</div></div>
       <div class="card m0"><div class="ch"><h3>Sign-Ups</h3><span class="lab">Last 14 Days</span></div><div class="cb"><div class="ubars">${sign.map((v, i) => `<div><i style="height:${v / mx * 100}%" title="${v} sign-ups"></i><span>${i % 2 ? '' : day(13 - i).replace(/^\w+ /, '')}</span></div>`).join('')}</div></div></div></div>
-      <div class="two" style="margin-top:14px"><div class="card m0"><div class="ch"><h3>Where Users Are</h3><span class="lab">Sample</span></div><div class="cb fg">${topC.map(([c, v]) => `<div><div class="rowl"><span>${c}</span><b>${v}</b></div><div class="split"><i style="width:${v / topC[0][1] * 100}%"></i></div></div>`).join('')}</div></div>
-      <div class="card m0"><div class="ch"><h3>KYC Results</h3><span class="lab">Last 30 Days</span></div><div class="cb"><div class="kv"><div><span>Approved Automatically</span><b>81%</b></div><div><span>Sent to a Person</span><b>16%</b></div><div><span>Rejected</span><b>3%</b></div><div><span>Average Time to a Decision</span><b>4 Minutes Automatic · 6 Hours by Hand</b></div><div><span>Cost per Check</span><b>[Price per Check]</b></div></div></div></div></div>`;
+      <div class="two" style="margin-top:14px"><div class="card m0"><div class="ch"><h3>Where Users Are</h3><span class="lab">All Users</span></div><div class="cb fg">${topC.map(([c, v]) => `<div><div class="rowl"><span>${c}</span><b>${v}</b></div><div class="split"><i style="width:${v / topC[0][1] * 100}%"></i></div></div>`).join('')}</div></div>
+      <div class="card m0"><div class="ch"><h3>KYC Results</h3><span class="lab">Last 30 Days</span></div><div class="cb"><div class="kv"><div><span>Verified</span><b>${k30.length ? Math.round(kv2 / k30.length * 100) : 0}%</b></div><div><span>Waiting for a Person</span><b>${k30.length ? Math.round(kp / k30.length * 100) : 0}%</b></div><div><span>Rejected</span><b>${k30.length ? Math.round(kr / k30.length * 100) : 0}%</b></div><div><span>Checks Sent</span><b>${k30.length}</b></div><div><span>Provider</span><b>${F.on('sumsub') ? 'Sumsub' : 'Sumsub, not connected'}</b></div></div></div></div></div>`;
   }
 
   // ---------- users ----------
@@ -292,7 +229,7 @@ function startUsers(root) {
       <div class="card uhd"><div class="uhd1"><span class="uav lg">${ini(u.name)}</span><div class="uhdn"><div class="il"><h1>${esc(u.name)}</h1>${ub(u)}${kb(u)}<span class="b plain">${ext(u, d).seg}</span>${u.tags.map((t) => `<span class="b plain">${esc(t)}</span>`).join('')}</div>
         <div class="uhdm"><span class="mono">${u.id}</span><span>${esc(u.email)}</span><span>${esc(u.city)}, ${esc(u.ctry)}</span><span>Joined ${u.joined}</span><span>Last Seen ${u.lastAgo ? day(u.lastAgo) : 'Today'}</span></div></div>
         <div class="uhda"><button class="pill" data-act="imp">Log In As User</button><button class="pill" data-act="drw" data-k="email">Send Email</button><div class="mwrap"><button class="pill" data-act="menu" aria-expanded="${S.menu}">More Actions <span aria-hidden="true">▾</span></button>${S.menu ? `<div class="menu" role="menu">${[['edit', 'Edit Details'], ['pw', 'Send Password Reset'], ['2fa', 'Reset Two-Factor Sign-In'], ['out', 'Sign Out Everywhere'], u.st === 'Locked' ? ['unlock', 'Unlock Account'] : ['lock', 'Lock Account'], ['exportu', 'Download All Data'], u.st === 'Banned' ? ['unban', 'Lift Ban'] : ['ban', 'Ban User']].map(([k, l]) => `<button role="menuitem" class="${['ban', 'lock'].includes(k) ? 'dng' : ''}" data-act="uact" data-k="${k}">${l}</button>`).join('')}</div>` : ''}</div></div></div>
-        ${u.locked ? `<div class="ubn warn">Locked ${u.locked.when}: ${esc(u.locked.why)}. The user cannot sign in until you unlock the account.<button class="pill sm" data-act="uact" data-k="unlock">Unlock</button></div>` : ''}${u.notes[0] && u.st !== 'Banned' ? `<div class="ubn pin"><b>Pinned Note</b><span>${esc(u.notes[0][2])}</span><span class="hint">${esc(u.notes[0][0])} · ${u.notes[0][1]}</span></div>` : ''}${u.st === 'Banned' ? `<div class="ubn bad">Banned Nov 20 by two people: document looks edited. Their devices, cards and wallets are on the Risk blocklist.</div>` : ''}
+        ${u.locked ? `<div class="ubn warn">Locked ${u.locked.when}: ${esc(u.locked.why)}. The user cannot sign in until you unlock the account.<button class="pill sm" data-act="uact" data-k="unlock">Unlock</button></div>` : ''}${u.notes[0] && u.st !== 'Banned' ? `<div class="ubn pin"><b>Pinned Note</b><span>${esc(u.notes[0][2])}</span><span class="hint">${esc(u.notes[0][0])} · ${u.notes[0][1]}</span></div>` : ''}${u.st === 'Banned' ? `<div class="ubn bad">Banned. They are signed out and cannot sign in again.</div>` : ''}
       </div>
       <div class="subt" role="tablist" aria-label="Profile">${PT.map(([k, l]) => `<button role="tab" aria-selected="${S.ptab === k}" class="${S.ptab === k ? 'on' : ''}" data-act="ptab" data-k="${k}">${l}${cnt[k] != null ? `<i class="${cnt[k] === '!' ? 'bad' : ''}">${cnt[k]}</i>` : ''}</button>`).join('')}</div>
       ${({ journey: pJourney, overview: pOverview, identity: pIdentity, trading: pTrading, links: pLinks, accounts: pAccounts, payments: pPayments, payouts: pPayouts, activity: pActivity, logins: pLogins, agree: pAgree, support: pSupport, notes: pNotes, staff: pStaff })[S.ptab](u, d)}`;
@@ -388,7 +325,7 @@ function startUsers(root) {
   // ---------- setup ----------
   function vProv() { const C = S.set;
     return `<div class="ph"><div><h1>Provider and Checks</h1><p>How identity checks run with ${PROV}, when users are asked, and what passes automatically. The connection itself is in ${XL('Settings', 'int', 'Settings')}.</p></div></div>
-      <div class="two"><div class="card m0"><div class="ch"><h3>${PROV}</h3><span class="b live">Connected</span></div><div class="cb"><div class="kv"><div><span>API Key</span><b class="mono">sk_live_••••••••3f9a</b></div><div><span>Webhook</span><b class="mono">/hooks/kyc</b></div><div><span>Last Event</span><b>2 minutes ago</b></div><div><span>Checks This Month</span><b>312</b></div></div><div class="edact" style="margin-top:12px"><button class="pill sm" data-act="ptest">Send Test Check</button><button class="pill sm" data-act="prot">Replace API Key</button></div></div></div>
+      <div class="two"><div class="card m0"><div class="ch"><h3>${PROV}</h3>${F.on('sumsub') ? '<span class="b live">Connected</span>' : '<span class="b ended">Not Connected</span>'}</div><div class="cb"><div class="kv"><div><span>API Key</span><b class="mono">${F.on('sumsub') ? 'Saved, encrypted' : 'Not set'}</b></div><div><span>Webhook</span><b class="mono">/api/hooks/sumsub</b></div><div><span>Last Event</span><b>${(() => { const h = (BO.hooks || []).find((x) => x.provider === 'sumsub'); return h ? F.ago(h.created_at) : 'None yet'; })()}</b></div><div><span>Checks This Month</span><b>${BO.users.filter((x) => x.kyc && x.kyc.at && F.isoET(x.kyc.at).slice(0, 7) === F.isoET(Date.now()).slice(0, 7)).length}</b></div></div><div class="edact" style="margin-top:12px"><button class="pill sm" data-act="ptest">Send Test Check</button><button class="pill sm" data-act="prot">Open Settings</button></div></div></div>
       <div class="card m0"><div class="ch"><h3>When to Ask</h3></div><div class="cb fg"><div class="seg">${[['purchase', 'Before First Purchase'], ['funded', 'Before Funded Account'], ['payout', 'Before First Payout']].map(([k, l]) => `<button class="${C.when === k ? 'on' : ''}" data-act="setV" data-k="when" data-v="${k}">${l}</button>`).join('')}</div><p class="hint" style="margin:0">Asking later means more sales and fewer checks paid for. Asking earlier blocks bad actors sooner.</p></div></div></div>
       <div class="card" style="margin-top:14px"><div class="ch"><h3>Checks</h3></div><div class="cb fg">${sw('auto', 'Approve Automatically When Every Check Passes', 'Otherwise every check goes to the review queue')}${sw('addr', 'Ask for Proof of Address')}${sw('media', 'Search Negative News')}${sw('ongoing', 'Recheck Sanctions Lists Every Day', 'For funded traders')}
         <div class="srow"><span>Lowest Face Match to Pass</span><span class="il"><input type="number" min="50" max="99" value="${C.faceMin}" data-bind="set.faceMin" style="width:90px" aria-label="Face match percent">%</span></div><div class="srow"><span>Proof of Address No Older Than</span><span class="il"><input type="number" min="30" max="365" value="${C.poaDays}" data-bind="set.poaDays" style="width:90px" aria-label="Days">Days</span></div></div></div>`; }
@@ -420,11 +357,11 @@ function startUsers(root) {
     const reasons = ['KYC review', 'Support ticket', 'Risk alert', 'Payout review', 'Chargeback', 'Legal request'];
     const rsel = `<div class="fl"><label for="drr">Reason</label><select id="drr">${reasons.map((r) => `<option>${r}</option>`).join('')}</select></div><div class="fl"><label for="drn">Ticket, Alert or Case Number</label><input id="drn" placeholder="Optional, for example T-4821"></div>`;
     if (k === 'reveal' || k === 'revealdoc') { t = k === 'reveal' ? 'Show Full Details' : 'Show Documents'; body = `<p class="lead">${esc(u.name)}'s ${k === 'reveal' ? 'date of birth and address' : 'identity documents'} will be shown to you. Your name, the reason and the time are written to the audit log${S.set.reason ? '' : ' (reason optional)'}.</p>${rsel}`; foot = `<button class="pill" data-act="closeDrw">Cancel</button><button class="pill pri" data-act="doReveal" data-k="${k}">Show</button>`; }
-    if (k === 'imp') { t = 'Log In As User'; body = `<p class="lead">Opens Funded Sky as ${esc(u.name)} sees it. View only: you cannot buy, trade, request payouts or change settings. Every page you open is logged, and the user is not told.</p>${rsel}`; foot = `<button class="pill" data-act="closeDrw">Cancel</button><button class="pill pri" data-act="doImp">Start View-Only Session</button>`; }
+    if (k === 'imp') { t = 'Log In As User'; body = `<p class="lead">View-only sign-in as a trader is not available yet. Everything they see, their accounts, trades, orders and payouts, is on this profile.</p>${rsel}`; foot = `<button class="pill" data-act="closeDrw">Cancel</button><button class="pill pri" data-act="doImp">Start View-Only Session</button>`; }
     if (k === 'email') { t = 'Send Email'; body = `<div class="fl"><label>To</label><input value="${esc(u.email)}" disabled></div><div class="fl"><label for="ems">Subject</label><input id="ems" value="About Your Funded Sky Account"></div><div class="fl"><label for="emb">Message</label><textarea id="emb" rows="7">Hi ${esc(u.name.split(' ')[0])},\n\n</textarea></div><p class="hint" style="margin:0">Sent from support@ with the standard footer. A copy goes to the user's Support history.</p>`; foot = `<button class="pill" data-act="closeDrw">Cancel</button><button class="pill pri" data-act="doEmail">Send</button>`; }
     if (k === 'edit') { t = 'Edit Details'; body = `${[['name', 'Full Name', u.name], ['email', 'Email', u.email], ['city', 'City', u.city], ['ctry', 'Country', u.ctry]].map(([f, l, v]) => `<div class="fl"><label for="ed${f}">${l}</label><input id="ed${f}" value="${esc(v)}"></div>`).join('')}<p class="hint" style="margin:0">Changing the name or country after KYC asks the user for matching documents. Changing the email sends a confirmation to both addresses.</p>`; foot = `<button class="pill" data-act="closeDrw">Cancel</button><button class="pill pri" data-act="doEdit">Save</button>`; }
     if (k === 'resub') { t = 'Ask for New Documents'; body = `<p class="lead">${esc(u.name)} gets the New Documents Needed email with a link back to ${PROV}.</p><div class="fg">${(() => { const f = [...(u.ks.fail || []), ...(u.ks.warn || [])]; const def = f.includes('address') ? 'poa' : f.includes('face') ? 'selfie' : 'id'; return [['id', 'New Photo of ID'], ['selfie', 'New Selfie'], ['poa', 'Newer Proof of Address']].map(([kk, l]) => `<label class="evr il"><input type="checkbox" data-rs="${kk}" ${kk === def ? 'checked' : ''}>${l}</label>`).join(''); })()}</div><div class="fl"><label for="rsn">Message to the User</label><textarea id="rsn" rows="3">${esc(u.ks.why ? u.ks.why + '. Please send a clear, recent document.' : '')}</textarea></div>`; foot = `<button class="pill" data-act="closeDrw">Cancel</button><button class="pill pri" data-act="doResub">Send Request</button>`; }
-    if (k === 'ban' || k === 'lock') { t = k === 'ban' ? 'Ban User' : 'Lock Account'; body = `<p class="lead">${k === 'ban' ? `${esc(u.name)} is signed out, cannot sign in again, and every open trading account closes. Devices, cards and wallets go on the Risk blocklist. Needs a second person to confirm.` : `${esc(u.name)} is signed out and cannot sign in until someone unlocks the account. Trading accounts stay as they are.`}</p><div class="fl"><label for="bnr">Reason</label><textarea id="bnr" rows="3" placeholder="Shown in the audit log"></textarea></div>`; foot = `<button class="pill" data-act="closeDrw">Cancel</button><button class="pill dng" data-act="doBan" data-k="${k}">${k === 'ban' ? 'Send to Second Reviewer' : 'Lock Account'}</button>`; }
+    if (k === 'ban' || k === 'lock') { t = k === 'ban' ? 'Ban User' : 'Lock Account'; body = `<p class="lead">${k === 'ban' ? `${esc(u.name)} is signed out, cannot sign in again, and every open trading account closes.` : `${esc(u.name)} is signed out and cannot sign in until someone unlocks the account. Trading accounts stay as they are.`}</p><div class="fl"><label for="bnr">Reason</label><textarea id="bnr" rows="3" placeholder="Shown in the audit log"></textarea></div>`; foot = `<button class="pill" data-act="closeDrw">Cancel</button><button class="pill dng" data-act="doBan" data-k="${k}">${k === 'ban' ? 'Ban User' : 'Lock Account'}</button>`; }
     return `<div class="drw-bg" data-act="closeDrw"></div><div class="drw" role="dialog" aria-label="${t}"><div class="drw-h"><h3>${t}</h3><button class="ic" data-act="closeDrw" style="margin-left:auto" aria-label="Close">✕</button></div><div class="drw-b fg">${body}</div><div class="drw-f">${foot}</div></div>`;
   }
 
@@ -436,7 +373,7 @@ function startUsers(root) {
     const views = { overview: vOverview, users: vUsers, user: vUser, kycq: vKycQ, kycall: vKycAll, changes: vChanges, data: vData, kprov: vProv, kctry: vCtry, kdocs: vDocs, roles: vRoles, team: vTeam, audit: vAudit, settings: vSettings };
     const iu = S.imp && uById(S.imp.uid);
     root.innerHTML = `<div class="tb"><a class="pill bk" href="AdminHome.dc.html" aria-label="Back to Admin">←<span class="lg"> Back to Admin</span></a><span class="tb-t">Users</span>
-      <div class="tb-mid hm"><div class="tb-stats"><div><span>Users</span><b>1,204</b></div><div><span>Verified</span><b>209</b></div><div><span>KYC Waiting</span><b class="${kycQ().length ? 'warnt' : ''}">${kycQ().length}</b></div><div><span>Open Requests</span><b>${openCh().length + openDr().length}</b></div><div><span>Locked</span><b>${USERS.filter((u) => u.st === 'Locked').length}</b></div></div></div>
+      <div class="tb-mid hm"><div class="tb-stats"><div><span>Users</span><b>${USERS.length.toLocaleString('en-US')}</b></div><div><span>Verified</span><b>${USERS.filter((u) => u.kyc === 'verified').length}</b></div><div><span>KYC Waiting</span><b class="${kycQ().length ? 'warnt' : ''}">${kycQ().length}</b></div><div><span>Open Requests</span><b>${openCh().length + openDr().length}</b></div><div><span>Locked</span><b>${USERS.filter((u) => u.st === 'Locked').length}</b></div></div></div>
       <div class="gs hm"><input type="search" placeholder="Find a User" value="${esc(S.gq)}" data-live="gq" data-key="gq" aria-label="Find a user">${S.gq.length > 1 ? `<div class="gsd">${searchResults(S.gq).map((u) => `<button data-act="user" data-id="${u.id}"><span class="uav sm">${ini(u.name)}</span><b>${esc(u.name)}</b><span class="hint">${u.id} · ${esc(u.email)}</span></button>`).join('') || '<div class="empty">Nothing found.</div>'}</div>` : ''}</div>
       <button class="pill" data-act="go" data-v="audit">Audit Log</button></div>
     ${iu ? `<div class="impb"><span class="il"><i></i><b>Viewing as ${esc(iu.name)}</b></span><span class="hint">View only · Reason: ${esc(S.imp.why)} · Every page is logged</span><button class="pill sm" data-act="endImp">End Session</button></div>` : ''}
@@ -448,7 +385,7 @@ function startUsers(root) {
 
   // ---------- events ----------
   const val = (sel) => { const el = root.querySelector(sel); return el ? el.value.trim() : ''; };
-  const openUser = (id, tab, from) => { S.uid = id; S.view = 'user'; S.ptab = tab || 'overview'; S.from = from || null; S.drawer = null; S.menu = false; S.gq = ''; S.af = 'all'; const m = root.querySelector('.main'); if (m) m.scrollTop = 0; };
+  const openUser = (id, tab, from) => { const uu = uById(id); if (uu) { loadX(uu); id = uu.id; } S.uid = id; S.view = 'user'; S.ptab = tab || 'overview'; S.from = from || null; S.drawer = null; S.menu = false; S.gq = ''; S.af = 'all'; const m = root.querySelector('.main'); if (m) m.scrollTop = 0; };
   const kycDecide = (u, st, what) => { u.kyc = st; u.kycToday = true; const k = detail(u).kyc; k.history.unshift(['Just now', what, (val('#kyn') || 'No note') + ' · ' + ME]); audit(ME, what, `${u.name}${val('#kyn') ? ' · ' + val('#kyn') : ''}`); detail(u).staffLog.unshift(['Just now', ME, what, val('#kyn') || 'No note']); };
   root.addEventListener('click', (ev) => {
     if (S.menu && !ev.target.closest('.mwrap')) { S.menu = false; if (!ev.target.closest('[data-act]')) { render(); return; } }
@@ -472,52 +409,54 @@ function startUsers(root) {
       case 'imp': S.drawer = { k: 'imp' }; break;
       case 'uact': S.menu = false;
         if (['edit', 'ban', 'lock'].includes(k)) { S.drawer = { k }; break; }
-        if (k === 'pw') { audit(ME, 'Reset Password Link Sent', u.name); toast(`Password reset link sent to ${u.email}`); return; }
-        if (k === '2fa') { u.twofa = false; audit(ME, 'Two-Factor Reset', u.name); toast('Two-factor sign-in removed. They set it up again at next sign-in.'); return; }
-        if (k === 'out') { detail(u).sessions.forEach((s) => { s.live = false; }); audit(ME, 'Signed Out Everywhere', u.name); toast(`${u.name} signed out on every device`); return; }
-        if (k === 'unlock') { u.st = 'Active'; u.locked = null; audit(ME, 'Account Unlocked', u.name); toast(`${u.name} can sign in again`); return; }
-        if (k === 'exportu') { audit(ME, 'Downloaded All Data', u.name); toast(`Preparing ${u.id}.zip: profile, orders, trades, payouts, KYC results`); return; }
-        if (k === 'unban') { audit(ME, 'Ban Lift Requested', `${u.name} · waiting for ${RV2}`); toast(`Sent to ${RV2} to confirm`); return; }
+        if (k === 'pw') { LV(F.api('/users/' + u.uid + '/reset-password', {}), `Password reset link sent to ${u.email}`); return; }
+        if (k === '2fa') { toast('Two-factor sign-in is not turned on for traders yet. Nothing to reset.'); return; }
+        if (k === 'out') { LV(F.api('/users/' + u.uid + '/signout', {}), `${u.name} signed out on every device`); return; }
+        if (k === 'unlock') { LV(F.api('/users/' + u.uid, { status: 'active' }), `${u.name} can sign in again`); return; }
+        if (k === 'exportu') { const blob = new Blob([JSON.stringify({ profile: u.raw, accounts: BO.accounts.filter((a) => a.user === u.uid), orders: BO.orders.filter((o) => o.user === u.uid), payouts: BO.payouts.filter((p) => p.user === u.uid), tickets: BO.tickets.filter((t) => t.user === u.uid), extra: X[u.uid] || {} }, null, 2)], { type: 'application/json' }); const ln = document.createElement('a'); ln.href = URL.createObjectURL(blob); ln.download = u.id + '.json'; ln.click(); F.api('/audit', { action: 'user.export', target: u.id }).catch(() => {}); return; }
+        if (k === 'unban') { if (!confirm(`Lift the ban on ${u.name}?`)) return; LV(F.api('/users/' + u.uid, { status: 'active' }), 'Ban lifted'); return; }
         return;
-      case 'doReveal': { const why = val('#drr') + (val('#drn') ? ' ' + val('#drn') : ''); S.reveal[(k === 'revealdoc' ? 'doc' : '') + u.id] = true; audit(ME, k === 'revealdoc' ? 'Viewed Documents' : 'Viewed Full Details', `${u.name} · reason: ${why}`); detail(u).staffLog.unshift(['Just now', ME, k === 'revealdoc' ? 'Viewed Documents' : 'Viewed Full Details', why]); S.drawer = null; break; }
-      case 'docs': if (k === 'hide') { delete S.reveal['doc' + u.id]; break; } audit(ME, 'Downloaded Documents', u.name); toast('Download started. Logged.'); return;
-      case 'doImp': S.imp = { uid: u.id, why: val('#drr') + (val('#drn') ? ' ' + val('#drn') : '') }; audit(ME, 'Logged In As User', `${u.name} · view only · reason: ${S.imp.why}`); detail(u).staffLog.unshift(['Just now', ME, 'Logged In As User', S.imp.why]); S.drawer = null; toast('View-only session started in a new tab'); return;
-      case 'endImp': audit(ME, 'Ended View-Only Session', uById(S.imp.uid).name); S.imp = null; break;
-      case 'doEmail': detail(u).emails.unshift([val('#ems') || 'Message', 'Just now', 'Delivered']); audit(ME, 'Email Sent', `${u.name} · ${val('#ems')}`); S.drawer = null; toast('Email sent'); return;
-      case 'doEdit': { const nm = val('#edname'), em = val('#edemail'); const ch = []; if (nm && nm !== u.name) { ch.push('name'); u.name = nm; } if (em && em !== u.email) { ch.push('email'); u.email = em; } u.city = val('#edcity') || u.city; S.drawer = null; audit(ME, 'Details Changed', `${u.name} · ${ch.join(', ') || 'city or country'}`); toast(ch.includes('name') ? 'Saved. The user is asked for a matching ID.' : ch.includes('email') ? 'Saved. Confirmation sent to both addresses.' : 'Saved'); return; }
-      case 'doBan': { const why = val('#bnr'); if (!why) { toast('Write a reason first'); return; } if (k === 'lock') { u.st = 'Locked'; u.locked = { why, when: 'Just now' }; audit(ME, 'Account Locked', `${u.name} · ${why}`); S.drawer = null; toast(`${u.name} locked`); return; } audit(ME, 'Ban Proposed', `${u.name} · ${why} · waiting for ${RV2}`); S.drawer = null; u.banPending = true; toast(`Sent to ${RV2}. Banned once they confirm.`); return; }
+      case 'doReveal': { const why = val('#drr') + (val('#drn') ? ' ' + val('#drn') : ''); S.reveal[(k === 'revealdoc' ? 'doc' : '') + u.id] = true; F.api('/audit', { action: k === 'revealdoc' ? 'user.documents.view' : 'user.details.view', target: u.id + ' · ' + why }).catch(() => {}); detail(u).staffLog.unshift(['Just now', ME, k === 'revealdoc' ? 'Viewed Documents' : 'Viewed Full Details', why]); S.drawer = null; break; }
+      case 'docs': if (k === 'hide') { delete S.reveal['doc' + u.id]; break; } toast(`Documents are stored in ${PROV}. Open the check there to download them.`); return;
+      case 'doImp': toast('View-only sign-in as a trader is not available yet. Their accounts, trades and orders are all on this page.'); S.drawer = null; return;
+      case 'endImp': S.imp = null; break;
+      case 'doEmail': { const subj = val('#ems') || 'A message from Funded Sky'; const body = val('#emb') || subj; LV(F.api('/users/' + u.uid + '/notify', { title: subj, body, link: 'dashboard' }), 'Email sent'); S.drawer = null; return; }
+      case 'doEdit': { const nm = val('#edname').trim(), em = val('#edemail').trim(); const parts = nm.split(' '); LV(F.api('/users/' + u.uid + '/details', { first: parts[0] || u.raw.first, last: parts.slice(1).join(' ') || u.raw.last, email: em || u.email, country: val('#edctry') || u.raw.country, phone: val('#edphone') || u.raw.phone }, 'PUT'), 'Saved'); S.drawer = null; return; }
+      case 'doBan': { const why = val('#bnr'); if (!why) { toast('Write a reason first'); return; } if (k === 'lock') { LV(F.api('/users/' + u.uid, { status: 'suspended' }).then(() => F.api('/users/' + u.uid + '/note', { body: 'Locked: ' + why })), `${u.name} locked`); S.drawer = null; return; } LV(F.api('/users/' + u.uid, { status: 'banned' }).then(() => F.api('/users/' + u.uid + '/note', { body: 'Banned: ' + why })), `${u.name} banned and signed out`); S.drawer = null; return; }
       case 'kyc':
-        if (k === 'approve') { kycDecide(u, 'verified', 'KYC Approved'); toast(`${u.name} verified. Identity Verified email sent.`); break; }
-        if (k === 'reject') { if (!val('#kyn')) { toast('Write a note before rejecting'); return; } kycDecide(u, 'pending', 'KYC Rejection Proposed'); toast(`Sent to ${RV2} to confirm the rejection`); break; }
-        if (k === 'rerun') { audit(ME, 'KYC Checks Run Again', u.name); toast(`Sent to ${PROV}. Results in about a minute.`); return; }
-        if (k === 'prov') { toast(`Opens this check in ${PROV}`); return; }
-        if (k === 'nudge') { audit(ME, 'KYC Reminder Sent', u.name); toast('Reminder email sent'); return; }
+        if (k === 'approve') { LV(F.api('/users/' + u.uid, { kyc_status: 'verified' }).then(() => F.put('users.kycmeta', Object.assign({}, KMETA, { [u.uid]: { st: 'verified', by: ME, at: new Date().toISOString(), note: val('#kyn') } }))), `${u.name} verified`); return; }
+        if (k === 'reject') { if (!val('#kyn')) { toast('Write a note before rejecting'); return; } if (!confirm(`Reject ${u.name}'s identity check? They are told why.`)) return; LV(F.api('/users/' + u.uid, { kyc_status: 'rejected', reason: val('#kyn') }).then(() => F.put('users.kycmeta', Object.assign({}, KMETA, { [u.uid]: { st: 'rejected', why: val('#kyn'), by: ME, at: new Date().toISOString() } }))), 'Rejected. The trader is told why.'); return; }
+        if (k === 'rerun') { toast(`Checks run again inside ${PROV}. Open the applicant there.`); return; }
+        if (k === 'prov') { window.open('https://cockpit.sumsub.com/checkus#/applicants/individual?searchQuery=' + encodeURIComponent(u.email), '_blank'); return; }
+        if (k === 'nudge') { LV(F.api('/users/' + u.uid + '/notify', { title: 'Finish your identity check', body: 'Verify your identity in Settings so we can open funded accounts and send payouts.', link: 'settings?tab=identity' }), 'Reminder sent'); return; }
         if (k === 'next') { openUser(id, 'identity', 'kycq'); break; }
         return;
-      case 'doResub': { const what = [...root.querySelectorAll('[data-rs]:checked')].map((x) => x.parentElement.textContent.trim()); if (!what.length) { toast('Pick at least one document'); return; } u.kyc = 'resubmit'; detail(u).kyc.history.unshift(['Just now', 'New Documents Asked For', what.join(', ') + ' · ' + ME]); detail(u).emails.unshift(['We Need New Documents', 'Just now', 'Delivered']); audit(ME, 'New KYC Documents Asked For', `${u.name} · ${what.join(', ')}`); S.drawer = null; toast('Request sent'); break; }
-      case 'acc': { const ac = detail(u).accts[+el.dataset.i]; if (k === 'reset') { ac.st = 'Active'; ac.bal = ac.size; audit(ME, 'Free Reset Given', `${u.name} · ${ac.id}`); toast(`${ac.id} reset to ${money(ac.size)}`); break; } if (k === 'extend') { audit(ME, 'Evaluation Extended 14 Days', `${u.name} · ${ac.id}`); toast(`${ac.id}: 14 days added`); return; } toast(`${ac.plat} login sent to ${u.email}`); audit(ME, 'Platform Login Resent', ac.id); return; }
-      case 'refund': { const o = detail(u).orders[+el.dataset.i]; if (!el.dataset.sure) { el.dataset.sure = '1'; el.textContent = `Refund ${money(o.amt)}?`; return; } o.st = 'Refunded'; u.spent -= o.amt; audit(ME, 'Refund Issued', `${u.name} · ${o.id} · ${money(o.amt)}`); toast(`${money(o.amt)} refunded to ${o.method}`); break; }
-      case 'linkOk': { const l = ext(u, detail(u)).links[+el.dataset.i]; l.ok = true; l.lvl = 'lo'; audit(ME, 'Connection Marked Not Related', `${u.name} and ${l.name} · ${l.via}`); toast('Marked not related. Logged.'); break; }
-      case 'sess': detail(u).sessions[+el.dataset.i].live = false; audit(ME, 'Session Ended', u.name); toast('Session ended'); break;
-      case 'agreeDl': toast(`${k} PDF with signature, date and IP address`); return;
-      case 'note': { const v = val('#unote'); if (!v) { toast('Write a note first'); return; } u.notes.unshift([ME, 'Just now', v]); detail(u).act.unshift(['staff', 'Today', 'Note Added by ' + ME, v]); audit(ME, 'Note Added', u.name); break; }
-      case 'tag': { const v = val('#tagsel'); if (v) { u.tags.push(v); audit(ME, 'Tag Added', `${u.name} · ${v}`); } break; }
-      case 'untag': { const t = u.tags.splice(+el.dataset.i, 1)[0]; audit(ME, 'Tag Removed', `${u.name} · ${t}`); break; }
-      case 'chg': { const c = CHANGES.find((x) => x.id === id); const cu = uById(c.uid);
-        if (k === 'ok' && c.two) { c.st = 'second'; audit(ME, 'Change Approved, Needs Second', `${c.id} · ${c.type}`); toast(`Sent to ${RV2} for the second approval`); break; }
-        c.st = k === 'no' ? 'denied' : 'approved'; if (c.st === 'approved' && c.type === 'Name Change') cu.name = c.to; if (c.st === 'approved' && c.type === 'Email Change') cu.email = c.to;
-        audit(k === 'ok2' ? `${ME} and ${RV2}` : ME, `${c.type} ${c.st === 'approved' ? 'Approved' : 'Denied'}`, `${cu.name} · ${c.id}`); toast(`${c.type} ${c.st}. ${cu.name.split(' ')[0]} gets an email.`); break; }
-      case 'dreq': { const r = DATAREQ.find((x) => x.id === id); const ru = uById(r.uid); if (r.type === 'Delete My Account') { r.st = 'second'; audit(ME, 'Data Deletion Proposed', `${ru.name} · ${r.id}`); toast(`Sent to ${RV2} to confirm`); break; } r.st = 'done'; r.note = r.type === 'Copy of My Data' ? 'Sent as a download link, expires in 7 days.' : 'Unsubscribed from all marketing.'; if (r.type === 'Stop Marketing Emails') ru.mkt = false; audit(ME, r.type + ' Done', `${ru.name} · ${r.id}`); toast('Done. The user is told by email.'); break; }
-      case 'dreq2': { const r = DATAREQ.find((x) => x.id === id); r.st = 'done'; r.note = 'Name, contact details and documents deleted. Legal records kept 5 years.'; audit(`${ME} and ${RV2}`, 'Personal Data Deleted', `${uById(r.uid).name} · ${r.id}`); toast('Personal data deleted'); break; }
-      case 'export': audit(ME, 'Exported', S.view === 'audit' ? `${AUDIT.length} audit entries` : `${userList().length} users`); toast('Export ready. Logged with your name.'); return;
-      case 'ptest': toast(`Test check sent to ${PROV}. Webhook answered in 380 ms.`); return;
-      case 'prot': audit(ME, 'KYC API Key Replaced', PROV); toast('New key saved. The old key stops working in 24 hours.'); return;
-      case 'cadd': { const v = val('#cadd'); if (!v) { toast('Type a country'); return; } COUNTRIES_BLOCKED.push(v); audit(ME, 'Country Blocked', v); break; }
-      case 'cdel': { const c = COUNTRIES_BLOCKED.splice(+el.dataset.i, 1)[0]; audit(ME, 'Country Allowed', c); toast(`${c} removed`); break; }
-      case 'docT': { const x = DOCS[+el.dataset.i]; x[1] = !x[1]; audit(ME, 'Accepted Documents Changed', `${x[0]} ${x[1] ? 'accepted' : 'not accepted'}`); break; }
-      case 'invite': toast('Invite sent. They pick a role after setting up two-factor sign-in.'); return;
-      case 'setT': S.set[k] = !S.set[k]; audit(ME, 'Setting Changed', k); break;
-      case 'setV': S.set[k] = el.dataset.v; audit(ME, 'Setting Changed', `${k} · ${el.dataset.v}`); break;
+      case 'doResub': { const what = [...root.querySelectorAll('[data-rs]:checked')].map((x) => x.parentElement.textContent.trim()); if (!what.length) { toast('Pick at least one document'); return; } LV(F.api('/users/' + u.uid, { kyc_status: 'none' }).then(() => F.put('users.kycmeta', Object.assign({}, KMETA, { [u.uid]: { st: 'resubmit', why: 'New documents needed: ' + what.join(', '), by: ME, at: new Date().toISOString() } }))).then(() => F.api('/users/' + u.uid + '/notify', { title: 'We need new documents', body: `Please send again: ${what.join(', ')}. Open Settings, Identity to upload them.`, link: 'settings?tab=identity' })), 'Request sent'); S.drawer = null; return; }
+      case 'acc': { const ac = detail(u).accts[+el.dataset.i]; if (k === 'reset') { if (!confirm(`Reset ${ac.id} to ${money(ac.size)} for free?`)) return; LV(F.api('/accounts/' + ac.id + '/reset', {}), `${ac.id} reset to ${money(ac.size)}`); return; } if (k === 'extend') { toast('Evaluations have no time limit, so there is nothing to extend.'); return; } toast('Accounts trade on the simulated feed. There is no platform login to send yet.'); return; }
+      case 'refund': { const o = detail(u).orders[+el.dataset.i]; if (!el.dataset.sure) { el.dataset.sure = '1'; el.textContent = `Refund ${money(o.amt)}?`; return; } LV(F.api('/orders/' + o.id + '/refund', { note: 'Refunded from the user profile' }), `${money(o.amt)} refunded`); return; }
+      case 'linkOk': { const l = ext(u, detail(u)).links[+el.dataset.i]; const v = Object.assign({}, LINKOK, { [u.uid]: (LINKOK[u.uid] || []).concat([l.id]) }); LV(F.put('users.linkok', v), 'Marked not related. Logged.'); return; }
+      case 'sess': LV(F.api('/users/' + u.uid + '/signout', {}), 'Signed out of every session'); return;
+      case 'agreeDl': window.open(k === 'Privacy Policy' ? '/privacy' : k === 'Refund Policy' ? '/refund-policy' : '/terms', '_blank'); return;
+      case 'note': { const v = val('#unote'); if (!v) { toast('Write a note first'); return; } LV(F.api('/users/' + u.uid + '/note', { body: v }), 'Note added'); return; }
+      case 'tag': { const v = val('#tagsel'); if (!v) return; const t = Object.assign({}, TAGS, { [u.uid]: (TAGS[u.uid] || []).concat([v]) }); LV(F.put('users.tags', t), 'Tag added'); return; }
+      case 'untag': { const t = Object.assign({}, TAGS, { [u.uid]: (TAGS[u.uid] || []).filter((x, j) => j !== +el.dataset.i) }); LV(F.put('users.tags', t), 'Tag removed'); return; }
+      case 'chg': { const ci = CHG.findIndex((x) => x.id === id); const c = CHG[ci]; const cu = uById(c.uid); const v = CHG.slice(); v[ci] = Object.assign({}, c, { st: k === 'no' ? 'denied' : 'approved', by: ME });
+        const apply = k === 'no' ? Promise.resolve() : c.type === 'Email Change' ? F.api('/users/' + cu.uid + '/details', { email: c.to }, 'PUT') : c.type === 'Name Change' ? F.api('/users/' + cu.uid + '/details', { first: c.to.split(' ')[0], last: c.to.split(' ').slice(1).join(' ') }, 'PUT') : c.type === 'Country Change' ? F.api('/users/' + cu.uid + '/details', { country: c.to }, 'PUT') : Promise.resolve();
+        LV(apply.then(() => F.put('users.changes', v)).then(() => F.api('/users/' + cu.uid + '/notify', { title: `${c.type} ${k === 'no' ? 'not approved' : 'approved'}`, body: k === 'no' ? 'Contact support if you have questions.' : `Your ${c.type.toLowerCase()} is done.`, link: 'settings' })), `${c.type} ${k === 'no' ? 'denied' : 'approved'}`); return; }
+      case 'dreq': { const all = F.st('users.datareq', []); const ri = all.findIndex((x) => x.id === id); const r = all[ri]; const ru = uById(r.uid);
+        if (r.type === 'Delete My Account') { if (!confirm(`Delete ${ru.name}'s personal data? Name, email, phone and identity details are erased. Orders, trades and payouts are kept for legal records. This cannot be undone.`)) return; const v = all.slice(); v[ri] = Object.assign({}, r, { st: 'done', note: 'Personal data deleted. Legal records kept 5 years.', by: ME }); LV(F.api('/users/' + ru.uid + '/anonymize', {}).then(() => F.put('users.datareq', v)), 'Personal data deleted'); return; }
+        if (r.type === 'Copy of My Data') { const blob = new Blob([JSON.stringify({ profile: ru.raw, accounts: BO.accounts.filter((a) => a.user === ru.uid), orders: BO.orders.filter((o) => o.user === ru.uid), payouts: BO.payouts.filter((p) => p.user === ru.uid) }, null, 2)], { type: 'application/json' }); const ln = document.createElement('a'); ln.href = URL.createObjectURL(blob); ln.download = ru.id + '-data.json'; ln.click(); }
+        const v = all.slice(); v[ri] = Object.assign({}, r, { st: 'done', note: r.type === 'Copy of My Data' ? 'Downloaded. Send it to the user securely.' : 'Unsubscribed from all marketing.', by: ME }); LV(F.put('users.datareq', v), 'Done'); return; }
+      case 'dreq2': return;
+      case 'export': if (S.view === 'audit') { const rows = [['When', 'Who', 'What', 'Detail']].concat(AUDIT); const ln = document.createElement('a'); ln.href = URL.createObjectURL(new Blob([rows.map((r2) => r2.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n')], { type: 'text/csv' })); ln.download = 'user-audit.csv'; ln.click(); return; } location.href = '/api/admin/export/users.csv'; return;
+      case 'ptest': F.api('/integrations/sumsub/test', {}).then((r2) => toast(r2.msg || 'Sumsub answered')).catch((e) => toast(e.message)); return;
+      case 'prot': location.href = '/admin/settings#int'; return;
+      case 'cadd': { const v = val('#cadd').trim(); if (!v) { toast('Type a country'); return; } const L2 = CLIST.filter((c) => c.name !== v).concat([{ name: v, blocked: true }]); LV(F.api('/list/countries', { value: L2 }, 'PUT'), `${v} blocked`); return; }
+      case 'cdel': { const c = COUNTRIES_BLOCKED[+el.dataset.i]; const L2 = CLIST.map((x) => (x.name === c ? Object.assign({}, x, { blocked: false }) : x)); LV(F.api('/list/countries', { value: L2 }, 'PUT'), `${c} allowed again`); return; }
+      case 'docT': { const v = DOCS.map((x) => x.slice()); v[+el.dataset.i][1] = !v[+el.dataset.i][1]; LV(F.put('users.docs', v), 'Saved'); return; }
+      case 'invite': location.href = '/admin/team#members'; return;
+      case 'setT': S.set[k] = !S.set[k]; F.put('users.settings', S.set).catch(() => {}); break;
+      case 'setV': S.set[k] = el.dataset.v; F.put('users.settings', S.set).catch(() => {}); break;
       default: return;
     }
     render();
@@ -526,15 +465,15 @@ function startUsers(root) {
   root.addEventListener('change', (ev) => {
     const el = ev.target;
     if (el.id === 'mnavsel') { const x = AREAS.find((y) => 'a:' + y.id === el.value); if (!x) return; S.view = lastTab[x.id] || x.tabs[0][0]; S.drawer = null; render(); const m = root.querySelector('.main'); if (m) m.scrollTop = 0; return; }
-    if (el.dataset.role) { const r = ROLES[+el.dataset.role]; r[1][+el.dataset.perm] = el.checked ? 1 : 0; audit(ME, 'Role Changed', `${r[0]} ${el.checked ? 'can now' : 'can no longer'} ${PERMS[+el.dataset.perm].toLowerCase()}`); toast('Saved and logged'); return; }
-    if (el.dataset.team) { TEAM[+el.dataset.team][1] = el.value; audit(ME, 'Staff Role Changed', `${TEAM[+el.dataset.team][0]} → ${el.value}`); toast('Role changed'); return; }
+    if (el.dataset.role) { el.checked = !el.checked; toast('What each role can do is set in Team and Approvals'); return; }
+    if (el.dataset.team) { const st = BO.users.filter((y) => y.role !== 'trader')[+el.dataset.team]; const rk = { Admin: 'admin', Risk: 'risk', Support: 'support', Finance: 'finance', Owner: 'admin' }[el.value]; if (!st || !rk) return; if (!confirm(`Change ${F.full(st)} to ${el.value}?`)) { render(); return; } LV(F.api('/staff/' + st.id + '/role', { role: rk }), 'Role changed'); return; }
     const b = el.dataset.bind; if (!b) return;
     if (b === 'us') S.us = el.value; else if (b.startsWith('set.')) { const kk = b.slice(4); S.set[kk] = el.type === 'number' ? +el.value : el.value; audit(ME, 'Setting Changed', kk); }
     render();
   });
   document.addEventListener('keydown', (ev) => { if (!root.isConnected) return; if (ev.key === 'Escape' && (S.drawer || S.gq || S.menu)) { S.drawer = null; S.gq = ''; S.menu = false; render(); } });
 
-  function ROUTE(hv, P) { if (hv === 'user') { const q = (P.id || P.name || '').toLowerCase(); const u = USERS.find((x) => x.id.toLowerCase() === q || x.name.toLowerCase() === q || x.short.toLowerCase() === q); if (u) { S.uid = u.id; S.view = 'user'; S.ptab = P.tab || 'overview'; } return; } if (hv) S.view = hv; }
+  function ROUTE(hv, P) { if (hv === 'user') { const q = (P.id || P.name || '').toLowerCase(); const u = USERS.find((x) => x.id.toLowerCase() === q || String(x.uid) === q || x.name.toLowerCase() === q || x.short.toLowerCase() === q); if (u) { S.uid = u.id; S.view = 'user'; S.ptab = P.tab || 'overview'; } return; } if (hv) S.view = hv; }
   // deep links: Board.dc.html#view?key=value
   const DEEP = () => { try { const raw = decodeURIComponent((location.hash || '').slice(1)); if (!raw) return; const [hv, hq] = raw.split('?'); const P = {}; (hq || '').split('&').forEach((kv) => { const [k, v] = kv.split('='); if (k) P[k] = v || ''; }); ROUTE(hv, P); } catch (e) { /* no deep link */ } };
   DEEP();
@@ -544,48 +483,41 @@ function startUsers(root) {
   // ===== richer profile (function declarations only: hoisted) =====
   function wkey(w) { if (!w || w === 'Today' || w === 'Just now') return [2026, 10]; const p = w.replace(',', '').split(' '); return [/\d{4}$/.test(w) ? +w.slice(-4) : 2026, MON.indexOf(p[0])]; }
   function ext(u, d) {
-    if (d.x) return d.x; const r = rng('x' + u.id); const x = {};
-    // journey
-    const T = d.T; const passed = d.accts.some((a) => ['Passed', 'Funded'].includes(a.st)); const fp = d.payouts.length;
-    x.steps = [['Signed Up', u.joined, true], ['First Evaluation', day(T.fe), d.orders.length > 0], ['Passed', day(T.pass), passed], ['KYC Verified', day(T.kyc), u.kyc === 'verified'], ['Funded', day(T.fund), u.funded > 0], ['First Payout', day(T.pay), fp > 0]];
-    // money by month
+    if (d.x) return d.x; const x = {}; const ex = X[u.uid] || {}; const raw = u.raw; const T = d.T;
+    const acc = BO.accounts.filter((a) => a.user === u.uid); const passed = acc.some((a) => a.passed); const fp = d.payouts.filter((p) => p.st === 'Paid').length;
+    x.steps = [['Signed Up', u.joined, true], ['First Evaluation', d.orders.length ? day(T.fe) : '', d.orders.some((o) => o.st === 'Paid')], ['Passed', day(T.pass), passed], ['KYC Verified', raw.kyc && raw.kyc.at ? F.dayLabel(raw.kyc.at) : '', u.kyc === 'verified'], ['Funded', day(T.fund), u.funded > 0], ['First Payout', day(T.pay), fp > 0]];
     const months = Math.min(12, Math.max(3, Math.ceil(u.joinedAgo / 30) + 1)); x.money = [];
-    for (let k = months - 1; k >= 0; k--) { const dt = new Date(2026, 10 - k, 1); x.money.push({ l: MON[dt.getMonth()], y: dt.getFullYear(), m: dt.getMonth(), s: 0, p: 0 }); }
-    const slot = (w) => { const [y, m] = wkey(w); return x.money.find((b) => b.y === y && b.m === m); };
-    d.orders.forEach((o) => { const b = slot(o.when); if (b && o.st === 'Paid') b.s += o.amt; });
-    d.payouts.forEach((p) => { const b = slot(p.when); if (b) b.p += p.amt; });
-    // risk parts
-    const shared = d.devices.some((v) => v.shared.length) || u.i === 11;
-    const raw = [['Limit Use', 2 + r() * 10], ['Trading Pattern', 2 + r() * 9], ['Open Alerts', u.i === 7 ? 22 : u.i === 11 ? 14 : r() * 3], ['Shared Devices, Cards or IPs', shared ? 18 : r() * 3], ['Chargebacks and Refunds', u.i === 11 ? 12 : d.orders.some((o) => o.st === 'Refunded') ? 5 : 0], ['New Account', u.joinedAgo < 60 ? 8 : 1], ['Identity', u.kyc === 'pending' && u.ks.sev === 'hi' ? 20 : u.kyc === 'verified' ? 0 : 4]];
-    const tot = raw.reduce((s, q) => s + q[1], 0) || 1; x.risk = raw.map(([n, v]) => [n, Math.round(v / tot * u.risk)]).sort((a, b) => b[1] - a[1]);
-    // engagement
-    x.sign30 = u.lastAgo > 20 ? 1 : Math.round(6 + r() * 34); x.sess = Math.round(8 + r() * 40); x.open = Math.round(35 + r() * 55); x.nps = u.i === 3 ? 4 : Math.round(6 + r() * 4);
-    x.churn = u.st !== 'Active' ? 'Gone' : u.lastAgo > 14 ? 'High' : u.lastAgo > 5 || x.sign30 < 8 ? 'Medium' : 'Low';
+    for (let k = months - 1; k >= 0; k--) { const dt = new Date(); dt.setDate(1); dt.setMonth(dt.getMonth() - k); x.money.push({ l: MON[dt.getMonth()], y: dt.getFullYear(), m: dt.getMonth(), s: 0, p: 0 }); }
+    const slot = (iso) => { const t = new Date(iso); return x.money.find((b) => b.y === t.getFullYear() && b.m === t.getMonth()); };
+    BO.orders.filter((o) => o.user === u.uid && o.status === 'paid').forEach((o) => { const b = slot(o.paid); if (b) b.s += o.total; });
+    BO.payouts.filter((p) => p.user === u.uid && p.status === 'paid').forEach((p) => { const b = slot(p.paid); if (b) b.p += p.amount; });
+    const live = acc.filter((a) => a.phase === 'active');
+    const limUse = live.length ? Math.max(...live.map((a) => (a.dll && a.today < 0 ? -a.today / a.dll * 100 : 0))) : 0;
+    const raw2 = [['Limit Use', limUse / 10], ['Rule Breaks', acc.filter((a) => a.phase === 'breached').length * 4], ['Shared Devices, Cards or IPs', 0], ['Chargebacks and Refunds', (BO.disputes || []).filter((c) => c.user === u.uid).length * 25 + BO.orders.filter((o) => o.user === u.uid && o.status === 'refunded').length * 8], ['New Account', u.joinedAgo < 60 ? 8 : 1], ['Identity', u.ks.sev === 'hi' ? 20 : u.kyc === 'verified' ? 0 : 4]];
+    const tot = raw2.reduce((s, q) => s + q[1], 0) || 1; x.risk = raw2.map(([n, v]) => [n, Math.round(v / tot * u.risk)]).sort((a, b) => b[1] - a[1]);
+    const sess = ex.sessions || []; x.sign30 = sess.filter((s) => F.within(s.seen_at, 30)).length; x.sess = null; x.open = null; x.nps = null;
+    x.churn = u.st !== 'Active' ? 'Gone' : u.lastAgo > 14 ? 'High' : u.lastAgo > 5 ? 'Medium' : 'Low';
     x.seg = u.st === 'Banned' ? 'Banned' : u.funded && u.paid > u.spent ? 'Funded Earner' : u.funded ? 'Funded Trader' : d.orders.length >= 4 ? 'Repeat Buyer' : d.orders.length ? 'New Buyer' : 'Never Bought';
     x.next90 = u.st === 'Active' ? Math.round((u.spent / Math.max(1, u.joinedAgo / 30)) * 3 * (x.churn === 'Low' ? 1 : x.churn === 'Medium' ? 0.6 : 0.2) / 10) * 10 : 0;
-    // trading
-    if (d.accts.length) {
-      const n = 40 + Math.floor(r() * 380); const win = 0.38 + r() * 0.26; const aw = Math.round(90 + r() * 260), al = Math.round(70 + r() * 220);
-      x.tr = { n, win, aw, al, pf: (win * aw) / ((1 - win) * al), best: Math.round(aw * (2 + r() * 5)), worst: -Math.round(al * (2 + r() * 4)), hold: Math.round(30 + r() * 900), maxUse: Math.round(40 + r() * 60), news: Math.round(r() * 30), overnight: Math.floor(r() * 4), bestShare: Math.round(18 + r() * 40), longs: Math.round(40 + r() * 30) };
-      const syms = [['NQ', 'Nasdaq 100'], ['ES', 'S&P 500'], ['MNQ', 'Micro Nasdaq'], ['CL', 'Crude Oil'], ['GC', 'Gold'], ['MES', 'Micro S&P'], ['YM', 'Dow']]; let left = 100; x.tr.sym = [];
-      syms.slice().sort(() => r() - 0.5).slice(0, 4).forEach(([s, nm], k) => { const v = k === 3 ? left : Math.round(left * (0.4 + r() * 0.3)); left -= v; x.tr.sym.push([s, nm, v]); });
-      const peak = r() < 0.7 ? 2 : 8; x.tr.heat = Array.from({ length: 5 }, () => Array.from({ length: 12 }, (_, h) => Math.max(0, Math.round((Math.exp(-Math.pow(h - peak, 2) / 6) * 0.9 + r() * 0.25) * 100))));
-      let v = 0; x.tr.curve = Array.from({ length: 48 }, (_, k) => { v += (r() - (win > 0.5 ? 0.42 : 0.55)) * aw; if (u.funded && k > 30) v += aw * 0.15; return Math.round(v); });
-      x.tr.breaks = d.accts.filter((a) => a.st === 'Breached').map((a) => [a.started, a.id, 'Daily Loss Limit', 'Account closed']);
-      if (u.i === 7) x.tr.breaks.unshift(['Nov 20', d.accts[0].id, 'Hedging Across Accounts', 'Alert RK-1182 open']);
-      if (x.tr.news > 22) x.tr.breaks.push(['Nov 6', d.accts[0].id, 'Trade During Big News', 'Warning email sent']);
-    }
-    // connections
+    const tr = ex.trades || [];
+    if (tr.length) { const w = tr.filter((t) => t.pnl > 0), l = tr.filter((t) => t.pnl < 0); const aw = w.length ? F.sum(w.map((t) => t.pnl)) / w.length : 0, al = l.length ? -F.sum(l.map((t) => t.pnl)) / l.length : 0;
+      x.tr = { n: tr.length, win: w.length / tr.length, aw: Math.round(aw), al: Math.round(al), pf: al && l.length ? F.sum(w.map((t) => t.pnl)) / -F.sum(l.map((t) => t.pnl)) : 0, best: Math.round(Math.max(...tr.map((t) => t.pnl))), worst: Math.round(Math.min(...tr.map((t) => t.pnl))), hold: Math.round(F.sum(tr.map((t) => t.hold_min || 0)) / tr.length), maxUse: Math.round(limUse), news: 0, overnight: 0, bestShare: 0, longs: Math.round(tr.filter((t) => /buy|long/i.test(t.side)).length / tr.length * 100) };
+      const byDay = {}; tr.forEach((t) => { const k = F.isoET(t.ts); byDay[k] = (byDay[k] || 0) + t.pnl; }); const pos = Object.values(byDay).filter((v) => v > 0); x.tr.bestShare = pos.length ? Math.round(Math.max(...pos) / F.sum(pos) * 100) : 0;
+      const sym = {}; tr.forEach((t) => { sym[t.instrument] = (sym[t.instrument] || 0) + 1; }); x.tr.sym = Object.entries(sym).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([s2, n]) => [s2, s2, Math.round(n / tr.length * 100)]);
+      x.tr.heat = Array.from({ length: 5 }, (_, dw) => Array.from({ length: 12 }, (_, h) => { const c = tr.filter((t) => { const e = F.et(t.ts); return (e.getDay() + 6) % 7 === dw && Math.floor(e.getHours() / 2) === h; }).length; return c; }));
+      const mx = Math.max(1, ...[].concat(...x.tr.heat)); x.tr.heat = x.tr.heat.map((r2) => r2.map((v) => Math.round(v / mx * 100)));
+      let v = 0; const asc = tr.slice().reverse(); const step = Math.max(1, Math.floor(asc.length / 48)); x.tr.curve = []; asc.forEach((t, k) => { v += t.pnl; if (k % step === 0) x.tr.curve.push(Math.round(v)); }); if (x.tr.curve.length < 2) x.tr.curve = [0, Math.round(v)];
+      x.tr.breaks = acc.filter((a) => a.phase === 'breached').map((a) => [F.dayLabel(a.breached), a.id, a.breach || 'Rule broken', 'Account closed']); }
     x.links = [];
-    d.devices.forEach((v) => v.shared.forEach((s) => { const lu = USERS.find((z) => z.name === s); x.links.push({ id: lu ? lu.id : DUPID, name: lu ? lu.name : 'Closed Account ' + DUPID, via: 'Same Device', det: v.fp + ' · ' + v.dev, lvl: 'hi' }); }));
-    if (u.i === 11) x.links.push({ id: USERS[10].id, name: USERS[10].name, via: 'Same Card', det: 'Visa •• 8841 paid for both', lvl: 'hi' });
-    if (u.i === 16) x.links.push({ id: DUPID, name: 'Closed Account ' + DUPID, via: 'Same Passport', det: 'Passport number matches', lvl: 'hi' });
-    if (r() < 0.3) { const o = USERS[(u.i + 5) % USERS.length]; x.links.push({ id: o.id, name: o.name, via: 'Same Wi-Fi', det: 'Same IP address on 3 days, different devices', lvl: 'lo' }); }
-    if (u.i === 0) x.links.push({ id: USERS[26].id, name: USERS[26].name, via: 'Same Address', det: 'Same street address, different surname', lvl: 'md' });
-    x.refBy = u.aff ? `Affiliate ${u.aff}` : u.i % 9 === 2 ? `Friend ${USERS[(u.i + 3) % USERS.length].name}` : '';
-    x.refs = u.i === 4 ? Array.from({ length: 6 }, (_, k) => { const o = USERS[(k * 5 + 9) % USERS.length]; return [o.id, o.name, day(10 + k * 17), money(149 + k * 50)]; }) : u.i % 6 === 1 ? [[USERS[(u.i + 2) % USERS.length].id, USERS[(u.i + 2) % USERS.length].name, day(40), '$149']] : [];
-    x.refEarn = u.i === 4 ? 1140 : x.refs.length * 15;
-    d.x = x; return x;
+    BO.users.forEach((y) => { if (y.id === u.uid || y.role !== 'trader') return; const yu = uById(y.id); if (!yu) return;
+      if (y.kyc && raw.kyc && y.kyc.name && y.kyc.name === raw.kyc.name && y.kyc.dob === raw.kyc.dob) x.links.push({ id: yu.id, name: yu.name, via: 'Same Identity', det: 'Same name and date of birth', lvl: 'hi' });
+      const my = BO.methods.filter((m) => m.user === u.uid).map((m) => m.label); const th = BO.methods.filter((m) => m.user === y.id && my.includes(m.label)); if (th.length) x.links.push({ id: yu.id, name: yu.name, via: 'Same Payout Method', det: th[0].label, lvl: 'hi' }); });
+    x.links = x.links.filter((l) => !(LINKOK[u.uid] || []).includes(l.id) || Object.assign(l, { ok: true, lvl: 'lo' }));
+    x.refBy = u.aff ? `Affiliate ${u.aff}` : (() => { const r2 = BO.users.find((y) => y.id === raw.referred_by || (y.ref_code && y.ref_code === raw.referred_by)); return r2 ? `Friend ${F.full(r2)}` : ''; })();
+    const refs = BO.users.filter((y) => y.referred_by === u.uid || (raw.ref_code && y.referred_by === raw.ref_code));
+    x.refs = refs.map((y) => [y.tid, F.full(y), F.dayLabel(y.created_at), money(F.sum(BO.orders.filter((o) => o.user === y.id && o.status === 'paid').map((o) => o.total)))]);
+    x.refEarn = refs.filter((y) => BO.orders.some((o) => o.user === y.id && o.status === 'paid')).length * 10;
+    if (X[u.uid]) d.x = x; return x;
   }
   function journeyHtml(x) {
     const cur = x.steps.findIndex((s) => !s[2]);
@@ -619,7 +551,7 @@ function startUsers(root) {
       <div class="two wl eq"><div class="card m0"><div class="ch"><h3>Money Over Time</h3><span class="lab">${x.money.length >= 12 && u.joinedAgo > 330 ? 'Last 12 Months' : 'Since Joining'}</span><div class="r lab"><i class="lgs"></i>Spent<i class="lgp"></i>Paid Out</div></div><div class="cb">${moneyChart(x)}</div></div>
       <div class="card m0"><div class="ch"><h3>Needs Attention</h3><span class="lab">${flags.length || ''}</span></div>${flags.length ? flags.map(([t, s, go, c]) => `<button class="ali" data-act="${go === 'risk' ? 'risk' : 'ptab'}" data-k="${go}"><span class="b ${c}">${c === 'err' ? 'Risk' : c === 'sched' ? 'To Do' : 'Info'}</span><div><b>${t}</b><div class="hint">${esc(s)}</div></div><span class="chev">›</span></button>`).join('') : '<div class="empty">Nothing open on this user.</div>'}</div></div>
       <div class="two eq" style="margin-top:14px"><div class="card m0"><div class="ch"><h3>What Makes Up the Risk Score</h3><span class="sc ${u.risk >= 70 ? 'hi' : u.risk >= 45 ? 'md' : ''}">${u.risk}</span></div><div class="cb fg">${x.risk.filter((q) => q[1] > 0).map(([n, v]) => `<div><div class="rowl"><span>${n}</span><b>+${v}</b></div><div class="split"><i style="width:${v / Math.max(1, x.risk[0][1]) * 100}%;background:${v >= 15 ? 'var(--no)' : v >= 8 ? 'var(--wa)' : 'var(--sky)'}"></i></div></div>`).join('')}</div></div>
-      <div class="card m0"><div class="ch"><h3>Engagement</h3><span class="b plain">${x.seg}</span></div><div class="cb"><div class="kv">${[['Customer For', u.joinedAgo > 60 ? Math.round(u.joinedAgo / 30) + ' Months' : u.joinedAgo + ' Days'], ['Sign-Ins, Last 30 Days', x.sign30], ['Average Session', x.sess + ' Minutes'], ['Emails Opened', x.open + '%'], ['Last Purchase', d.orders[0] ? d.orders[0].when : 'Never'], ['Satisfaction Score', x.nps + ' out of 10'], ['Referred By', x.refBy || 'Nobody']].map(([k, v]) => `<div><span>${k}</span><b>${esc(v)}</b></div>`).join('')}</div></div></div></div>
+      <div class="card m0"><div class="ch"><h3>Engagement</h3><span class="b plain">${x.seg}</span></div><div class="cb"><div class="kv">${[['Customer For', u.joinedAgo > 60 ? Math.round(u.joinedAgo / 30) + ' Months' : u.joinedAgo + ' Days'], ['Sign-Ins, Last 30 Days', x.sign30], ['Average Session', (x.sess == null ? '—' : x.sess + ' Minutes')], ['Emails Opened', (x.open == null ? '—' : x.open + '%')], ['Last Purchase', d.orders[0] ? d.orders[0].when : 'Never'], ['Satisfaction Score', (x.nps == null ? '—' : x.nps + ' out of 10')], ['Referred By', x.refBy || 'Nobody']].map(([k, v]) => `<div><span>${k}</span><b>${esc(v)}</b></div>`).join('')}</div></div></div></div>
       <div class="two eq" style="margin-top:14px"><div class="card m0"><div class="ch"><h3>Trading at a Glance</h3><div class="r">${tr ? '<button class="lnk" data-act="ptab" data-k="trading">All Trading</button>' : ''}</div></div>${tr ? `<div class="cb"><div class="ugl">${[['Trades', tr.n.toLocaleString('en-US')], ['Win Rate', Math.round(tr.win * 100) + '%'], ['Profit Factor', tr.pf.toFixed(2)], ['Average Hold', tr.hold > 120 ? Math.round(tr.hold / 60) + ' Min' : tr.hold + ' Sec']].map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join('')}</div>${curveSvg(tr.curve, 120)}<div class="usy">${tr.sym.map((s) => `<span class="b plain">${s[0]} ${s[2]}%</span>`).join('')}</div></div>` : '<div class="empty">No trades yet.</div>'}</div>
       <div class="card m0"><div class="ch"><h3>Connections</h3><span class="lab">${new Set(x.links.map((l) => l.id)).size} Linked</span><div class="r"><button class="lnk" data-act="ptab" data-k="links">All Connections</button></div></div>${x.links.length ? `<div class="cb">${graphSvg(u, x, false)}</div>` : '<div class="empty">Not connected to any other user by device, card, IP, address or wallet.</div>'}</div></div>
       <div class="two eq" style="margin-top:14px"><div class="card m0"><div class="ch"><h3>Personal Details</h3><div class="r"><button class="lnk" data-act="uact" data-k="edit">Edit</button></div></div><div class="cb"><div class="kv">${[['Full Name', u.name], ['Email', u.email + (u.i === 6 ? ' · change waiting' : '')], ['Phone', u.phone], ['Date of Birth', S.set.mask && !S.reveal[u.id] ? '•• ••, ' + u.dob.slice(-4) : u.dob], ['Address', S.set.mask && !S.reveal[u.id] ? `•••, ${u.city}, ${u.ctry}` : `14 Harbor Street, ${u.city}, ${u.ctry}`], ['Time Zone', u.tz], ['Language', u.lang], ['Signed Up With', u.via], ['Two-Factor Sign-In', u.twofa ? 'On' : 'Off'], ['Marketing Emails', u.mkt ? 'Opted In' : 'Opted Out']].map(([k, v]) => `<div><span>${k}</span><b>${esc(v)}</b></div>`).join('')}</div>${S.set.mask ? `<div class="cbf">${S.reveal[u.id] ? '<span class="hint">Showing full details. Your view was logged.</span>' : `<button class="pill sm" data-act="drw" data-k="reveal">Show Full Details</button><span class="hint">Asks for a reason and is logged</span>`}</div>` : ''}</div></div>
