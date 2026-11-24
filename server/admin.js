@@ -72,6 +72,8 @@ function router(h) {
     if (b.kyc_status !== undefined) { need(req.user, 'risk', 'support'); if (!['none', 'submitted', 'verified', 'rejected'].includes(b.kyc_status)) bad('Unknown status'); vals.push(b.kyc_status); sets.push('kyc_status=$' + vals.length); }
     if (b.points !== undefined) { need(req.user, 'support'); const d = parseInt(b.points, 10) || 0; await core.points(null, u.id, d, clean(b.reason, 80) || 'Adjusted by support'); }
     if (sets.length) await db.q(`UPDATE users SET ${sets.join(',')} WHERE id=$1`, vals);
+    if (b.kyc_status === 'verified') require('./mail').t('kycok', u.id, { url: require('./auth').BASE() + '/app#settings?tab=identity' });
+    if (b.kyc_status === 'rejected') require('./mail').t('kycno', u.id, { url: require('./auth').BASE() + '/app#support' });
     if (b.kyc_status === 'verified') await core.notify(null, u.id, 'Identity verified', 'You can now receive payouts.', 'settings?tab=identity');
     if (b.kyc_status === 'rejected') await core.notify(null, u.id, 'We could not verify your identity', clean(b.reason, 200) || 'Check your details and submit again, or contact support.', 'settings?tab=identity');
     await core.audit(req.user.id, 'user.update', u.tid, b);
@@ -134,7 +136,7 @@ function router(h) {
   r.get('/risk/trades', h(async (req) => { const since = req.query.days ? +req.query.days : 1; return db.all(`SELECT t.account_id, t.ts, t.instrument, t.side, t.qty, t.pnl::float pnl, t.hold_min, a.user_id FROM trades t JOIN accounts a ON a.id=t.account_id WHERE t.ts > now() - ($1 || ' days')::interval ORDER BY t.ts DESC LIMIT 3000`, [String(Math.min(30, since))]); }));
   r.post('/tickets', h(async (req) => { need(req.user, 'support', 'risk', 'finance'); const b = req.body; const u = await db.one('SELECT id, email, first FROM users WHERE id=$1', [+b.user]); if (!u) bad('Pick a trader');
     const subj = clean(b.subject, 200); if (!subj) bad('Add a subject'); const t = await db.one("INSERT INTO tickets(user_id,subject,category,channel,status,priority,assignee) VALUES($1,$2,$3,'Email',$4,$5,$6) RETURNING id", [u.id, subj, clean(b.category, 60) || 'General', b.body ? 'pending' : 'open', ['low', 'normal', 'high', 'urgent'].includes(b.priority) ? b.priority : 'normal', req.user.id]);
-    if (b.body) { await db.q('INSERT INTO ticket_msgs(ticket_id,author_id,staff,body) VALUES($1,$2,true,$3)', [t.id, req.user.id, clean(b.body, 5000)]); await core.notify(null, u.id, 'Support: ' + subj, clean(b.body, 140), 'support?tkt=' + t.id); await require('./mail').send(u.email, `${subj} [#${t.id}]`, `Hi ${u.first},\n\n${clean(b.body, 5000)}\n\nReply from your dashboard: ${require('./auth').BASE()}/app/support?tkt=${t.id}`, 'ticket'); }
+    if (b.body) { await db.q('INSERT INTO ticket_msgs(ticket_id,author_id,staff,body) VALUES($1,$2,true,$3)', [t.id, req.user.id, clean(b.body, 5000)]); await core.notify(null, u.id, 'Support: ' + subj, clean(b.body, 140), 'support?tkt=' + t.id); await require('./mail').send(u.email, `${subj} [#${t.id}]`, `Hi ${u.first},\n\n${clean(b.body, 5000)}\n\nReply from your dashboard: ${require('./auth').BASE()}/app#support?tkt=${t.id}`, 'ticket'); }
     await core.audit(req.user.id, 'ticket.create', String(t.id), {}); return { id: t.id }; }));
   // ---- Store: board settings and lists kept for each board ----
   r.put('/store/:key', h(async (req) => { const k = clean(req.params.key, 60); if (!/^[a-z0-9_.-]+$/i.test(k)) bad('Bad key'); need(req.user, 'finance', 'risk', 'support'); await putStore(k, req.body.value); await core.audit(req.user.id, 'store.' + k, k, {}); }));
@@ -158,7 +160,8 @@ function router(h) {
     await db.q('UPDATE tickets SET status=$2, updated_at=now(), assignee=COALESCE(assignee,$3) WHERE id=$1', [t.id, req.body.solve ? 'solved' : 'pending', req.user.id]);
     await core.notify(null, t.user_id, 'Support replied: ' + t.subject, body.slice(0, 140), 'support?tkt=' + t.id);
     const u = await db.one('SELECT email, first FROM users WHERE id=$1', [t.user_id]);
-    await require('./mail').send(u.email, `Re: ${t.subject} [#${t.id}]`, `Hi ${u.first},\n\n${body}\n\nReply from your dashboard: ${require('./auth').BASE()}/app/support?tkt=${t.id}`, 'ticket');
+    await require('./mail').sendT('reply', u.email, { first_name: u.first, ticket: t.id, subject: t.subject, agent: req.user.first, snippet: body.slice(0, 90), message: body, url: `${require('./auth').BASE()}/app#support?tkt=${t.id}` }, { uid: t.user_id });
+    if (req.body.solve) require('./mail').t('closed', t.user_id, { ticket: t.id, subject: t.subject, url: `${require('./auth').BASE()}/app#support?tkt=${t.id}` });
   }));
   r.post('/tickets/:id/status', h(async (req) => { const st = ['open', 'pending', 'solved', 'hold'].includes(req.body.status) ? req.body.status : 'open'; await db.q('UPDATE tickets SET status=$2, updated_at=now() WHERE id=$1', [+req.params.id, st]); }));
 
@@ -213,6 +216,25 @@ function router(h) {
     return db.all(`SELECT t.*, a.user_id, a.plan, a.size FROM trades t JOIN accounts a ON a.id=t.account_id ${q.length ? 'WHERE ' + q.join(' AND ') : ''} ORDER BY t.ts DESC LIMIT 500`, v); }));
   // ---- Support ----
   r.post('/tickets/:id/assign', h(async (req) => { const to = req.body.to === 'me' ? req.user.id : req.body.to ? +req.body.to : null; await db.q('UPDATE tickets SET assignee=$2, updated_at=now() WHERE id=$1', [+req.params.id, to]); }));
+  // Emails board: designs, sending numbers and logs
+  r.get('/emails', h(async (req) => { const M = require('./mail');
+    const [byDay, logs, users] = await Promise.all([
+      db.all("SELECT template, (created_at AT TIME ZONE 'America/New_York')::date::text d, status, count(*)::int n FROM outbox WHERE created_at > now() - interval '91 days' GROUP BY 1,2,3"),
+      db.all("SELECT o.id, o.to_email, o.subject, o.template, o.status, o.created_at, o.ext_id, o.events, o.user_id, u.tid, u.first, u.last FROM outbox o LEFT JOIN users u ON u.id=o.user_id OR (o.user_id IS NULL AND u.email=o.to_email) WHERE o.created_at > now() - interval '30 days' ORDER BY o.id DESC LIMIT 1500"),
+      Promise.resolve(null)]);
+    return { defs: M.DEFS, byDay, logs }; }));
+  r.post('/emails/test', h(async (req) => { const M = require('./mail'); const key = String(req.body.key || ''); const C = await M.cfg(); const base = M.tplOf(C, key); if (!base) bad('Unknown email');
+    const d = req.body.draft && typeof req.body.draft === 'object' ? req.body.draft : {}; const e = Object.assign({}, base, d, { flow: base.flow });
+    const vars = Object.assign({}, M.DEFS.SAMPLE, { first_name: req.user.first, url: require('./auth').BASE() + '/app' }); const f = (t) => String(t || '').replace(/\{(\w+)\}/g, (m, k) => (vars[k] != null ? vars[k] : ''));
+    await M.deliverRaw({ to: req.user.email, subject: '[Test] ' + f(e.s), body: f(e.h) + ' ' + f(e.a), html: M.render(e, vars, C.brand), template: 'test:' + key, from: M.DEFS.SENDERS[e.fr], uid: req.user.id }); return { to: req.user.email }; }));
+  r.post('/emails/resend/:id', h(async (req) => { need(req.user, 'support'); const o = await db.one('SELECT * FROM outbox WHERE id=$1', [+req.params.id]); if (!o) bad('Message not found', 404);
+    const sup = ((await db.one("SELECT v FROM kv WHERE k='store.emails.supp'")) || {}).v || []; if (sup.some((x) => String(x.a).toLowerCase() === o.to_email.toLowerCase() && x.k === 'Bounced')) bad('This address is on the suppression list. Remove it first.');
+    await require('./mail').send(o.to_email, o.subject, o.body, o.template); await core.audit(req.user.id, 'email.resend', String(o.id), {}); }));
+  r.get('/emails/domain', h(async () => { const c = await require('./integrations').cfg('resend').catch(() => null); const key = (c && c.apiKey) || process.env.RESEND_API_KEY; if (!key) return { connected: false, from: (c && c.from) || '' };
+    const H = { Authorization: 'Bearer ' + key }; const l = await fetch('https://api.resend.com/domains', { headers: H }).then((r2) => r2.json()).catch(() => ({}));
+    const doms = l.data || []; const want = (((c && c.from) || '').match(/@([^>\s]+)/) || [])[1]; const d0 = doms.find((d) => d.name === want) || doms[0];
+    const det = d0 ? await fetch('https://api.resend.com/domains/' + d0.id, { headers: H }).then((r2) => r2.json()).catch(() => null) : null;
+    return { connected: true, from: (c && c.from) || '', domains: doms.map((d) => ({ name: d.name, status: d.status, created: d.created_at, region: d.region })), domain: det && { name: det.name, status: det.status, created: det.created_at, region: det.region, records: (det.records || []).map((x) => ({ rec: x.record, type: x.type, name: x.name, value: x.value, status: x.status })) } }; }));
   r.post('/tickets/:id/category', h(async (req) => { await db.q('UPDATE tickets SET category=$2, updated_at=now() WHERE id=$1', [+req.params.id, clean(req.body.category, 60) || 'General']); }));
   r.post('/tickets/:id/note', h(async (req) => { const body = clean(req.body.body, 5000); if (!body) bad('Write a note first'); await db.q('INSERT INTO ticket_msgs(ticket_id,author_id,staff,internal,body) VALUES($1,$2,true,true,$3)', [+req.params.id, req.user.id, body]); }));
   r.post('/tickets/:id/priority', h(async (req) => { await db.q('UPDATE tickets SET priority=$2 WHERE id=$1', [+req.params.id, ['low', 'normal', 'high', 'urgent'].includes(req.body.priority) ? req.body.priority : 'normal']); }));

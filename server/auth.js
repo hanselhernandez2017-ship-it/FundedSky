@@ -75,7 +75,7 @@ async function logout(req, res) { if (req.sess) await db.q('DELETE FROM sessions
 async function forgot(req) {
   const email = clean(req.body.email, 200).toLowerCase();
   const u = await db.one('SELECT * FROM users WHERE email=$1', [email]);
-  if (u) { const t = await makeToken(u.id, 'reset', 2); await mail.send(email, 'Reset your Funded Sky password', `Hi ${u.first},\n\nReset your password here:\n${BASE()}/reset-password?token=${t}\n\nThis link works for 2 hours. If you did not ask for this, ignore this email.`, 'reset'); }
+  if (u) { const t = await makeToken(u.id, 'reset', 2); await mail.sendT('pwreset', email, { first_name: u.first, url: `${BASE()}/reset-password?token=${t}` }, { uid: u.id }); }
   return { ok: true };
 }
 async function resetPassword(req, res) {
@@ -86,6 +86,7 @@ async function resetPassword(req, res) {
   await db.q('UPDATE tokens SET used=true WHERE token=$1', [t.token]);
   await db.q('DELETE FROM sessions WHERE user_id=$1', [t.user_id]);
   const u = await db.one('SELECT * FROM users WHERE id=$1', [t.user_id]);
+  mail.t('pwchanged', u.id, { time: new Date().toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) + ' ET', device: String(req.get('user-agent') || '').replace(/^.*?(Chrome|Firefox|Safari|Edg)[^ ]*.*?$/, '$1').slice(0, 40) || 'Browser', location: req.get('cf-ipcountry') || req.get('x-vercel-ip-country') || 'Unknown', url: BASE() + '/forgot-password' });
   await startSession(req, res, u);
   return { ok: true };
 }
@@ -93,15 +94,17 @@ async function sendVerify(u) {
   const code = String(Math.floor(100000 + Math.random() * 900000));
   await db.q("UPDATE tokens SET used=true WHERE user_id=$1 AND kind='verify' AND used=false", [u.id]);
   await db.q(`INSERT INTO tokens(token,user_id,kind,expires_at) VALUES($1,$2,'verify', now() + interval '30 minutes')`, ['V' + u.id + ':' + code, u.id]);
-  await mail.send(u.email, `${code} is your Funded Sky code`, `Hi ${u.first},\n\nYour verification code is ${code}. It expires in 30 minutes.\n\nOr open this link while logged in:\n${BASE()}/verify-email?code=${code}`, 'verify');
+  await mail.sendT('confirm', u.email, { first_name: u.first, code, url: `${BASE()}/verify-email?code=${code}` }, { uid: u.id });
 }
 async function verifyEmail(req) {
   if (!req.user) bad('Log in first, then enter your code', 401);
   const code = clean(req.body.code, 10).replace(/\D/g, '');
   const t = await db.one("SELECT * FROM tokens WHERE token=$1 AND kind='verify' AND used=false AND expires_at > now()", ['V' + req.user.id + ':' + code]);
   if (!t) bad('That code is wrong or has expired. Send a new one.');
+  const was = await db.one('SELECT verified FROM users WHERE id=$1', [t.user_id]);
   await db.q('UPDATE users SET verified=true WHERE id=$1', [t.user_id]);
   await db.q('UPDATE tokens SET used=true WHERE token=$1', [t.token]);
+  if (was && !was.verified) mail.t('welcome', t.user_id, { url: BASE() + '/checkout' });
   return { ok: true };
 }
 async function resendVerify(req) {

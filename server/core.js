@@ -16,6 +16,9 @@ async function saveCatalog(data, by) {
 const planDef = (cat, id) => cat.plans.find((p) => p.id === id);
 const sizeDef = (cat, pid, size) => { const p = planDef(cat, pid); return p && p.sizes.find((s) => s.size === Number(size)); };
 const kLabel = (s) => '$' + s / 1000 + 'K';
+const M = (...a) => require('./mail').t(...a);
+const etTime = (d) => new Date(d || Date.now()).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) + ' ET';
+const pName = async (id) => ((planDef(await catalog(), id) || {}).name || id);
 
 function promoFor(cat, code, planId, now = new Date()) {
   if (!code) return null;
@@ -123,6 +126,7 @@ async function fulfilOrder(orderId) {
         made.push(await createAccount(c, { userId: o.user_id, orderId: o.id, plan: it.plan, size: it.size, platform: it.platform, addons: it.addons }));
       }
       for (const id of made) await notify(c, o.user_id, `Your account ${id} is ready`, 'Log in to your platform and place your first trade. Your rules are on the account page.', 'account?acct=' + id);
+      for (const id of made) { const ac = await c.one('SELECT plan, size, platform FROM accounts WHERE id=$1', [id]); M('ready', o.user_id, { account: id, plan: await pName(ac.plan), size: kLabel(ac.size), platform: ac.platform, login: id, server: 'Funded Sky Simulated Feed', url: require('./auth').BASE() + '/app#account?acct=' + id }); }
     } else if (o.kind === 'reset') {
       await resetAccount(c, o.meta.account, o.user_id);
       made.push(o.meta.account);
@@ -154,6 +158,7 @@ async function resetAccount(c, accountId, userId) {
   await c.q("UPDATE trades SET note='before reset' WHERE account_id=$1 AND note=''", [a.id]);
   await c.q('DELETE FROM trades WHERE account_id=$1', [a.id]);
   await notify(c, userId, `${a.id} has been reset`, 'Fresh balance, same rules. Good luck.', 'account?acct=' + a.id);
+  M('resetdone', userId, { account: a.id, plan: await pName(a.plan), size: kLabel(a.size), platform: a.platform, url: require('./auth').BASE() + '/app#account?acct=' + a.id });
 }
 
 // Passed evaluation -> funded account (Prime after agreement; Essential after activation fee)
@@ -167,6 +172,7 @@ async function activateFunded(c, accountId, userId, orderId) {
   const steps = { ...(a.steps || {}), funded: new Date().toISOString(), ...(orderId ? { activation: new Date().toISOString() } : {}) };
   await c.q("UPDATE accounts SET phase='closed', closed_at=now(), steps=$2 WHERE id=$1", [a.id, steps]);
   await c.q('UPDATE accounts SET steps=$2 WHERE id=$1', [id, steps]);
+  M('funded', userId, { account: id, plan: await pName(a.plan), size: kLabel(a.size), platform: a.platform, login: id, split: (R.rulesFor(await catalog(), a).split || 90) + '%', url: require('./auth').BASE() + '/app#account?acct=' + id });
   await notify(c, userId, `You're funded: ${id}`, `Your ${kLabel(a.size)} funded account is live. Payouts start after ${(await catalog()).fundedCommon.winDays} winning days.`, 'account?acct=' + id);
   return id;
 }
@@ -204,6 +210,7 @@ async function requestPayout(userId, accountId, amount, methodId) {
       [code, a.id, userId, qd.number, gross, qd.split, net, m.label, m.rail]);
     // Hold the gross amount out of the account while in review
     await c.q('UPDATE accounts SET balance=balance-$2 WHERE id=$1', [a.id, gross]);
+    M('payreq', userId, { amount: money(net), account: a.id, time: etTime(), url: require('./auth').BASE() + '/app#payouts' });
     await notify(c, userId, `Payout ${code} requested`, `${money(net)} to ${m.label}. Reviewed in 1 to 2 business days.`, 'payouts');
     require('./integrations').alert('payout', `:hourglass: Payout ${code} requested: ${money(net)} from ${a.id} (${m.rail})`);
     return { code, net, gross };
@@ -221,6 +228,7 @@ async function reviewPayout(actorId, code, action, note, batchId) {
       const u = await c.one('SELECT kyc_status FROM users WHERE id=$1', [p.user_id]);
       if (u.kyc_status !== 'verified') bad('Verify this trader\'s identity before approving');
       await c.q("UPDATE payouts SET status='approved', approved_at=now(), reviewed_by=$2, note=$3 WHERE id=$1", [p.id, actorId, note || '']);
+      M('payok', p.user_id, { amount: money(p.amount), method: p.method, url: require('./auth').BASE() + '/app#payouts' });
       await notify(c, p.user_id, `Payout ${p.code} approved`, `${money(p.amount)} is being sent to ${p.method}.`, 'payouts');
     } else if (action === 'pay') {
       if (p.status !== 'approved') bad('Approve the payout first');
@@ -231,6 +239,7 @@ async function reviewPayout(actorId, code, action, note, batchId) {
       const phase = count >= r.reviewAfter ? 'review' : a.phase;
       await c.q(`UPDATE accounts SET payout_count=$2, paid_total=paid_total+$3, floor=LEAST(floor, start_bal), cycle_profit_start=balance, cycle_win_days=0, cycle_best=0, phase=$4 WHERE id=$1`, [a.id, count, p.amount, phase]);
       await points(c, p.user_id, 250, 'Payout ' + p.code);
+      M('paysent', p.user_id, { amount: money(p.amount), method: p.method, ref: p.provider_ref || p.code, url: require('./auth').BASE() + '/app#payouts' });
       await notify(c, p.user_id, `Payout ${p.code} sent`, `${money(p.amount)} sent to ${p.method}.`, 'payouts');
       const I2 = require('./integrations'); I2.alert('payout', `:white_check_mark: Payout ${p.code} sent: ${money(p.amount)}`); I2.announce(`Another payout sent: ${money(p.amount)} to a ${a.size / 1000}K ${a.plan === 'instant' ? 'Instant' : 'funded'} trader. Congrats!`);
     } else if (action === 'fail') {

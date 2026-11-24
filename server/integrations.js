@@ -22,7 +22,7 @@ const PROVIDERS = {
   track1099: { name: 'Track1099', cat: 'Tax', role: 'W-9 and W-8BEN forms', desc: 'Collects tax forms before payouts and files 1099-NEC for US traders.', docs: 'https://www.track1099.com/api_info/readme',
     fields: [['apiToken', 'API Token', 'secret'], ['companyId', 'Company ID', 'text'], ['baseUrl', 'API Base URL', 'text', 'https://www.track1099.com']] },
   resend: { name: 'Resend', cat: 'Email', role: 'Every email the system sends', desc: 'Verification codes, receipts, payout updates and support replies.', docs: 'https://resend.com/api-keys',
-    fields: [['apiKey', 'API Key (re_…)', 'secret'], ['from', 'From Address', 'text', 'Funded Sky <no-reply@fundedsky.com>'], ['replyTo', 'Reply-To', 'text', 'support@fundedsky.com']] },
+    fields: [['apiKey', 'API Key (re_…)', 'secret'], ['from', 'From Address', 'text', 'Funded Sky <no-reply@fundedsky.com>'], ['replyTo', 'Reply-To', 'text', 'support@fundedsky.com'], ['webhookSecret', 'Webhook Signing Secret (whsec_…)', 'secret']] },
   crisp: { name: 'Crisp', cat: 'Support', role: 'Live chat', desc: 'Chat on the website, checkout and trader dashboard.', docs: 'https://app.crisp.chat',
     fields: [['websiteId', 'Website ID', 'text']] },
   posthog: { name: 'PostHog', cat: 'Analytics', role: 'Website tracking', desc: 'Visits, sources and checkout funnel.', docs: 'https://posthog.com',
@@ -69,7 +69,7 @@ async function save(id, body, actor) {
 }
 async function mark(id, ok, err) { await db.q("UPDATE integrations SET status=$2, last_check=now(), last_error=$3 WHERE id=$1", [id, ok ? 'live' : 'error', err || '']); bust(); }
 
-const WEBHOOKS = { stripe: '/api/hooks/stripe', confirmo: '/api/hooks/confirmo', sumsub: '/api/hooks/sumsub', rise: '/api/hooks/rise' };
+const WEBHOOKS = { stripe: '/api/hooks/stripe', confirmo: '/api/hooks/confirmo', sumsub: '/api/hooks/sumsub', rise: '/api/hooks/rise', resend: '/api/hooks/resend' };
 
 // ---------- provider calls ----------
 const T = (ms) => AbortSignal.timeout(ms || 15000);

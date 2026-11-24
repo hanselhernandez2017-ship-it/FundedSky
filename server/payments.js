@@ -92,7 +92,8 @@ async function markPaid(o, provider, ref, method) {
   I.alert('order', `:moneybag: New order ${o.code}: $${Number(o.total).toFixed(2)} (${o.lines.filter((l) => l.kind === 'plan').map((l) => l.label).join(', ')}) via ${provider}`);
   if (o.kind === 'reset' && o.meta.useFree) await db.q('UPDATE accounts SET free_resets=GREATEST(0,free_resets-1) WHERE id=$1', [o.meta.account]);
   const u = await db.one('SELECT email, first FROM users WHERE id=$1', [o.user_id]);
-  await require('./mail').send(u.email, `Receipt for ${o.code}`, `Hi ${u.first},\n\nThanks for your order.\n\n${o.lines.map((l) => `${l.label}: ${money2(l.amount)}`).join('\n')}\nTotal: ${money2(o.total)}\n\nYour accounts are on your dashboard: ${BASE()}/app`, 'receipt');
+  { const cat = await core.catalog(); const it = (o.items || [])[0] || {}; const pl = it.plan ? ((core.planDef(cat, it.plan) || {}).name || it.plan) : (o.kind === 'reset' ? 'Reset' : o.kind); const adds = o.lines.filter((l) => l.kind === 'addon').map((l) => l.label);
+    await require('./mail').sendT('order', u.email, { first_name: u.first, order: o.code, plan: pl, size: it.size ? core.kLabel(it.size) : '', platform: it.platform || '', addons: adds.join(', '), discount: Number(o.discount) > 0 ? `${o.promo ? o.promo + ' · ' : ''}−${money2(o.discount)}` : '', total: money2(o.total), paid_with: method || provider, url: `${BASE()}/app#billing` }, { uid: o.user_id }); }
 }
 
 async function payOrder(user, code, body) {
@@ -203,6 +204,7 @@ async function refund(actorId, code, note) {
   await db.q("UPDATE orders SET status='refunded', refunded_at=now(), meta = meta || $2 WHERE id=$1", [o.id, JSON.stringify({ refundNote: note || '' })]);
   // close accounts created by this order that have not traded
   for (const id of (o.meta && o.meta.accounts) || []) await db.q("UPDATE accounts SET phase='closed', closed_at=now(), breach_reason='Order refunded' WHERE id=$1 AND phase IN ('active','passed')", [id]);
+  require('./mail').t('refund', o.user_id, { amount: money2(o.total), order: o.code, paid_with: o.pay_method || o.provider || 'Original payment method', url: `${BASE()}/app#billing` });
   await core.notify(null, o.user_id, `Refund for ${o.code}`, `${money2(o.total)} is on its way back to your original payment method.`, 'billing');
   await core.audit(actorId, 'order.refund', o.code, { note });
   return { ok: true };

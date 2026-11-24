@@ -22,6 +22,7 @@ const raw = express.raw({ type: '*/*', limit: '1mb' });
 app.post(['/api/stripe/webhook', '/api/hooks/stripe'], raw, (req, res) => pay.webhook(req, res));
 app.post('/api/hooks/confirmo', raw, (req, res) => pay.confirmoHook(req, res).catch((e) => { console.error(e); res.status(500).end(); }));
 app.post('/api/hooks/sumsub', raw, (req, res) => flows.sumsubHook(req, res).catch((e) => { console.error(e); res.status(500).end(); }));
+app.post('/api/hooks/resend', raw, (req, res) => require('./mail').hook(req, res).catch((e) => { console.error(e); res.status(500).end(); }));
 app.post('/api/hooks/rise', raw, (req, res) => flows.riseHook(req, res).catch((e) => { console.error(e); res.status(500).end(); }));
 // Request timings for System Health: last 24 hours in hourly buckets, kept in memory
 const REQSTAT = global.FS_REQSTAT = { hours: {}, routes: {} };
@@ -84,6 +85,7 @@ T.post('/notifications/read', h(async (req) => { if (req.body.all) await db.q('U
 T.post('/tickets', h(async (req) => {
   const s = clean(req.body.subject, 160); if (!s) bad('Add a subject');
   const t = await db.one('INSERT INTO tickets(user_id,subject,category,channel) VALUES($1,$2,$3,$4) RETURNING id', [req.user.id, s, clean(req.body.category, 60) || 'General', 'Web']);
+  require('./mail').t('ticket', req.user.id, { ticket: t.id, subject: s, url: require('./auth').BASE() + '/app#support?tkt=' + t.id });
   await db.q('INSERT INTO ticket_msgs(ticket_id,author_id,body) VALUES($1,$2,$3)', [t.id, req.user.id, clean(req.body.body, 5000) || s]);
   return { id: t.id };
 }));
