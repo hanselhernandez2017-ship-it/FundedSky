@@ -103,3 +103,13 @@
 }
 @media (max-width:360px){.fsbo .mclk .cd2{display:none}}
 @media (max-width:860px){.fsbo .mclk .cd2,.fsbo .mclk #ckl2{font-family:'Mona Sans',system-ui,sans-serif;font-size:12.5px;font-weight:500}}
+/* plan cards: fill the row, every size on one line */
+.fsbo .tiles.plans{grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr))}
+.fsbo .pln{min-width:0;container-type:inline-size}
+.fsbo .pz{grid-template-columns:repeat(var(--n,4),minmax(0,1fr))}
+.fsbo .pz>div{min-width:0;height:auto;min-height:76px;padding:10px}
+.fsbo .pz b{font-size:16px;white-space:nowrap}
+.fsbo .pz small.fa{white-space:normal;line-height:1.3}
+.fsbo .pln .kv>div{gap:12px}
+.fsbo .pln .kv>div span{flex:none}
+@container (max-width:340px){.fsbo .pz[data-n="4"]{grid-template-columns:repeat(2,minmax(0,1fr))}}
