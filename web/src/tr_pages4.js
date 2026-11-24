@@ -1,0 +1,57 @@
+  // ===== accounts home (cards first) =====
+  function nextStep(a) {
+    const dd = a.bal - a.floor;
+    if (a.kind === 'breached') return ['no', `Closed ${a.closed}. ${esc(a.breach || 'A rule was broken.')}`];
+    if (a.phase === 'passed') return ['ok', a.steps.some((x) => x[0] === 'Agreement Signed') && a.activation ? `Passed. Pay the ${money(a.activation)} activation fee to get funded.` : 'Passed. Sign the funded agreement to get your funded account.'];
+    if (a.phase === 'review') return ['sk', 'In review after 6 payouts. Our risk team will be in touch.'];
+    if (a.halted) return ['wa', 'Daily loss limit reached. Trading resumes at 6:00 PM ET.'];
+    if (a.kind === 'funded') { if (a.pending) return ['sk', `Payout ${a.pending.code} of ${money(a.pending.amt)} is in review.`]; if (a.quote && a.quote.ok) return ['ok', `Every payout rule is met. ${money(a.avail)} is yours at a ${a.split}% split.`]; const miss = (a.quote ? a.quote.checks : []).filter((c) => !c.ok); return ['sk', miss.length ? `Next payout: ${miss[0].label.toLowerCase()}${miss[0].k === 'win' ? ` (${miss[0].have} so far)` : ''}.` : 'Keep trading to your next payout.']; }
+    if (a.bal < a.start) return ['wa', `Down ${money(a.start - a.bal)}. ${money(dd)} of max loss room left, ${money(Math.max(0, a.dll - a.dllUsed))} of today's loss limit left.`];
+    const md = Math.max(0, a.minDays - a.days), need = Math.max(0, a.target - a.bal);
+    return ['ok', md || need ? `${md ? (md === 1 ? '1 more trading day' : `${md} more trading days`) + (need ? ' and ' : '') : ''}${need ? money(need) + ' more profit' : ''} to pass.` : `Target reached. Keep your best day under ${a.cons}% of profit to pass.`];
+  }
+  function acard(a) {
+    const isB = a.kind === 'breached', isF = a.kind === 'funded';
+    const prof = a.bal - a.start, tgt = a.target - a.start, dd = Math.max(0, a.bal - a.floor), ddMax = a.ddAmt;
+    const [nc, nt] = nextStep(a);
+    const col = isB ? 'var(--fa)' : a.today > 0 ? 'var(--ok)' : a.today < 0 ? 'var(--no)' : 'var(--sky)';
+    const rn = resetNow(a); const action = isB ? (a.quote ? `<a class="btn sm" href="#account?acct=${a.id}">Details</a>` : `<a class="btn sm pri" href="${resetHref(a)}">${rn ? 'Reset for ' + money(rn) : 'Free Reset'}</a>`) : a.phase === 'passed' ? (a.steps.some((x) => x[0] === 'Agreement Signed') && a.activation ? `<a class="btn sm pri" href="/checkout/payment?activate=${encodeURIComponent(a.id)}">Pay ${money(a.activation)}</a>` : `<button class="btn sm pri" data-act="agree" data-id="${a.id}">Get Funded</button>`) : a.quote && a.quote.ok ? `<button class="btn sm pri" data-act="reqPay" data-id="${a.id}">Request ${money(a.avail)}</button>` : `<a class="btn sm" href="#journal">Journal</a>`;
+    return `<article class="acard${isB ? ' off' : ''}${a.quote && a.quote.ok ? ' hot' : ''}">
+      <header class="ach"><span class="asz">${a.size}</span><div class="act"><b>$${a.size} ${kindWord(a)}</b><span>${a.plan} · ${a.platform}</span></div>${bd(a.status, a.st === 'ok' ? 'ok' : a.st === 'no' ? 'no' : 'sk')}</header>
+      <div class="abal"><b class="num">${money(a.bal)}</b><span class="num ${isB ? 'mu' : a.today > 0 ? 'pos' : a.today < 0 ? 'neg' : 'mu'}">${isB ? 'Closed' : (a.today ? signed(a.today) : '$0') + ' today'}</span></div>
+      <div class="asp">${VZ.spark(series(a), { w: 300, h: 56, c: col })}</div>
+      <div class="amt">
+        ${isF ? `<div class="am"><div class="l"><span>Withdrawable</span><b class="num">${money(a.avail)} <i>· min ${money(RULE_ALL.payoutMin)}</i></b></div><div class="bar"><i class="${a.avail >= RULE_ALL.payoutMin ? 'ok' : ''}" style="width:${Math.min(100, (a.avail / RULE_ALL.payoutMin) * 100).toFixed(1)}%"></i></div></div>` : `<div class="am"><div class="l"><span>Profit target</span><b class="num">${signed(prof)} <i>of ${money(tgt)}</i></b></div><div class="bar"><i class="${prof >= tgt ? 'ok' : ''}" style="width:${Math.max(0, Math.min(100, (prof / tgt) * 100)).toFixed(1)}%"></i></div></div>`}
+        <div class="am"><div class="l"><span>Max loss room</span><b class="num">${money(dd)} <i>left</i></b></div><div class="bar"><i class="${isB ? 'no' : dd / ddMax < 0.35 ? 'no' : dd / ddMax < 0.75 ? 'wa' : 'ok'}" style="width:${Math.max(0, Math.min(100, (dd / ddMax) * 100)).toFixed(1)}%"></i></div></div>
+        ${(() => { const n = isF ? a.needWin : a.minDays, h2 = isF ? a.winDays : a.days; return `<div class="am"><div class="l"><span>${isF ? 'Winning days' : 'Trading days'}</span><b class="num">${Math.min(h2, n)} <i>of ${n}</i></b></div><div class="dots">${Array.from({ length: n }, (_, i) => `<i class="${i < h2 ? 'y' : ''}"></i>`).join('')}</div></div>`; })()}
+      </div>
+      <p class="anx ${nc}"><i></i>${nt}</p>
+      <footer class="acf"><a class="lk" href="#account?acct=${a.id}">Details ${ico('back', 'width="12" height="12" style="transform:rotate(180deg);vertical-align:-1px"')}</a><span class="mono fa">${a.id}</span>${action}</footer>
+    </article>`;
+  }
+  function pAccounts() {
+    const act = ACC.filter((a) => a.kind !== 'breached'); const today = act.reduce((s, a) => s + a.today, 0); const bal = act.reduce((s, a) => s + a.bal, 0);
+    const f = S.af || 'all'; const list = ACC.filter((a) => f === 'all' || a.kind === f);
+    const cnt = (k) => ACC.filter((a) => a.kind === k).length;
+    const ready = ACC.find((a) => a.quote && a.quote.ok); const passed = ACC.find((a) => a.phase === 'passed');
+    const now = new Date(); const greet = Number(new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour: 'numeric', hour12: false }).format(now)); const hello = greet < 12 ? 'Good Morning' : greet < 18 ? 'Good Afternoon' : 'Good Evening';
+    const tmax = Math.max(...act.map((a) => Math.abs(a.today)), 1);
+        const yr = new Date().getFullYear(); const dOf = (d) => { const x = new Date(String(d).replace(/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\w*\s+/, '') + ' ' + yr + ' 23:59'); return isNaN(x) ? new Date(8.64e15) : x; }; const now0 = new Date(); now0.setHours(0, 0, 0, 0);
+    const cal = NEWS.filter((n) => n[3] !== 'Low' && dOf(n[0]) >= now0).slice(0, 4).map(([d, t, s2, imp]) => [d, t, imp === 'Holiday' ? s2 + '.' : `${s2}. No new orders 2 minutes before and after.`, imp === 'High' ? 'no' : imp === 'Holiday' ? 'wa' : 'sk', imp === 'High' ? 'Restricted' : imp === 'Holiday' ? 'Market Hours' : 'Medium']);
+    if (PROMO && PROMO.ends) cal.push([PROMO.ends, '', `${PROMO.n} ends. ${PROMO.pct}% off ${PROMO.plans.map(PLAN_SHORT).join(' and ')}.`, 'ok', 'Offer']);
+    COMPS.filter((c) => c.st === 'upcoming').slice(0, 1).forEach((c) => cal.push([c.start, '', `${c.n} starts. ${c.size}, free entry.`, 'sk', 'Contest'])); cal.sort((x, y) => dOf(x[0]) - dOf(y[0]));
+    const pm = {}; act.forEach((a) => (a.dl || []).forEach((d) => { pm[d.iso] = (pm[d.iso] || 0) + d.pnl; })); const dsum = DAYS.slice(-30); const cumD = []; let run = bal; for (let i = dsum.length - 1; i >= 0; i--) { cumD.unshift(run); run -= pm[dsum[i].iso] || 0; } const eq = cumD.length > 1 ? cumD : [bal, bal];
+    const eqx = dsum.length ? [dsum[0].d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), '', dsum[Math.floor(dsum.length / 2)].d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), '', 'Today'] : ['', '', '', '', 'Today'];
+    const afford = REWARDS.filter((r) => r.pts <= S.pts).length;
+    return `<div class="sec first"><div class="hgrid"><div><div class="eyebrow">${now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'America/New_York' })}</div><h2 class="hero">${hello}, ${ME.first}.</h2><p class="lede">${today >= 0 ? `Up <b class="pos">${signed(today)}</b> today across ${act.length} account${act.length === 1 ? '' : 's'}.` : `Down <b class="neg">${signed(today)}</b> today.`} ${ready ? `Your $${ready.size} account has <b>${money(ready.avail)}</b> ready to withdraw.` : passed ? `You passed <span class="mono">${passed.id}</span>. Your funded account is one step away.` : ''}</p><div class="hbtns">${ready ? `<button class="btn pri" data-act="reqPay" data-id="${ready.id}">Request ${money(ready.avail)}</button>` : passed ? `<a class="btn pri" href="#account?acct=${passed.id}">Get Funded</a>` : ''}<a class="btn" href="${buyHref()}">+ Add Account</a></div></div>
+      <div>${sh('Combined Balance', 'Last 30 days', `<span class="kpi"><b>${money(bal)}</b></span>`)}${achart(eq, { h: 170, c: 'var(--sky)', x: eqx })}</div></div>
+      <div class="sumrow" style="margin:28px 0 0">
+        <div class="sum"><span>Today</span><b class="num ${today >= 0 ? 'pos' : 'neg'}">${signed(today)}</b><small>${act.filter((a) => a.today > 0).length} of ${act.length} accounts green</small></div>
+        ${ready ? `<div class="sum hl"><span>Payout Ready</span><b class="num">${money(ready.avail)}</b><small>${ready.id}</small></div>` : ''}
+        <div class="sum"><span>Paid to You</span><b class="num">${money(PAYOUTS.reduce((s, p) => s + p.amt, 0))}</b><small><a href="#payouts">${PAYOUTS.length} payouts</a></small></div>
+        <div class="sum"><span>Reward Points</span><b class="num">${S.pts.toLocaleString('en-US')}</b><small><a href="#rewards">${afford ? afford + (afford === 1 ? ' reward' : ' rewards') + ' ready' : 'Earn 1 point per $1'}</a></small></div>
+        <div class="sum"><span>Accounts</span><b class="num">${act.length}</b><small>${ACC.filter((a) => a.kind === 'funded').length} funded · ${ACC.filter((a) => a.kind === 'evaluation').length} evaluating</small></div>
+      </div></div>
+      <div class="homeg"><div class="hmain">${sh('Your Accounts', '', `<div class="vzchips">${[['all', 'All', ACC.length], ['evaluation', 'Evaluations', cnt('evaluation')], ['funded', 'Funded', cnt('funded')], ['breached', 'Breached', cnt('breached')]].map(([k, l, n]) => `<button class="${f === k ? 'on' : ''}" data-act="af" data-k="${k}">${l} <em>${n}</em></button>`).join('')}</div>`)}
+        <div class="acards">${list.map(acard).join('')}${f === 'all' ? `<a class="acard add" href="${buyHref()}"><span class="pl">+</span><b>Add an Account</b><span>Evaluations from ${money(Math.min(...PLANS.filter((p) => p.kind === 'evaluation').flatMap((p) => p.sizes.map((z) => z[1]))))}.${PROMO ? ` ${PROMO.pct}% off ${PROMO.plans.map(PLAN_SHORT).join(' and ')}${PROMO.ends ? ' until ' + PROMO.ends : ''}.` : ''}</span></a>` : ''}</div><div class="swh" aria-hidden="true">${list.map(() => '<i></i>').join('')}</div></div>
+      <aside class="hside"><section>${sh('Today by Account')}${act.map((a) => `<div class="prog"><div class="l"><span>$${a.size} ${kindWord(a)}</span><b class="${a.today > 0 ? 'pos' : a.today < 0 ? 'neg' : 'mu'}">${a.today ? signed(a.today) : '$0'}</b></div><div class="bar"><i class="${a.today >= 0 ? 'ok' : 'no'}" style="width:${((Math.abs(a.today) / tmax) * 100).toFixed(1)}%"></i></div></div>`).join('')}</section><section>${sh('Coming Up', 'Eastern Time', '<a class="lk" href="#resources?tab=news">News Calendar</a>')}${cal.map(([d, t, s, c, b]) => `<div class="row"><div class="t"><b>${d}${t ? ` <span class="fa" style="display:inline;font-weight:400">· ${t}</span>` : ''}</b><span>${s}</span></div><div class="e">${bd(b, c)}</div></div>`).join('')}</section><section>${sh('From Funded Sky', '', '<button class="lk" data-act="bell">All</button>')}${NOTES.slice(0, 3).map((x) => `<a class="row" href="#${x.go}" style="text-decoration:none;color:inherit"><div class="t"><b>${esc(x.t)}</b><span>${esc(x.s)}</span></div><div class="e fa" style="font-size:12px">${x.ago}</div></a>`).join('')}</section></aside></div>`; }

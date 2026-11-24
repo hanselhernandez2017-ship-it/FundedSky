@@ -1,0 +1,118 @@
+/* ===== app shell: search, buy, profile, promo ===== */
+.fsbo .top{gap:14px}
+.fsbo .srch{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:8px;height:38px;padding:0 10px 0 12px;border:1px solid var(--ln);border-radius:10px;color:var(--mu);font-size:13px;width:210px;margin-left:18px;transition:border-color .15s,color .15s}
+.fsbo .srch:hover{border-color:#3A3A42;color:var(--tx)}
+.fsbo.light .srch:hover{border-color:#C5CAD2}
+.fsbo .srch svg{width:15px;height:15px;flex:none}
+.fsbo .srch span{flex:1}
+.fsbo kbd{font:600 11px/1 'Mona Sans',system-ui,sans-serif;padding:4px 6px;border-radius:5px;border:1px solid var(--ln);color:var(--mu);background:var(--p2)}
+.fsbo .top .clk{margin-left:auto}
+.fsbo .top .buy{flex:none}
+.fsbo .srch-m{display:none}
+.fsbo .avbtn{all:unset;box-sizing:border-box;cursor:pointer;width:38px;height:38px;border-radius:50%;display:grid;place-items:center;font-size:11.5px;font-weight:700;color:var(--sky);background:var(--skyt);border:1px solid rgba(124,196,255,.35);flex:none;transition:box-shadow .15s}
+.fsbo .avbtn:hover,.fsbo .avbtn.on{box-shadow:0 0 0 3px var(--skyt)}
+.fsbo .pmenu{position:absolute;right:40px;top:58px;z-index:55;width:300px;background:var(--p2);border:1px solid var(--ln);border-radius:16px;box-shadow:0 24px 48px rgba(0,0,0,.5);overflow:hidden;animation:popIn .16s ease-out}
+.fsbo.light .pmenu{box-shadow:0 24px 48px rgba(16,24,40,.14)}
+.fsbo .pmh{display:flex;align-items:center;gap:12px;padding:16px 18px;border-bottom:1px solid var(--ln2)}
+.fsbo .pmh .av{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:700;color:var(--sky);background:var(--skyt);flex:none}
+.fsbo .pmh b{display:block;font-size:14px;font-weight:600}
+.fsbo .pmh span{display:block;font-size:12.5px;color:var(--mu)}
+.fsbo .pml{padding:6px;border-bottom:1px solid var(--ln2)}
+.fsbo .pml:last-child{border-bottom:0}
+.fsbo .pml>a,.fsbo .pml>button{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:12px;width:100%;padding:10px 12px;border-radius:10px;font-size:13.5px;color:var(--tx)}
+.fsbo .pml>*:hover{background:var(--p3);color:var(--tx)}
+.fsbo .pml svg{width:16px;height:16px;color:var(--mu)}
+.fsbo .promo{display:flex;flex-direction:column;gap:4px;margin:18px 4px 14px;padding:14px;border-radius:14px;text-decoration:none;color:var(--tx);background:radial-gradient(120% 120% at 100% 0%,rgba(124,196,255,.22),transparent 60%),var(--p2);border:1px solid rgba(124,196,255,.25);transition:border-color .15s,transform .15s}
+.fsbo .promo:hover{border-color:var(--sky);color:var(--tx);transform:translateY(-1px)}
+.fsbo .promo .pt{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;color:var(--sky);text-transform:uppercase;letter-spacing:.04em}
+.fsbo .promo b{font-size:15px;font-weight:600}
+.fsbo .promo span:not(.pt){font-size:12px;color:var(--mu);line-height:1.4}
+.fsbo .promo em{font-style:normal;font-size:12.5px;font-weight:600;color:var(--sky);margin-top:4px}
+.fsbo .side .nav{margin-bottom:0}
+/* search palette */
+.fsbo .palov{position:fixed;inset:0;z-index:80;background:rgba(8,8,10,.55);backdrop-filter:blur(3px);display:flex;justify-content:center;align-items:flex-start;padding-top:12vh}
+.fsbo.light .palov{background:rgba(16,18,22,.25)}
+.fsbo .pal{width:640px;max-width:calc(100% - 32px);background:var(--p1);border:1px solid var(--ln);border-radius:18px;box-shadow:0 30px 60px rgba(0,0,0,.5);overflow:hidden;animation:popIn .16s ease-out}
+.fsbo.light .pal{box-shadow:0 30px 60px rgba(16,24,40,.18)}
+.fsbo .pin{display:flex;align-items:center;gap:12px;padding:0 18px;border-bottom:1px solid var(--ln)}
+.fsbo .pin svg{width:18px;height:18px;color:var(--mu);flex:none}
+.fsbo .pin input{all:unset;flex:1;height:58px;font-size:16px;color:var(--tx)}
+.fsbo .pin input::placeholder{color:var(--fa)}
+.fsbo .pres{max-height:52vh;overflow:auto;padding:6px}
+.fsbo .pg{padding:6px 0}
+.fsbo .pgh{display:block;padding:6px 12px;font-size:11.5px;font-weight:600;color:var(--fa);text-transform:uppercase;letter-spacing:.05em}
+.fsbo .pg a{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;color:var(--tx);text-decoration:none}
+.fsbo .pg a:hover,.fsbo .pg a:first-of-type:focus{background:var(--p3);color:var(--tx)}
+.fsbo .pg a svg{width:16px;height:16px;color:var(--mu);flex:none}
+.fsbo .pg a b{display:block;font-size:13.5px;font-weight:500}
+.fsbo .pg a span{display:block;font-size:12px;color:var(--mu)}
+.fsbo .pft{display:flex;gap:18px;padding:10px 18px;border-top:1px solid var(--ln);font-size:12px;color:var(--fa)}
+.fsbo .empty{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;padding:34px 20px;color:var(--mu)}
+.fsbo .empty svg{color:var(--fa);margin-bottom:4px}
+.fsbo .empty b{color:var(--tx);font-weight:600}
+.fsbo .empty span{font-size:13px;max-width:340px}
+/* transitions and hover */
+@keyframes popIn{from{opacity:0;transform:translateY(-6px) scale(.98)}to{opacity:1;transform:none}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.fsbo .content.enter>*{animation:fadeUp .42s cubic-bezier(.2,.7,.2,1) both}
+.fsbo .content.enter>*:nth-child(2){animation-delay:.05s}.fsbo .content.enter>*:nth-child(3){animation-delay:.1s}.fsbo .content.enter>*:nth-child(4){animation-delay:.15s}.fsbo .content.enter>*:nth-child(5){animation-delay:.2s}.fsbo .content.enter>*:nth-child(n+6){animation-delay:.24s}
+.fsbo .pop{animation:popIn .16s ease-out}
+.fsbo .drw{animation:drwIn .22s cubic-bezier(.2,.7,.2,1)}
+@keyframes drwIn{from{transform:translateX(30px);opacity:.4}to{transform:none;opacity:1}}
+.fsbo .btn{transition:background .15s,border-color .15s,transform .1s}
+.fsbo .btn:active{transform:translateY(1px)}
+.fsbo table.t tbody tr{transition:background .12s}
+.fsbo table.t tbody tr:not(.sub):hover td{background:color-mix(in srgb,var(--p2) 70%,transparent)}
+.fsbo .acard{transition:border-color .15s,transform .15s,box-shadow .15s}
+.fsbo .acard:not(.add):hover{transform:translateY(-2px);box-shadow:0 14px 30px rgba(0,0,0,.25)}
+.fsbo.light .acard:not(.add):hover{box-shadow:0 14px 30px rgba(16,24,40,.08)}
+.fsbo .rw,.fsbo .cc,.fsbo .pm{transition:border-color .15s,transform .15s}
+.fsbo .rw:hover,.fsbo .cc:hover{transform:translateY(-1px)}
+.fsbo .row[data-act]:hover,.fsbo a.row:hover{background:color-mix(in srgb,var(--p2) 70%,transparent);margin:0 -12px;padding-left:12px;padding-right:12px;border-radius:10px}
+.fsbo .ni{transition:background .12s,color .12s}
+@media (prefers-reduced-motion:reduce){.fsbo *{animation:none!important;transition:none!important}}
+.fsbo .top{padding:0 40px 0 68px;gap:12px;min-width:0}
+.fsbo .top h1{flex:none;white-space:nowrap}
+.fsbo .top .clk{flex:none;gap:12px}
+.fsbo .top .tcb{width:180px}
+.fsbo .top .buy{margin-left:6px}
+@media (max-width:1560px) and (min-width:861px){.fsbo .srch{width:38px;padding:0;justify-content:center;margin-left:12px}.fsbo .srch span,.fsbo .srch kbd{display:none}.fsbo .top .tcb{width:140px}}
+@media (max-width:1360px) and (min-width:861px){.fsbo .top .clk .c{display:none}.fsbo .top{padding:0 28px 0 40px}.fsbo .content{padding-left:40px!important;padding-right:28px!important}}
+@media (max-width:1140px) and (min-width:861px){.fsbo .top .tcb{width:80px}.fsbo .top .ckv{display:none}.fsbo .top .buy{padding:0 12px}}
+/* ===== mobile app feel ===== */
+@media (max-width:860px){
+  .fsbo .srch,.fsbo .top .buy{display:none}
+  .fsbo .srch-m{display:inline-flex}
+  .fsbo .mtop{position:sticky;top:0;z-index:40;background:color-mix(in srgb,var(--bg) 82%,transparent);backdrop-filter:saturate(1.4) blur(14px);-webkit-backdrop-filter:saturate(1.4) blur(14px)}
+  .fsbo .mtop .r{gap:6px}
+  .fsbo .mtop .ib,.fsbo .mtop .avbtn{width:36px;height:36px}
+  .fsbo .bnav{backdrop-filter:saturate(1.4) blur(14px);-webkit-backdrop-filter:saturate(1.4) blur(14px);background:color-mix(in srgb,var(--p1) 86%,transparent)}
+  /* bottom sheets */
+  .fsbo .ov{align-items:flex-end;justify-content:stretch}
+  .fsbo .drw{width:100%;height:auto;max-height:88vh;border-left:0;border-top:1px solid var(--ln);border-radius:22px 22px 0 0;animation:sheetUp .26s cubic-bezier(.2,.7,.2,1);position:relative}
+  .fsbo .drw::before{content:'';position:absolute;top:8px;left:50%;width:40px;height:4px;margin-left:-20px;border-radius:2px;background:var(--ln)}
+  .fsbo .drw .dh{padding:24px 20px 16px}
+  .fsbo .drw .db{padding:18px 20px}
+  .fsbo .drw .df{padding:14px 20px calc(14px + env(safe-area-inset-bottom))}
+  .fsbo .drw .df .btn{flex:1}
+  .fsbo .pop,.fsbo .pmenu{position:fixed;left:0;right:0;top:auto;bottom:0;width:auto;border-radius:22px 22px 0 0;z-index:75;animation:sheetUp .26s cubic-bezier(.2,.7,.2,1);box-shadow:0 -20px 50px rgba(0,0,0,.45);padding-top:12px}
+  .fsbo .pop::before,.fsbo .pmenu::before{content:'';position:absolute;top:8px;left:50%;width:40px;height:4px;margin-left:-20px;border-radius:2px;background:var(--ln)}
+  .fsbo .pop .pl{max-height:60vh}
+  .fsbo .palov{padding-top:0;align-items:stretch}
+  .fsbo .pal{max-width:100%;width:100%;border-radius:0;border:0;display:flex;flex-direction:column;height:100%}
+  .fsbo .pres{max-height:none;flex:1}
+  .fsbo .pft{display:none}
+  /* swipeable account cards */
+  .fsbo .acards{grid-auto-flow:column;grid-template-columns:none;grid-auto-columns:86%;overflow-x:auto;scroll-snap-type:x mandatory;margin:0 -16px;padding:4px 16px 8px;gap:12px;scrollbar-width:none}
+  .fsbo .acards::-webkit-scrollbar{display:none}
+  .fsbo .acard{scroll-snap-align:center}
+  .fsbo .acard.add{min-height:auto}
+  .fsbo .swh{display:flex!important}
+  .fsbo .content.enter>*{animation-duration:.3s}
+}
+@keyframes sheetUp{from{transform:translateY(40px);opacity:.3}to{transform:none;opacity:1}}
+.fsbo .swh{display:none;align-items:center;justify-content:center;gap:6px;margin-top:12px}
+.fsbo .swh i{width:6px;height:6px;border-radius:3px;background:var(--ln)}
+.fsbo .swh i:first-child{width:18px;background:var(--sky)}
+.fsbo .scrim{display:none}
+@media (max-width:860px){.fsbo .scrim{display:block;position:fixed;inset:0;z-index:70;background:rgba(8,8,10,.55)}.fsbo.light .scrim{background:rgba(16,18,22,.3)}}

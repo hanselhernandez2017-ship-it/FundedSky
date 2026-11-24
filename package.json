@@ -1,0 +1,22 @@
+{
+  "name": "fundedsky",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Funded Sky prop firm platform",
+  "main": "server/index.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server/index.js",
+    "build": "node scripts/build-web.js",
+    "migrate": "node server/migrate.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "express": "^4.21.2",
+    "morphdom": "^2.7.8",
+    "pg": "^8.13.1",
+    "stripe": "^17.5.0"
+  }
+}

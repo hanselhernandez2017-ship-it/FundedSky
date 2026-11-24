@@ -1,0 +1,17 @@
+.fsbo.light{--bg:#F4F5F7;--p1:#FFFFFF;--p2:#FFFFFF;--p3:#F1F3F6;--ln:#E1E4E9;--ln2:#ECEEF2;--tx:#101216;--t2:#2B2E34;--mu:#5E636C;--fa:#8A8F98;--sky:#1C84DE;--skyt:rgba(28,132,222,.11);--ok:#139A63;--okt:rgba(19,154,99,.11);--no:#D8394A;--not:rgba(216,57,74,.10);--wa:#B87A0A;--wat:rgba(184,122,10,.12);color-scheme:light}
+.fsbo.light a:hover,.fsbo.light .lk:hover{color:#1569B3}
+.fsbo.light :is(.logo i,.ib i,.steps>div.ok i){color:#fff}
+.fsbo.light .ni em.n{background:var(--skyt)}
+.fsbo.light .av{color:var(--sky)}
+.fsbo.light :is(.ib:hover,.ib.on,.btn:hover,.opt:hover,.cc:hover){border-color:#C5CAD2}
+.fsbo.light .btn.pri{background:#101216;color:#fff;border-color:#101216}
+.fsbo.light .btn.pri:hover{background:#2B2E34}
+.fsbo.light .sw:not(.on){background:#CDD2D9}
+.fsbo.light :is(.ov,.more){background:rgba(16,18,22,.32)}
+.fsbo.light .toast{background:#101216;color:#fff}
+.fsbo.light .pop{box-shadow:0 24px 48px rgba(16,24,40,.14)}
+.fsbo.light .drw{box-shadow:-20px 0 48px rgba(16,24,40,.12)}
+.fsbo.light .cc .cv{background:linear-gradient(135deg,#E6F0FA,#F4F5F7)}
+body:has(.fsbo.light){background:#F4F5F7}
+.fsbo.light .vzchips button.on{color:#fff}
+.fsbo.light .steps>div.ok i{color:#fff}

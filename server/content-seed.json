@@ -1,0 +1,358 @@
+{
+ "courses": [
+  {
+   "id": "c1",
+   "n": "How Evaluations Work",
+   "d": "Targets, minimum days and what passing means.",
+   "l": 6,
+   "min": 24,
+   "tag": "Start Here",
+   "hue": 0
+  },
+  {
+   "id": "c2",
+   "n": "Drawdown, Explained",
+   "d": "Trailing versus end-of-day, with worked examples.",
+   "l": 5,
+   "min": 19,
+   "tag": "Rules",
+   "hue": 1
+  },
+  {
+   "id": "c3",
+   "n": "Getting Paid",
+   "d": "Payout rules, the split, Rise and crypto.",
+   "l": 4,
+   "min": 15,
+   "tag": "Payouts",
+   "hue": 2
+  },
+  {
+   "id": "c4",
+   "n": "Risk Before Reward",
+   "d": "Sizing so one bad trade never ends an account.",
+   "l": 7,
+   "min": 31,
+   "tag": "Skills",
+   "hue": 3
+  },
+  {
+   "id": "c5",
+   "n": "Trading the Open",
+   "d": "The first 30 minutes after 9:30 AM ET.",
+   "l": 3,
+   "min": 12,
+   "tag": "New",
+   "hue": 4
+  },
+  {
+   "id": "c6",
+   "n": "News Days",
+   "d": "Why the news rule exists and how to plan around it.",
+   "l": 3,
+   "min": 10,
+   "tag": "Rules",
+   "hue": 1
+  },
+  {
+   "id": "c7",
+   "n": "Consistency Rule",
+   "d": "Why one huge day can delay a payout.",
+   "l": 3,
+   "min": 9,
+   "tag": "Payouts",
+   "hue": 2
+  },
+  {
+   "id": "c8",
+   "n": "Platform Setup: Tradovate",
+   "d": "Log in, set your layout and place a test order.",
+   "l": 4,
+   "min": 14,
+   "tag": "Platforms",
+   "hue": 5
+  },
+  {
+   "id": "c9",
+   "n": "Platform Setup: NinjaTrader",
+   "d": "Connect your funded login and charts.",
+   "l": 4,
+   "min": 16,
+   "tag": "Platforms",
+   "hue": 5
+  },
+  {
+   "id": "c10",
+   "n": "Reading Your Journal",
+   "d": "Find the habits that cost you money.",
+   "l": 3,
+   "min": 11,
+   "tag": "Skills",
+   "hue": 3
+  },
+  {
+   "id": "c11",
+   "n": "Futures Basics",
+   "d": "Contracts, ticks, margin and sessions.",
+   "l": 8,
+   "min": 40,
+   "tag": "Start Here",
+   "hue": 0
+  },
+  {
+   "id": "c12",
+   "n": "Trading Psychology",
+   "d": "Tilt, revenge trading and how to stop.",
+   "l": 5,
+   "min": 22,
+   "tag": "Skills",
+   "hue": 3
+  }
+ ],
+ "lessons": {
+  "c3": [
+   "Who can request a payout",
+   "The 90% split and the payout threshold",
+   "Rise or crypto: which to choose",
+   "What happens after you request"
+  ],
+  "c4": [
+   "Why accounts really fail",
+   "Sizing from your daily loss limit",
+   "Stops that respect drawdown",
+   "Scaling up after a green week",
+   "Red day rules",
+   "Correlated positions",
+   "Review: build your plan"
+  ],
+  "c5": [
+   "What happens at 9:30",
+   "Opening range and volume",
+   "When to sit out"
+  ]
+ },
+ "rewards": [
+  {
+   "id": "r1",
+   "n": "10% Off Any Evaluation",
+   "d": "One use, any plan and size.",
+   "pts": 1500
+  },
+  {
+   "id": "r2",
+   "n": "Free Reset",
+   "d": "Reset a breached or struggling evaluation.",
+   "pts": 3000
+  },
+  {
+   "id": "r3",
+   "n": "25% Off Any Evaluation",
+   "d": "One use, any plan and size.",
+   "pts": 4000
+  },
+  {
+   "id": "r4",
+   "n": "Free $25K Evaluation",
+   "d": "Any plan with a $25K size, your choice of platform.",
+   "pts": 6000
+  },
+  {
+   "id": "r5",
+   "n": "Payout Split Up to 95%",
+   "d": "For one payout on any funded account.",
+   "pts": 9000
+  },
+  {
+   "id": "r6",
+   "n": "Funded Sky Hoodie",
+   "d": "Shipped to you. Sizes S to XXL.",
+   "pts": 12000
+  }
+ ],
+ "earn": [
+  [
+   "Buy an Evaluation",
+   "1 point per $1"
+  ],
+  [
+   "Pass an Evaluation",
+   "500 points"
+  ],
+  [
+   "Get a Payout",
+   "250 points"
+  ],
+  [
+   "Refer a Friend Who Buys",
+   "1,000 points"
+  ],
+  [
+   "Share a Certificate",
+   "50 points, once a week"
+  ],
+  [
+   "Leave a Review",
+   "200 points, once"
+  ]
+ ],
+ "articles": [
+  [
+   "Rules",
+   "How the Max Drawdown Works",
+   "Every account has a max loss floor. On evaluations it trails your highest end-of-day balance by the max loss for your size ($1,000 on 25K, $2,000 on 50K, $3,000 on 100K, $4,500 on 150K). It only moves at the end of the trading day, never down. On funded accounts it stops $100 above your starting balance. If your balance touches the floor at any time, the account is breached."
+  ],
+  [
+   "Rules",
+   "The Daily Loss Limit",
+   "If you lose more than your daily loss limit in one trading day ($500 on 25K, $1,000 on 50K, $2,000 on 100K, $3,000 on 150K), trading pauses until the next session opens at 6:00 PM ET. The account is not closed. The trading day runs from 6:00 PM to 5:00 PM ET."
+  ],
+  [
+   "Rules",
+   "Trading Around High-Impact News",
+   "You cannot open new orders from 2 minutes before to 2 minutes after a high-impact event on the news calendar. Positions you already hold can stay open. The calendar is on the Resources page."
+  ],
+  [
+   "Rules",
+   "The Consistency Rule for Payouts",
+   "To pass an evaluation, your best day can be at most 50% of your total profit. For a funded payout, your best day in the cycle can be at most 40% of that cycle's profit (20% on Instant accounts). If one big day breaks the rule, keep trading: more profitable days bring the share down."
+  ],
+  [
+   "Payouts",
+   "How and When You Get Paid",
+   "Funded accounts can request a payout after 5 winning days of $100 or more in the cycle, with at least $250 available. You keep 90% (Instant: 80% for the first 3 payouts, then 90%). Each payout has a cap by size, and there is a lifetime cap per account. Requests are reviewed in 1 to 2 business days, then sent by Rise or USDC."
+  ],
+  [
+   "Payouts",
+   "Setting Up Rise",
+   "Rise pays you in your local currency by bank transfer. Add your bank account under Settings, Payout Methods. New payout methods are held for 48 hours as a safety check."
+  ],
+  [
+   "Platforms",
+   "Logging In to Tradovate",
+   "Platform connections are being set up. Until they go live, your accounts trade on the Funded Sky simulated feed and your dashboard shows every trade. We will email your platform login when your connection is ready."
+  ],
+  [
+   "Platforms",
+   "Switching Platforms",
+   "You can switch platform once per account, before your first trade. Contact support with your account number and the platform you want."
+  ],
+  [
+   "Billing",
+   "Refund Policy",
+   "Evaluations with no trades can be refunded within 14 days of purchase. Resets, activation fees and accounts that have traded cannot be refunded. Refunds go back to your original payment method in 3 to 5 business days."
+  ],
+  [
+   "Billing",
+   "Resets: What Happens to Your Account",
+   "A reset puts your evaluation back to its starting balance with the same rules. Your trading days, best day and history start over. A reset costs 55% of the plan price. If you bought the Free Reset add-on, your first reset is free."
+  ],
+  [
+   "Getting Funded",
+   "Identity Check: What You Need",
+   "Before your first payout we verify your identity once. You need a passport, driver's license or national ID, and your name must match your payout method. Submit your details under Settings, Identity. Our team reviews them within 1 business day."
+  ]
+ ],
+ "topics": [
+  "Payouts",
+  "Breach Dispute",
+  "Billing and Refunds",
+  "Identity Check",
+  "Platform and Login",
+  "Rules Question",
+  "Account Changes",
+  "Affiliates"
+ ],
+ "news": [
+  [
+   "Tue Nov 24",
+   "10:00 AM",
+   "Consumer Confidence",
+   "Medium"
+  ],
+  [
+   "Wed Nov 25",
+   "8:30 AM",
+   "GDP, second estimate",
+   "High"
+  ],
+  [
+   "Wed Nov 25",
+   "8:30 AM",
+   "Jobless Claims",
+   "Medium"
+  ],
+  [
+   "Wed Nov 25",
+   "10:00 AM",
+   "PCE Price Index",
+   "High"
+  ],
+  [
+   "Wed Nov 25",
+   "2:00 PM",
+   "FOMC Minutes",
+   "High"
+  ],
+  [
+   "Thu Nov 26",
+   "All day",
+   "Thanksgiving Day",
+   "Holiday"
+  ],
+  [
+   "Fri Nov 27",
+   "1:15 PM",
+   "CME early close",
+   "Holiday"
+  ]
+ ],
+ "competitions": [
+  {
+   "id": "C-08",
+   "n": "Black Friday Sprint",
+   "st": "upcoming",
+   "start": "Nov 27",
+   "end": "Nov 30",
+   "size": "$25K practice account",
+   "entry": "Free",
+   "players": 0,
+   "prize": "$150K Funded Account + 9 more",
+   "rule": "Best return in 4 days"
+  },
+  {
+   "id": "C-09",
+   "n": "December Consistency Challenge",
+   "st": "upcoming",
+   "start": "Dec 1",
+   "end": "Dec 31",
+   "size": "$100K practice account",
+   "entry": "Free",
+   "players": 0,
+   "prize": "3 \u00d7 $50K Funded Accounts",
+   "rule": "Best profit with no day above 30% of total"
+  }
+ ],
+ "cprizes": [
+  [
+   "1st",
+   "$100K Funded Account"
+  ],
+  [
+   "2nd",
+   "$50K Funded Account"
+  ],
+  [
+   "3rd",
+   "$25K Funded Account"
+  ],
+  [
+   "4th",
+   "Free $50K Evaluation"
+  ],
+  [
+   "5th",
+   "Free $25K Evaluation"
+  ]
+ ],
+ "leaderboard": []
+}

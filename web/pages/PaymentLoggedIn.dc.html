@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Funded Sky checkout: payment, logged in</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mona+Sans:wdth,wght@100..125,400..700&amp;family=Geist+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0;background:#08080A}
+a{color:#7CC4FF}a:hover{color:#A9D8FF}
+.fs-in{border:1px solid #26262A;outline:none;transition:border-color .15s,box-shadow .15s}
+.fs-in:hover{border-color:#3A3A40}
+.fs-in:focus{border-color:#7CC4FF;box-shadow:0 0 0 3px rgba(124,196,255,.18)}
+.fs-opt{transition:border-color .15s,background .15s}
+.fs-opt:hover{border-color:#3A3A40}
+.fs-check{appearance:none;-webkit-appearance:none;width:20px;height:20px;margin:0;flex:none;border:1.5px solid #3A3A40;border-radius:5px;background:#08080A;display:inline-grid;place-content:center;cursor:pointer;transition:background .15s,border-color .15s}
+.fs-check::before{content:"";width:11px;height:11px;background:#08080A;clip-path:polygon(12% 50%,0 63%,40% 100%,100% 22%,87% 10%,40% 74%);transform:scale(0);transition:transform .12s}
+.fs-check:hover{border-color:#7CC4FF}
+.fs-check:checked{background:#7CC4FF;border-color:#7CC4FF}
+.fs-check:checked::before{transform:scale(1)}
+.fs-radio{appearance:none;-webkit-appearance:none;width:20px;height:20px;margin:0;flex:none;border:1.5px solid #3A3A40;border-radius:50%;background:#08080A;display:inline-grid;place-content:center;cursor:pointer;transition:border-color .15s}
+.fs-radio::before{content:"";width:10px;height:10px;border-radius:50%;background:#7CC4FF;transform:scale(0);transition:transform .12s}
+.fs-radio:hover{border-color:#7CC4FF}
+.fs-radio:checked{border-color:#7CC4FF}
+.fs-radio:checked::before{transform:scale(1)}
+.fs-bar{display:none}
+.fs-mprog{display:none}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4FF;outline-offset:2px}
+@media (max-width: 760px){
+.fs-steps,.fs-secure{display:none!important}
+.fs-hdr{padding:0 20px!important;height:64px;box-sizing:border-box}
+.fs-mprog{display:flex!important}
+.fs-main{padding:24px 20px 32px!important;gap:28px!important}
+.fs-col{gap:28px!important}
+.fs-h1{font-size:28px!important;line-height:32px!important}
+.fs-lead{font-size:15px!important;line-height:22px!important}
+.fs-aside{position:static!important;padding:20px!important}
+.fs-cta{display:none!important}
+.fs-total{display:none!important}
+.fs-bar{display:flex!important}
+.fs-in{font-size:16px!important}
+}
+</style>
+</helmet>
+<div style="min-height: 1060px; background: #08080A; color: #F4F2F1; font-family: 'Mona Sans', system-ui, sans-serif;">
+
+<header style="border-bottom: 1px solid #26262A;">
+<div class="fs-hdr" style="max-width: 1200px; width: 100%; box-sizing: border-box; margin: 0 auto; padding: 18px 32px; display: flex; align-items: center; justify-content: space-between; gap: 24px;">
+<a href="/" style="display: flex; align-items: center; gap: 6px; text-decoration: none;"><span style="font-weight: 700; font-size: 22px; letter-spacing: -0.045em; color: #F4F2F1; line-height: 1;">fundedsky</span><span style="background: #7CC4FF; color: #08080A; font-weight: 600; font-size: 15px; letter-spacing: -0.01em; padding: 2px 6px 3px; border-radius: 4px; line-height: 1;">futures</span></a>
+<ol class="fs-steps" style="display: flex; gap: 14px; align-items: center; list-style: none; margin: 0; padding: 0; font-size: 13px; color: #9C9693;" aria-label="Checkout steps">
+<li style="display: flex; align-items: center; gap: 8px; color: #D4CFCD;"><span style="width: 22px; height: 22px; border-radius: 11px; background: #26262A; color: #7CC4FF; display: flex; align-items: center; justify-content: center;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"></path></svg></span>Choose Account</li>
+<li class="fs-sep" aria-hidden="true" style="width: 64px; height: 3px; border-radius: 2px; background: #26262A; overflow: hidden; align-self: center;"><i style="display: block; height: 100%; width: 100%; background: #7CC4FF; border-radius: 2px;"></i></li>
+<li style="display: flex; align-items: center; gap: 8px; color: #F4F2F1;" aria-current="step"><span style="width: 22px; height: 22px; border-radius: 11px; background: #7CC4FF; color: #08080A; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center;">2</span>Payment</li>
+<li class="fs-sep" aria-hidden="true" style="width: 64px; height: 3px; border-radius: 2px; background: #26262A; overflow: hidden; align-self: center;"><i style="display: block; height: 100%; width: 34%; background: #7CC4FF; border-radius: 2px;"></i></li>
+<li style="display: flex; align-items: center; gap: 8px;"><span style="width: 22px; height: 22px; border-radius: 11px; border: 1px solid #3A3A40; font-size: 12px; display: flex; align-items: center; justify-content: center;">3</span>Start Trading</li>
+</ol>
+<div style="display: flex; align-items: center; gap: 20px;">
+<span style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #D4CFCD;"><span style="width: 32px; height: 32px; border-radius: 16px; background: #26262A; color: #F4F2F1; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center;">{{ ini }}</span><span class="fs-secure">{{ firstName }}</span></span>
+<span style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: #9C9693;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg><span class="fs-secure">Secure Checkout</span></span>
+</div>
+</div>
+</header>
+
+<div class="fs-mprog" style="padding: 12px 20px 0; flex-direction: column; gap: 8px;">
+<div style="display: flex; justify-content: space-between; font-size: 12px; line-height: 16px; color: #9C9693;"><span>Payment</span><span style="font-family: 'Geist Mono', monospace;">2 / 3</span></div>
+<div style="height: 4px; border-radius: 2px; background: #26262A;"><div style="width: 66.67%; height: 4px; border-radius: 2px; background: #7CC4FF;"></div></div>
+</div>
+
+<main class="fs-main" style="max-width: 1200px; margin: 0 auto; padding: 40px 32px 64px; display: flex; flex-wrap: wrap; gap: 32px; align-items: flex-start; box-sizing: border-box;">
+
+<form class="fs-col" style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 32px;">
+<div style="display: flex; flex-direction: column; gap: 10px;">
+<p class="fs-steps" style="margin: 0; font-stretch: 125%; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: #9C9693; font-weight: 500;">Step 2 of 3</p>
+<h1 class="fs-h1" style="margin: 0; font-size: 44px; line-height: 48px; font-weight: 600; letter-spacing: -0.03em;">Welcome Back.</h1>
+<p class="fs-lead" style="margin: 0; font-size: 17px; line-height: 26px; color: #D4CFCD;">Your details are saved. Confirm how you want to pay and the new account is added to your dashboard.</p>
+</div>
+
+<fieldset style="border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; min-width: 0;">
+<legend style="font-size: 18px; line-height: 24px; font-weight: 600; letter-spacing: -0.01em; margin-bottom: 14px; padding: 0;">Signed In As</legend>
+<div style="min-height: 72px; box-sizing: border-box; background: #111113; border: 1px solid #26262A; border-radius: 8px; padding: 14px 16px; display: flex; align-items: center; gap: 14px;">
+<span style="flex: none; width: 44px; height: 44px; border-radius: 22px; background: #26262A; color: #F4F2F1; font-size: 15px; font-weight: 600; display: flex; align-items: center; justify-content: center;">{{ ini }}</span>
+<span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px;"><span style="font-size: 15px; line-height: 20px; font-weight: 600;">{{ fullName }}</span><span style="font-size: 13px; line-height: 18px; color: #9C9693;">{{ emailLine }}</span></span>
+<a href="{{ guestHref }}" style="flex: none; min-height: 44px; display: flex; align-items: center; font-size: 13px; font-weight: 500;">Not You?</a>
+</div>
+<p style="margin: 0; font-size: 13px; line-height: 18px; color: #9C9693;">You have <span style="color: #F4F2F1;">{{ activeLabel }}</span>. This one will appear alongside them in your dashboard.</p>
+</fieldset>
+
+<fieldset style="border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; min-width: 0;">
+<legend style="font-size: 18px; line-height: 24px; font-weight: 600; letter-spacing: -0.01em; margin-bottom: 14px; padding: 0;">Payment Method</legend>
+<sc-for list="{{ methods }}" as="m" hint-placeholder-count="4">
+<label class="fs-opt" style="min-height: 64px; box-sizing: border-box; display: flex; align-items: center; gap: 14px; background: {{ m.bg }}; border: 1px solid {{ m.bd }}; border-radius: 8px; padding: 12px 16px; cursor: pointer;"><input type="radio" class="fs-radio" name="pm" checked="{{ m.on }}" onChange="{{ m.pick }}"><span style="flex: 1; display: flex; flex-direction: column; gap: 2px;"><span style="font-size: 15px; line-height: 20px; font-weight: 500;">{{ m.label }}</span><span style="font-size: 13px; line-height: 18px; color: #9C9693;">{{ m.sub }}</span></span><sc-if value="{{ m.isDefault }}" hint-placeholder-val="{{ false }}"><span style="flex: none; background: #7CC4FF; color: #08080A; font-size: 10px; line-height: 1; font-weight: 600; font-stretch: 112%; padding: 4px 7px 5px; border-radius: 4px;">Default</span></sc-if></label>
+</sc-for>
+<sc-if value="{{ isNew }}" hint-placeholder-val="{{ false }}">
+<div style="background: #111113; border: 1px solid #26262A; border-radius: 8px; padding: 18px; display: flex; flex-direction: column; gap: 14px;">
+<div style="display: flex; flex-direction: column; gap: 6px;"><label for="card" style="font-size: 13px; color: #9C9693;">Card Number</label><input id="card" class="fs-in" value="{{ card }}" onChange="{{ set_card }}" type="text" inputmode="numeric" autocomplete="cc-number" placeholder="1234 1234 1234 1234" style="height: 48px; box-sizing: border-box; background: #08080A; border-radius: 4px; padding: 0 14px; color: #F4F2F1; font-family: 'Geist Mono', monospace; font-size: 15px;"></div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px;">
+<div style="display: flex; flex-direction: column; gap: 6px; min-width: 0;"><label for="exp" style="font-size: 13px; color: #9C9693;">Expiry</label><input id="exp" class="fs-in" value="{{ exp }}" onChange="{{ set_exp }}" type="text" inputmode="numeric" autocomplete="cc-exp" placeholder="MM / YY" style="height: 48px; min-width: 0; box-sizing: border-box; background: #08080A; border-radius: 4px; padding: 0 14px; color: #F4F2F1; font-family: 'Geist Mono', monospace; font-size: 15px;"></div>
+<div style="display: flex; flex-direction: column; gap: 6px; min-width: 0;"><label for="cvc" style="font-size: 13px; color: #9C9693;">CVC</label><input id="cvc" class="fs-in" value="{{ cvc }}" onChange="{{ set_cvc }}" type="text" inputmode="numeric" autocomplete="cc-csc" placeholder="123" style="height: 48px; min-width: 0; box-sizing: border-box; background: #08080A; border-radius: 4px; padding: 0 14px; color: #F4F2F1; font-family: 'Geist Mono', monospace; font-size: 15px;"></div>
+</div>
+<p style="margin: 0; font-size: 12.5px; color: #9C9693;">Test mode: use 4242 4242 4242 4242, any future date and any CVC. No real charge.</p>
+</div>
+</sc-if>
+</fieldset>
+
+<label style="display: flex; gap: 12px; align-items: flex-start; font-size: 14px; line-height: 20px; color: #D4CFCD; cursor: pointer;"><input type="checkbox" class="fs-check" checked="{{ agreed }}" onChange="{{ toggleAgree }}"><span>I've read the <a href="/checkout#order">Trading Rules</a> and agree to the <a href="/terms" target="_blank">Terms</a> and <a href="/refund-policy" target="_blank">Refund Policy</a>.</span></label>
+</form>
+
+<aside class="fs-aside" style="flex: 1 1 340px; min-width: 0; position: sticky; top: 24px; background: #18181A; border: 1px solid #26262A; border-radius: 8px; padding: 24px; box-sizing: border-box; display: flex; flex-direction: column; gap: 18px;">
+<div style="display: flex; justify-content: space-between; align-items: flex-start;">
+<div style="display: flex; flex-direction: column; gap: 4px;">
+<p style="margin: 0; font-stretch: 125%; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: #9C9693; font-weight: 500;">Order Summary</p>
+<p style="margin: 0; font-size: 20px; line-height: 26px; font-weight: 600; letter-spacing: -0.01em;">{{ sumTitle }}</p>
+<p style="margin: 0; font-size: 13px; color: #9C9693;">{{ sumSub }}</p>
+</div>
+<a href="{{ backHref }}" style="font-size: 13px;">Edit</a>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px; font-size: 14px; border-top: 1px solid #26262A; padding-top: 16px;">
+<sc-for list="{{ lines }}" as="l"><div style="display: flex; justify-content: space-between; gap: 12px; color: {{ l.color }};"><span>{{ l.label }}</span><span style="font-family: 'Geist Mono', monospace; white-space: nowrap;">{{ l.amount }}</span></div></sc-for>
+<div class="fs-total" style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 6px;"><span style="font-size: 16px; font-weight: 600;">Total Today</span><span style="font-family: 'Geist Mono', monospace; font-size: 26px; font-weight: 500;">{{ total }}</span></div>
+</div>
+<div class="fs-cta" style="display: flex; flex-direction: column; gap: 8px;">
+<sc-if value="{{ agreed }}" hint-placeholder-val="{{ true }}"><button type="button" onClick="{{ submit }}" disabled="{{ busy }}" style="width: 100%; border: 0; cursor: pointer; font: inherit; text-align: center; background: #FFFFFF; color: #111113; border-radius: 4px; padding: 14px; font-size: 15px; font-weight: 600; font-stretch: 112%; text-decoration: none;">{{ payLabel }}</button></sc-if>
+<sc-if value="{{ notAgreed }}" hint-placeholder-val="{{ false }}"><button type="button" disabled style="width: 100%; background: #26262A; color: #9C9693; border: 0; border-radius: 4px; padding: 14px; font: inherit; font-size: 15px; font-weight: 600; font-stretch: 112%;">{{ payLabel0 }}</button><p style="margin: 0; font-size: 12px; color: #9C9693; text-align: center;">Tick the box to agree to the rules and terms first.</p></sc-if>
+<sc-if value="{{ err }}"><p role="alert" style="margin: 10px 0 0; font-size: 13.5px; line-height: 19px; color: #F2777F;">{{ err }}</p></sc-if></div>
+<ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; font-size: 13px; color: #9C9693; border-top: 1px solid #26262A; padding-top: 16px;">
+<li style="display: flex; gap: 10px; align-items: center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7CC4FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"></path></svg>{{ trust1 }}</li>
+<li style="display: flex; gap: 10px; align-items: center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7CC4FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"></path></svg>{{ trust2 }}</li>
+<li style="display: flex; gap: 10px; align-items: center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7CC4FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"></path></svg>Questions? Send a ticket from your dashboard</li>
+</ul>
+</aside>
+</main>
+
+<div class="fs-bar" style="position: sticky; bottom: 0; background: #111113; border-top: 1px solid #26262A; padding: 12px 20px 28px; flex-direction: column; gap: 12px;">
+<div style="display: flex; justify-content: space-between; font-size: 13px; line-height: 16px; color: #9C9693;"><span>{{ sumTitle }}</span><a href="{{ backHref }}" style="font-weight: 500;">Edit</a></div>
+<div style="display: flex; align-items: center; gap: 16px;">
+<div style="flex: 1; display: flex; flex-direction: column; gap: 2px;"><span style="font-size: 11px; line-height: 14px; color: #9C9693;">Total Today</span><span style="font-family: 'Geist Mono', monospace; font-size: 22px; line-height: 26px; font-weight: 500;">{{ total }}</span></div>
+<sc-if value="{{ agreed }}" hint-placeholder-val="{{ true }}"><button type="button" onClick="{{ submit }}" disabled="{{ busy }}" style="border: 0; cursor: pointer; font: inherit; height: 48px; padding: 0 28px; display: flex; align-items: center; background: #FFFFFF; color: #111113; border-radius: 4px; font-size: 15px; font-weight: 600; font-stretch: 112%; text-decoration: none;">{{ payShort }}</button></sc-if>
+<sc-if value="{{ notAgreed }}" hint-placeholder-val="{{ false }}"><button type="button" disabled style="height: 48px; padding: 0 28px; background: #26262A; color: #9C9693; border: 0; border-radius: 4px; font: inherit; font-size: 15px; font-weight: 600; font-stretch: 112%;">Pay</button></sc-if>
+</div>
+<sc-if value="{{ notAgreed }}" hint-placeholder-val="{{ false }}"><p style="margin: 0; font-size: 12px; line-height: 16px; color: #9C9693;">Agree to the rules and terms to pay.</p></sc-if>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"mobileLinks":{"editor":"boolean","default":false},"$preview":{"width":1280,"height":1060}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { method: 'card', agreed: false, sum: null, me: null, busy: false, err: '', card: '', exp: '', cvc: '', n: 0 };
+  }
+  async componentDidMount() {
+    const me = await FSX.me(); if (!me) { location.replace('/login?next=' + encodeURIComponent('/checkout/payment' + location.search)); return; }
+    try {
+      const [sum, boot] = await Promise.all([FSX.checkout.load(true), DC.api('/api/trader/boot').catch(() => null)]);
+      if (sum.empty) { location.replace('/checkout'); return; }
+      if (sum.status === 'paid') { location.replace('/checkout/confirmed?order=' + sum.code); return; }
+      this.setState({ sum, me, n: boot ? boot.ACC.filter((a) => a.kind !== 'breached').length : 0 });
+    } catch (e) { this.setState({ me, err: e.message }); }
+    if (DC.qs('canceled')) this.setState({ err: 'Payment was canceled. You can try again.' });
+  }
+  async submit() {
+    const st = this.state; if (st.busy || !st.sum) return;
+    if (st.method === 'crypto') return this.setState({ err: 'Crypto checkout is coming soon. Use a card for now.' });
+    if (st.method === 'apple' && st.sum.cat.payments === 'test') return this.setState({ err: 'Apple Pay is not available in test mode. Use the test card.' });
+    this.setState({ busy: true, err: '' });
+    try { location.href = await FSX.checkout.pay(st.sum, st); } catch (e) { this.setState({ busy: false, err: e.message }); }
+  }
+  renderVals() {
+    const st = this.state; const sum = st.sum; const me = st.me || {}; const test = !sum || sum.cat.payments === 'test';
+    const defs = [
+      { id: 'card', label: test ? 'Test Card' : 'Card', sub: test ? 'Test mode, no real charge' : 'On our payment processor\'s secure page', isDefault: true },
+      { id: 'apple', label: 'Apple Pay or Google Pay', sub: test ? 'Available with live payments' : 'On the secure page', isDefault: false },
+      { id: 'crypto', label: 'Crypto', sub: 'Coming soon', isDefault: false }
+    ];
+    const methods = defs.map((d) => { const sel = st.method === d.id; return Object.assign({}, d, { on: sel, bg: sel ? '#13202E' : '#111113', bd: sel ? '#7CC4FF' : '#26262A', pick: () => this.setState({ method: d.id, err: '' }) }); });
+    const set = (k) => (e) => this.setState({ [k]: e.target.value, err: '' });
+    const total = sum ? FSX.money(sum.total) : '…';
+    return {
+      methods, isNew: st.method === 'card' && test,
+      agreed: st.agreed, notAgreed: !st.agreed, toggleAgree: () => this.setState({ agreed: !st.agreed }),
+      card: st.card, exp: st.exp, cvc: st.cvc, set_card: set('card'), set_exp: set('exp'), set_cvc: set('cvc'),
+      ini: ((me.first || '')[0] || '') + ((me.last || '')[0] || ''), firstName: me.first || '', fullName: `${me.first || ''} ${me.last || ''}`, emailLine: `${me.email || ''}${me.country ? ' · ' + me.country : ''}`,
+      activeLabel: st.n + (st.n === 1 ? ' Active Account' : ' Active Accounts'),
+      sumTitle: sum ? sum.title : 'Loading…', sumSub: sum ? sum.sub : '', lines: sum ? sum.lines : [], total,
+      payLabel: st.busy ? 'Working…' : 'Pay ' + total, payLabel0: 'Pay ' + total, payShort: st.busy ? '…' : 'Pay', busy: st.busy, err: st.err, submit: () => this.submit(),
+      trust1: 'Your accounts appear in your dashboard as soon as payment clears', trust2: test ? 'Test mode: no real charge' : 'Card payments processed by Stripe',
+      backHref: sum && sum.source === 'order' ? '/app/billing' : '/checkout', guestHref: '/logout?next=' + encodeURIComponent('/checkout/payment' + location.search)
+    };
+  }
+}
+</script>
+</body>
+</html>

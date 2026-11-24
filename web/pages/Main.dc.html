@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Funded Sky checkout: choose your account</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mona+Sans:wdth,wght@100..125,400..700&amp;family=Geist+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0;background:#08080A}
+a{color:#7CC4FF}a:hover{color:#A9D8FF}
+.fs-in{border:1px solid #26262A;outline:none;transition:border-color .15s,box-shadow .15s}
+.fs-in:hover{border-color:#3A3A40}
+.fs-in:focus{border-color:#7CC4FF;box-shadow:0 0 0 3px rgba(124,196,255,.18)}
+.fs-opt{transition:border-color .15s,background .15s}
+.fs-opt:hover{border-color:#3A3A40}
+.fs-check{appearance:none;-webkit-appearance:none;width:20px;height:20px;margin:0;flex:none;border:1.5px solid #3A3A40;border-radius:5px;background:#08080A;display:inline-grid;place-content:center;cursor:pointer;transition:background .15s,border-color .15s}
+.fs-check::before{content:"";width:11px;height:11px;background:#08080A;clip-path:polygon(12% 50%,0 63%,40% 100%,100% 22%,87% 10%,40% 74%);transform:scale(0);transition:transform .12s}
+.fs-check:hover{border-color:#7CC4FF}
+.fs-check:checked{background:#7CC4FF;border-color:#7CC4FF}
+.fs-check:checked::before{transform:scale(1)}
+.fs-qbtn{width:36px;height:36px;border:1px solid #26262A;border-radius:4px;background:#111113;color:#F4F2F1;font:inherit;font-size:18px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:border-color .15s}
+.fs-qbtn:hover{border-color:#7CC4FF}
+.fs-qbtn:disabled{color:#3A3A40;cursor:default;border-color:#26262A}
+.fs-bar{display:none}
+.fs-mprog{display:none}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4FF;outline-offset:2px}
+@media (max-width: 760px){
+.fs-steps,.fs-secure{display:none!important}
+.fs-hdr{padding:0 20px!important;height:64px;box-sizing:border-box}
+.fs-mprog{display:flex!important}
+.fs-main{padding:24px 20px 32px!important;gap:28px!important}
+.fs-col{gap:28px!important}
+.fs-h1{font-size:28px!important;line-height:32px!important}
+.fs-lead{font-size:15px!important;line-height:22px!important}
+.fs-g3{grid-template-columns:minmax(0,1fr)!important}
+.fs-g4{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+.fs-pills{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important}
+.fs-aside{position:static!important;padding:20px!important}
+.fs-cta{display:none!important}
+.fs-total{display:none!important}
+.fs-bar{display:flex!important}
+}
+</style>
+</helmet>
+<div style="min-height: 1600px; background: #08080A; color: #F4F2F1; font-family: 'Mona Sans', system-ui, sans-serif;">
+
+<header style="border-bottom: 1px solid #26262A;">
+<div class="fs-hdr" style="max-width: 1200px; width: 100%; box-sizing: border-box; margin: 0 auto; padding: 18px 32px; display: flex; align-items: center; justify-content: space-between; gap: 24px;">
+<a href="/" style="display: flex; align-items: center; gap: 6px; text-decoration: none;"><span style="font-weight: 700; font-size: 22px; letter-spacing: -0.045em; color: #F4F2F1; line-height: 1;">fundedsky</span><span style="background: #7CC4FF; color: #08080A; font-weight: 600; font-size: 15px; letter-spacing: -0.01em; padding: 2px 6px 3px; border-radius: 4px; line-height: 1;">futures</span></a>
+<ol class="fs-steps" style="display: flex; gap: 14px; align-items: center; list-style: none; margin: 0; padding: 0; font-size: 13px; color: #9C9693;" aria-label="Checkout steps">
+<li style="display: flex; align-items: center; gap: 8px; color: #F4F2F1;" aria-current="step"><span style="width: 22px; height: 22px; border-radius: 11px; background: #7CC4FF; color: #08080A; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center;">1</span>Choose Account</li>
+<li class="fs-sep" aria-hidden="true" style="width: 64px; height: 3px; border-radius: 2px; background: #26262A; overflow: hidden; align-self: center;"><i style="display: block; height: 100%; width: 34%; background: #7CC4FF; border-radius: 2px;"></i></li>
+<li style="display: flex; align-items: center; gap: 8px;"><span style="width: 22px; height: 22px; border-radius: 11px; border: 1px solid #3A3A40; font-size: 12px; display: flex; align-items: center; justify-content: center;">2</span>Payment</li>
+<li class="fs-sep" aria-hidden="true" style="width: 64px; height: 3px; border-radius: 2px; background: #26262A; overflow: hidden; align-self: center;"><i style="display: block; height: 100%; width: 0%; background: #7CC4FF; border-radius: 2px;"></i></li>
+<li style="display: flex; align-items: center; gap: 8px;"><span style="width: 22px; height: 22px; border-radius: 11px; border: 1px solid #3A3A40; font-size: 12px; display: flex; align-items: center; justify-content: center;">3</span>Start Trading</li>
+</ol>
+<div style="display: flex; align-items: center; gap: 20px;">
+<span class="fs-secure" style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: #9C9693;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg>Secure Checkout</span>
+<a href="{{ loginHref }}" style="min-height: 44px; display: flex; align-items: center; font-size: 14px; font-weight: 500;">{{ loginText }}</a>
+</div>
+</div>
+</header>
+
+<div class="fs-mprog" style="padding: 12px 20px 0; flex-direction: column; gap: 8px;">
+<div style="display: flex; justify-content: space-between; font-size: 12px; line-height: 16px; color: #9C9693;"><span>Choose Account</span><span style="font-family: 'Geist Mono', monospace;">1 / 3</span></div>
+<div style="height: 4px; border-radius: 2px; background: #26262A;"><div style="width: 33.33%; height: 4px; border-radius: 2px; background: #7CC4FF;"></div></div>
+</div>
+
+<main class="fs-main" style="max-width: 1200px; margin: 0 auto; padding: 40px 32px 64px; display: flex; flex-wrap: wrap; gap: 32px; align-items: flex-start; box-sizing: border-box;">
+
+<section class="fs-col" style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 36px;">
+<div style="display: flex; flex-direction: column; gap: 10px;">
+<p class="fs-steps" style="margin: 0; font-stretch: 125%; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: #9C9693; font-weight: 500;">Step 1 of 3</p>
+<h1 class="fs-h1" style="margin: 0; font-size: 44px; line-height: 48px; font-weight: 600; letter-spacing: -0.03em;">Choose Your Account. <span style="color: #7CC4FF;">Earn Your Funding.</span></h1>
+<p class="fs-lead" style="margin: 0; font-size: 17px; line-height: 26px; color: #D4CFCD;">Pick an account, a size and your platform. Pass the evaluation to trade our capital.</p>
+</div>
+
+<sc-if value="{{ multi }}" hint-placeholder-val="{{ false }}">
+<p style="margin: 0; background: #13202E; border: 1px solid #26262A; border-radius: 8px; padding: 12px 16px; font-size: 14px; line-height: 20px; color: #D4CFCD;">Editing <span style="color: #F4F2F1; font-weight: 600;">Account {{ activeIndex }} of {{ lineCount }}</span>. Changes below apply to this account only.</p>
+</sc-if>
+
+<div style="display: flex; flex-direction: column; gap: 12px;">
+<h2 style="margin: 0; font-size: 18px; line-height: 24px; font-weight: 600; letter-spacing: -0.01em;">Account</h2>
+<div class="fs-g3" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px 12px; padding-top: 8px;">
+<sc-for list="{{ plans }}" as="p" hint-placeholder-count="3">
+<button type="button" class="fs-opt" aria-pressed="{{ p.on }}" onClick="{{ p.pick }}" style="position: relative; min-height: 76px; text-align: left; background: {{ p.bg }}; border: 1px solid {{ p.bd }}; border-radius: 8px; padding: 16px; box-sizing: border-box; color: #F4F2F1; font: inherit; display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer;">
+<sc-if value="{{ p.badge }}" hint-placeholder-val="{{ false }}"><span style="position: absolute; top: -9px; left: 14px; background: #7CC4FF; color: #08080A; font-size: 10px; line-height: 1; font-weight: 600; font-stretch: 112%; padding: 4px 7px 5px; border-radius: 4px;">Most Popular</span></sc-if>
+<span style="display: flex; flex-direction: column; gap: 4px; min-width: 0;"><span style="font-size: 16px; line-height: 20px; font-weight: 600;">{{ p.name }}</span><span style="font-size: 13px; line-height: 18px; color: {{ p.sub }};">{{ p.desc }}</span></span>
+<span style="flex: none; width: 20px; height: 20px; border-radius: 10px; box-sizing: border-box; border: {{ p.ring }};"></span>
+</button>
+</sc-for>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 12px;">
+<h2 style="margin: 0; font-size: 18px; line-height: 24px; font-weight: 600; letter-spacing: -0.01em;">Account Size</h2>
+<div class="fs-g4" style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px;">
+<sc-for list="{{ sizes }}" as="s" hint-placeholder-count="4">
+<button type="button" class="fs-opt" aria-pressed="{{ s.on }}" onClick="{{ s.pick }}" style="height: 68px; background: {{ s.bg }}; border: 1px solid {{ s.bd }}; border-radius: 8px; color: #F4F2F1; font: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer;"><span style="font-family: 'Geist Mono', monospace; font-size: 20px; line-height: 24px; font-weight: 500;">{{ s.label }}</span><span style="font-size: 12px; line-height: 16px; color: {{ s.sub }};">{{ s.price }}</span></button>
+</sc-for>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 12px;">
+<h2 style="margin: 0; font-size: 18px; line-height: 24px; font-weight: 600; letter-spacing: -0.01em;">Trading Platform</h2>
+<div class="fs-pills" style="display: flex; flex-wrap: wrap; gap: 12px;">
+<sc-for list="{{ platforms }}" as="pl" hint-placeholder-count="4">
+<button type="button" class="fs-opt" aria-pressed="{{ pl.on }}" onClick="{{ pl.pick }}" style="height: 44px; padding: 0 20px; background: {{ pl.bg }}; border: 1px solid {{ pl.bd }}; border-radius: 999px; color: {{ pl.fg }}; font: inherit; font-size: 14px; font-weight: 500; cursor: pointer;">{{ pl.label }}</button>
+</sc-for>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 12px;">
+<h2 style="margin: 0; font-size: 18px; line-height: 24px; font-weight: 600; letter-spacing: -0.01em;">How Many?</h2>
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; background: #111113; border: 1px solid #26262A; border-radius: 8px; padding: 14px 16px;">
+<span style="display: flex; flex-direction: column; gap: 2px;"><span style="font-size: 15px; line-height: 20px; font-weight: 500;">{{ activeLabel }}</span><span style="font-size: 13px; line-height: 18px; color: #9C9693;">Each account gets its own login and rules.</span></span>
+<span style="flex: none; display: flex; align-items: center; gap: 12px;"><button type="button" class="fs-qbtn" aria-label="One fewer account" onClick="{{ dec }}" disabled="{{ atMin }}">−</button><span style="min-width: 20px; text-align: center; font-family: 'Geist Mono', monospace; font-size: 17px; font-weight: 500;" aria-live="polite">{{ activeQty }}</span><button type="button" class="fs-qbtn" aria-label="One more account" onClick="{{ inc }}">+</button></span>
+</div>
+<button type="button" onClick="{{ addLine }}" style="align-self: flex-start; min-height: 44px; background: transparent; border: 0; padding: 0; color: #7CC4FF; font: inherit; font-size: 14px; font-weight: 500; cursor: pointer;">+ Add a Different Account</button>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 12px;">
+<div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px;"><h2 style="margin: 0; font-size: 18px; line-height: 24px; font-weight: 600; letter-spacing: -0.01em;">Bundles</h2><span style="font-size: 13px; color: #9C9693;">Buy More, Pay Less</span></div>
+<div class="fs-g3" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px;">
+<sc-for list="{{ bundles }}" as="b" hint-placeholder-count="3">
+<button type="button" class="fs-opt" aria-pressed="{{ b.on }}" onClick="{{ b.pick }}" style="min-height: 76px; text-align: left; background: {{ b.bg }}; border: 1px solid {{ b.bd }}; border-radius: 8px; padding: 16px; box-sizing: border-box; color: #F4F2F1; font: inherit; display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer;">
+<span style="display: flex; flex-direction: column; gap: 4px; min-width: 0;"><span style="font-size: 16px; line-height: 20px; font-weight: 600;">{{ b.buy }}</span><span style="font-size: 13px; line-height: 18px; color: #5FD39B;">{{ b.get }}</span></span>
+<span style="flex: none; font-size: 12px; font-weight: 600; color: {{ b.cta }};">{{ b.state }}</span>
+</button>
+</sc-for>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 12px;">
+<div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px;"><h2 style="margin: 0; font-size: 18px; line-height: 24px; font-weight: 600; letter-spacing: -0.01em;">Add-Ons</h2><span style="font-size: 13px; color: #9C9693;">Optional</span></div>
+<sc-for list="{{ addons }}" as="a" hint-placeholder-count="2">
+<label class="fs-opt" style="min-height: 68px; box-sizing: border-box; display: flex; align-items: center; gap: 14px; background: {{ a.bg }}; border: 1px solid {{ a.bd }}; border-radius: 8px; padding: 14px 16px; cursor: pointer;"><input type="checkbox" class="fs-check" checked="{{ a.on }}" onChange="{{ a.toggle }}"><span style="flex: 1; display: flex; flex-direction: column; gap: 2px;"><span style="font-size: 15px; line-height: 20px; font-weight: 500;">{{ a.name }}</span><span style="font-size: 13px; line-height: 18px; color: #9C9693;">{{ a.desc }}</span></span><span style="flex: none; font-family: 'Geist Mono', monospace; font-size: 14px; color: #D4CFCD;">{{ a.price }}</span></label>
+</sc-for>
+</div>
+</section>
+
+<aside id="order" class="fs-aside" style="flex: 1 1 340px; min-width: 0; position: sticky; top: 24px; background: #18181A; border: 1px solid #26262A; border-radius: 8px; padding: 24px; box-sizing: border-box; display: flex; flex-direction: column; gap: 20px;">
+<div style="display: flex; justify-content: space-between; align-items: baseline;">
+<p style="margin: 0; font-stretch: 125%; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: #9C9693; font-weight: 500;">Your Order</p>
+<span style="font-size: 12px; color: #9C9693;">{{ accountsLabel }}</span>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 10px;">
+<sc-for list="{{ cart }}" as="c" hint-placeholder-count="1">
+<div style="background: #111113; border: 1px solid {{ c.bd }}; border-radius: 8px; padding: 14px; display: flex; flex-direction: column; gap: 12px;">
+<div style="display: flex; flex-direction: column; gap: 2px; min-width: 0;"><span style="font-size: 15px; line-height: 20px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ c.title }}</span><span style="font-size: 12px; line-height: 16px; color: #9C9693;">{{ c.sub }}</span></div>
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+<div style="display: flex; gap: 16px; font-size: 12px;">
+<sc-if value="{{ c.editing }}" hint-placeholder-val="{{ true }}"><span style="color: #7CC4FF; font-weight: 500;">Editing</span></sc-if>
+<sc-if value="{{ c.notEditing }}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{ c.edit }}" style="background: transparent; border: 0; padding: 0; color: #7CC4FF; font: inherit; font-size: 12px; font-weight: 500; cursor: pointer;">Edit</button></sc-if>
+<sc-if value="{{ c.removable }}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{ c.remove }}" style="background: transparent; border: 0; padding: 0; color: #9C9693; font: inherit; font-size: 12px; cursor: pointer;">Remove</button></sc-if>
+</div>
+<span style="flex: none; display: flex; align-items: center; gap: 8px;"><button type="button" class="fs-qbtn" style="width: 30px; height: 30px; font-size: 16px;" aria-label="One fewer" onClick="{{ c.dec }}" disabled="{{ c.atMin }}">−</button><span style="min-width: 16px; text-align: center; font-family: 'Geist Mono', monospace; font-size: 15px;">{{ c.qty }}</span><button type="button" class="fs-qbtn" style="width: 30px; height: 30px; font-size: 16px;" aria-label="One more" onClick="{{ c.inc }}">+</button></span>
+</div>
+</div>
+</sc-for>
+<button type="button" onClick="{{ addLine }}" style="min-height: 44px; background: transparent; border: 1px dashed #3A3A40; border-radius: 8px; color: #D4CFCD; font: inherit; font-size: 14px; font-weight: 500; cursor: pointer;">+ Add Another Account</button>
+</div>
+
+<dl style="margin: 0; display: flex; flex-direction: column; gap: 10px; font-size: 14px; border-top: 1px solid #26262A; padding-top: 16px;">
+<div style="display: flex; justify-content: space-between;"><dt style="color: #9C9693;">{{ rules.targetLabel }}</dt><dd style="margin: 0; font-family: 'Geist Mono', monospace;">{{ rules.target }}</dd></div>
+<div style="display: flex; justify-content: space-between;"><dt style="color: #9C9693;">{{ rules.maxLossLabel }}</dt><dd style="margin: 0; font-family: 'Geist Mono', monospace;">{{ rules.maxLoss }}</dd></div>
+<div style="display: flex; justify-content: space-between;"><dt style="color: #9C9693;">{{ rules.dllLabel }}</dt><dd style="margin: 0; font-family: 'Geist Mono', monospace;">{{ rules.dll }}</dd></div>
+<div style="display: flex; justify-content: space-between;"><dt style="color: #9C9693;">Max Position Size</dt><dd style="margin: 0; font-family: 'Geist Mono', monospace;">{{ rules.contracts }} Contracts</dd></div>
+<div style="display: flex; justify-content: space-between;"><dt style="color: #9C9693;">Profit Split When Funded</dt><dd style="margin: 0; font-family: 'Geist Mono', monospace; color: #5FD39B;">{{ rules.split }}</dd></div>
+</dl>
+<a href="{{ rulesHref }}" style="font-size: 13px;">{{ rulesNote }}</a>
+
+<div style="display: flex; flex-direction: column; gap: 8px; border-top: 1px solid #26262A; padding-top: 16px;">
+<label for="promo" style="font-size: 13px; color: #9C9693;">Promo Code</label>
+<div style="display: flex; gap: 8px;"><input id="promo" class="fs-in" type="text" placeholder="Enter Code" value="{{ promoInput }}" onChange="{{ setPromo }}" style="flex: 1; min-width: 0; height: 44px; box-sizing: border-box; background: #111113; border-radius: 4px; padding: 0 12px; color: #F4F2F1; font: inherit; font-size: 15px;"><button type="button" class="fs-opt" onClick="{{ applyPromo }}" style="height: 44px; background: transparent; border: 1px solid #26262A; border-radius: 4px; padding: 0 16px; color: #F4F2F1; font: inherit; font-size: 14px; font-weight: 500; cursor: pointer;">Apply</button></div><sc-if value="{{ promoMsg }}"><p style="margin: 6px 0 0; font-size: 12.5px; line-height: 18px; color: {{ promoColor }};">{{ promoMsg }}</p></sc-if>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 8px; font-size: 14px; border-top: 1px solid #26262A; padding-top: 16px;">
+<sc-for list="{{ lines }}" as="l" hint-placeholder-count="2">
+<div style="display: flex; justify-content: space-between; gap: 12px; color: {{ l.color }};"><span>{{ l.label }}</span><span style="font-family: 'Geist Mono', monospace;">{{ l.amount }}</span></div>
+</sc-for>
+<div class="fs-total" style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 6px;"><span style="font-size: 16px; font-weight: 600;">Total Today</span><span style="font-family: 'Geist Mono', monospace; font-size: 26px; font-weight: 500;">{{ total }}</span></div>
+</div>
+<a href="{{ nextHref }}" class="fs-cta" style="display: block; text-align: center; background: #FFFFFF; color: #111113; border-radius: 4px; padding: 14px; font-size: 15px; font-weight: 600; font-stretch: 112%; text-decoration: none;">Continue to Payment</a>
+<p style="margin: 0; font-size: 12px; line-height: 18px; color: #9C9693; text-align: center;">{{ feeTerms }}</p>
+</aside>
+</main>
+
+<div class="fs-bar" style="position: sticky; bottom: 0; background: #111113; border-top: 1px solid #26262A; padding: 12px 20px 28px; flex-direction: column; gap: 12px;">
+<div style="display: flex; justify-content: space-between; font-size: 13px; line-height: 16px; color: #9C9693;"><span>{{ accountsLabel }}</span><a href="#order" style="font-weight: 500;">View Order</a></div>
+<div style="display: flex; align-items: center; gap: 16px;">
+<div style="flex: 1; display: flex; flex-direction: column; gap: 2px;"><span style="font-size: 11px; line-height: 14px; color: #9C9693;">Total Today</span><span style="font-family: 'Geist Mono', monospace; font-size: 22px; line-height: 26px; font-weight: 500;">{{ total }}</span></div>
+<a href="{{ nextHref }}" style="height: 48px; padding: 0 28px; display: flex; align-items: center; background: #FFFFFF; color: #111113; border-radius: 4px; font-size: 15px; font-weight: 600; font-stretch: 112%; text-decoration: none;">Continue</a>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"mobileLinks":{"editor":"boolean","default":false},"$preview":{"width":1280,"height":1600}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    const saved = FSX.cart.get();
+    const qp = DC.qs('plan'); const qpromo = DC.qs('promo');
+    this.state = { cat: null, cart: saved && saved.cart && saved.cart.length ? saved.cart : [{ id: 1, plan: qp || 'prime', size: 50000, platform: 'Tradovate', addons: {}, qty: 1 }], active: 1, nextId: 9, promo: qpromo || (saved && saved.promo) || '', promoInput: qpromo || (saved && saved.promo) || '', priced: null, promoMsg: '', promoOk: false, me: null };
+    this.state.active = this.state.cart[0].id; this.state.nextId = Math.max(...this.state.cart.map((c) => c.id)) + 1;
+  }
+  async componentDidMount() {
+    const [cat, me] = await Promise.all([FSX.loadCatalog(), FSX.me()]);
+    const cart = this.state.cart.map((c) => this.fix(cat, c));
+    this.setState({ cat, me, cart });
+    this.reprice();
+  }
+  fix(cat, c) { const p = cat.plans.find((x) => x.id === c.plan) || cat.plans.find((x) => x.badge) || cat.plans[0]; const sz = p.sizes.find((z) => z.size === Number(c.size)) ? Number(c.size) : p.sizes[Math.min(1, p.sizes.length - 1)].size; const addons = {}; Object.keys(c.addons || {}).forEach((k) => { if (c.addons[k] && p.addons.includes(k)) addons[k] = true; }); return Object.assign({}, c, { plan: p.id, size: sz, platform: p.platforms.includes(c.platform) ? c.platform : p.platforms[0], addons }); }
+  updActive(fn) { const cat = this.state.cat; this.setState({ cart: this.state.cart.map((c) => (c.id === this.state.active ? this.fix(cat, Object.assign({}, c, fn(c))) : c)) }); this.reprice(); }
+  setCart(cart, extra) { this.setState(Object.assign({ cart }, extra || {})); this.reprice(); }
+  reprice() {
+    clearTimeout(this._t);
+    this._t = setTimeout(async () => {
+      const st = this.state; if (!st.cat) return;
+      const items = st.cart.map((c) => ({ plan: c.plan, size: c.size, platform: c.platform, addons: Object.keys(c.addons).filter((k) => c.addons[k]), qty: c.qty }));
+      FSX.cart.set({ cart: st.cart, promo: st.promoOk || !st.promo ? st.promo : '' });
+      try { const priced = await DC.api('/api/cart/price', { items, promo: st.promo || undefined }); this.setState({ priced, promoOk: !!st.promo, promoMsg: st.promo ? (priced.applied && priced.applied.type === 'promo' ? `${st.promo.toUpperCase()} applied.` : priced.applied ? `Your ${priced.applied.label.split(':')[0].toLowerCase()} saves more, so we used that instead.` : '') : '' }); }
+      catch (e) { if (st.promo) { this.setState({ promo: '', promoOk: false, promoMsg: e.message }); this.reprice(); } }
+    }, 120);
+  }
+  renderVals() {
+    const st = this.state; const cat = st.cat; const M = FSX.money;
+    const on = { bg: '#13202E', bd: '#7CC4FF', sub: '#D4CFCD', fg: '#F4F2F1', ring: '6px solid #7CC4FF' };
+    const off = { bg: '#111113', bd: '#26262A', sub: '#9C9693', fg: '#D4CFCD', ring: '1.5px solid #3A3A40' };
+    const empty = { plans: [], sizes: [], platforms: [], addons: [], bundles: [], cart: [], lines: [], rules: {}, total: '…', accountsLabel: 'Loading', activeLabel: '', activeQty: 1, atMin: true, feeTerms: '', loginHref: '/login?next=/checkout', nextHref: '#', rulesHref: '#', rulesNote: '', loginText: 'Log In' };
+    if (!cat) return empty;
+    const cur = st.cart.find((c) => c.id === st.active) || st.cart[0];
+    const P = (id) => cat.plans.find((p) => p.id === id);
+    const pc = P(cur.plan); const sd = pc.sizes.find((z) => z.size === cur.size);
+    const K = (z) => '$' + z / 1000 + 'K';
+    const plans = cat.plans.map((p) => Object.assign({ id: p.id, name: p.name, desc: p.desc, badge: !!p.badge }, cur.plan === p.id ? on : off, { on: cur.plan === p.id, pick: () => this.updActive(() => ({ plan: p.id })) }));
+    const promo = (cat.promos || []).find((x) => st.promoOk && st.promo && x.code === st.promo.toUpperCase());
+    const sizes = pc.sizes.map((z) => Object.assign({ label: K(z.size), price: M(z.price) + (z.activation ? ' + ' + M(z.activation) + ' later' : '') }, cur.size === z.size ? on : off, { on: cur.size === z.size, pick: () => this.updActive(() => ({ size: z.size })) }));
+    const platforms = pc.platforms.map((s) => Object.assign({ label: s }, cur.platform === s ? on : off, { on: cur.platform === s, pick: () => this.updActive(() => ({ platform: s })) }));
+    const addons = pc.addons.map((k) => { const a = cat.addons[k]; const sel = !!cur.addons[k]; return Object.assign({ id: k, name: a.name, desc: a.desc, price: '+' + M(Math.round(sd.price * a.pct / 100)) }, sel ? on : off, { on: sel, toggle: () => this.updActive((c) => ({ addons: Object.assign({}, c.addons, { [k]: !sel }) })) }); });
+    const count = st.cart.reduce((n, c) => n + c.qty, 0);
+    const bundles = (cat.bundles || []).map((b) => { const ok = count >= b.min; return Object.assign({ buy: b.buy, get: b.get }, ok ? on : off, { on: ok, state: ok ? 'Applied' : `Add ${b.min - count} more`, cta: ok ? '#7CC4FF' : '#9C9693', pick: () => { if (!ok) this.setCart(st.cart.map((c) => (c.id === cur.id ? Object.assign({}, c, { qty: c.qty + (b.min - count) }) : c))); } }); });
+    const many = st.cart.length > 1;
+    const cart = st.cart.map((c) => {
+      const editing = c.id === st.active; const p = P(c.plan);
+      const picked = Object.keys(c.addons).filter((k) => c.addons[k]).map((k) => cat.addons[k].name);
+      return { title: p.short + ' · ' + K(c.size), sub: [c.platform].concat(picked).join(' · '), qty: c.qty, bd: editing && many ? '#7CC4FF' : '#26262A', editing: editing && many, notEditing: !editing, removable: many, atMin: c.qty <= 1,
+        inc: () => this.setCart(st.cart.map((x) => (x.id === c.id ? Object.assign({}, x, { qty: Math.min(5, x.qty + 1) }) : x))),
+        dec: () => this.setCart(st.cart.map((x) => (x.id === c.id ? Object.assign({}, x, { qty: Math.max(1, x.qty - 1) }) : x))),
+        edit: () => this.setState({ active: c.id }),
+        remove: () => { const rest = st.cart.filter((x) => x.id !== c.id); this.setCart(rest, { active: editing ? rest[0].id : st.active }); } };
+    });
+    const pr = st.priced;
+    const lines = pr ? pr.lines.map((l) => ({ label: l.label, amount: l.amount < 0 ? '−' + M(-l.amount) : M(l.amount), color: l.amount < 0 ? '#5FD39B' : l.kind === 'addon' ? '#9C9693' : '#D4CFCD' })) : [];
+    const isI = pc.kind === 'funded';
+    const r = isI ? cat.instantRules[cur.size] : cat.evalRules[cur.size];
+    const rules = isI ? { targetLabel: 'Profit Goal Before First Payout', target: M(r.goal), maxLossLabel: 'Max Loss (Trailing, End of Day)', maxLoss: M(r.maxLoss), dllLabel: 'Daily Loss Limit', dll: M(r.dll), contracts: r.contracts, split: cat.instantCommon.splitFirst + '%, then ' + cat.instantCommon.splitLater + '%' }
+      : { targetLabel: 'Profit Target', target: M(r.target), maxLossLabel: 'Max Loss (Trailing, End of Day)', maxLoss: M(r.maxLoss), dllLabel: 'Daily Loss Limit', dll: M(r.dll), contracts: r.contracts, split: cat.fundedCommon.split + '%' };
+    const act = st.cart.some((c) => (P(c.plan).sizes.find((z) => z.size === c.size) || {}).activation);
+    const next = st.me ? '/checkout/payment' : '/checkout/payment';
+    return {
+      plans, sizes, platforms, addons, bundles, cart, lines, rules,
+      multi: many, lineCount: st.cart.length, activeIndex: st.cart.findIndex((c) => c.id === cur.id) + 1,
+      activeLabel: pc.short + ' · ' + K(cur.size), activeQty: cur.qty, atMin: cur.qty <= 1,
+      inc: () => this.updActive((c) => ({ qty: Math.min(5, c.qty + 1) })), dec: () => this.updActive((c) => ({ qty: Math.max(1, c.qty - 1) })),
+      addLine: () => this.setCart(st.cart.concat([{ id: st.nextId, plan: cur.plan, size: cur.size, platform: cur.platform, addons: {}, qty: 1 }]), { active: st.nextId, nextId: st.nextId + 1 }),
+      accountsLabel: count + (count === 1 ? ' Account' : ' Accounts'),
+      total: pr ? M(pr.total) : '…',
+      feeTerms: 'One-time payment, no subscription.' + (act ? ' Essential accounts pay a one-time activation fee when they pass.' : ''),
+      promoInput: st.promoInput, promoMsg: st.promoMsg, promoColor: st.promoOk ? '#5FD39B' : '#F2777F',
+      setPromo: (e) => this.setState({ promoInput: e.target.value }),
+      applyPromo: () => { const v = (st.promoInput || '').trim(); this.setState({ promo: v, promoOk: false, promoMsg: '' }); this.reprice(); },
+      rulesHref: st.me ? '/app/resources?tab=rules' : '#order', rulesNote: isI ? 'Instant: funded from day one' : 'Same rules on every evaluation plan',
+      nextHref: next, loginHref: st.me ? '/app' : '/login?next=/checkout', loginText: st.me ? 'Dashboard' : 'Log In'
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Funded Sky: sign up</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mona+Sans:wdth,wght@100..125,400..700&amp;family=Geist+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0;background:#08080A}
+a{color:#7CC4FF}a:hover{color:#A9D8FF}
+.fs-in{border:1px solid #26262A;outline:none;transition:border-color .15s,box-shadow .15s}
+.fs-in:hover{border-color:#3A3A40}
+.fs-in:focus{border-color:#7CC4FF;box-shadow:0 0 0 3px rgba(124,196,255,.18)}
+.fs-ghost{transition:border-color .15s}
+.fs-ghost:hover{border-color:#3A3A40}
+.fs-check{appearance:none;-webkit-appearance:none;width:20px;height:20px;margin:0;flex:none;border:1.5px solid #3A3A40;border-radius:5px;background:#08080A;display:inline-grid;place-content:center;cursor:pointer;transition:background .15s,border-color .15s}
+.fs-check::before{content:"";width:11px;height:11px;background:#08080A;clip-path:polygon(12% 50%,0 63%,40% 100%,100% 22%,87% 10%,40% 74%);transform:scale(0);transition:transform .12s}
+.fs-check:hover{border-color:#7CC4FF}
+.fs-check:checked{background:#7CC4FF;border-color:#7CC4FF}
+.fs-check:checked::before{transform:scale(1)}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4FF;outline-offset:2px}
+@media (max-width: 760px){
+.fs-hdr{padding:0 20px!important;height:64px;box-sizing:border-box}
+.fs-hide-m{display:none!important}
+.fs-main{padding:32px 20px 40px!important;align-items:stretch!important}
+.fs-card{background:transparent!important;border:0!important;padding:0!important;max-width:none!important}
+.fs-h1{font-size:28px!important;line-height:32px!important}
+.fs-in{font-size:16px!important}
+}
+</style>
+</helmet>
+<div style="min-height: 1100px; background: #08080A; color: #F4F2F1; font-family: 'Mona Sans', system-ui, sans-serif; display: flex; flex-direction: column;">
+
+<header style="border-bottom: 1px solid #26262A;">
+<div class="fs-hdr" style="max-width: 1200px; margin: 0 auto; padding: 18px 32px; display: flex; align-items: center; justify-content: space-between; gap: 24px;">
+<a href="/" style="display: flex; align-items: center; gap: 6px; text-decoration: none;"><span style="font-weight: 700; font-size: 22px; letter-spacing: -0.045em; color: #F4F2F1; line-height: 1;">fundedsky</span><span style="background: #7CC4FF; color: #08080A; font-weight: 600; font-size: 15px; letter-spacing: -0.01em; padding: 2px 6px 3px; border-radius: 4px; line-height: 1;">futures</span></a>
+<span style="display: flex; align-items: center; gap: 8px; font-size: 14px; color: #9C9693;"><span class="fs-hide-m">Already have an account?</span><a href="{{ loginHref }}" style="min-height: 44px; display: flex; align-items: center; font-weight: 500;">Log In</a></span>
+</div>
+</header>
+
+<main class="fs-main" style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 56px 32px; box-sizing: border-box;">
+<div class="fs-card" style="width: 100%; max-width: 480px; background: #18181A; border: 1px solid #26262A; border-radius: 12px; padding: 36px; box-sizing: border-box; display: flex; flex-direction: column; gap: 24px;">
+<div style="display: flex; flex-direction: column; gap: 8px;">
+<h1 class="fs-h1" style="margin: 0; font-size: 32px; line-height: 36px; font-weight: 600; letter-spacing: -0.03em;">Create Your Account.</h1>
+<p style="margin: 0; font-size: 15px; line-height: 22px; color: #D4CFCD;">One account for every evaluation, funded account and payout.</p>
+</div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px;">
+<button type="button" class="fs-ghost" style="height: 48px; background: #111113; border: 1px solid #26262A; border-radius: 4px; color: #F4F2F1; font: inherit; font-size: 14px; font-weight: 500; cursor: pointer;">Google</button>
+<button type="button" class="fs-ghost" style="height: 48px; background: #111113; border: 1px solid #26262A; border-radius: 4px; color: #F4F2F1; font: inherit; font-size: 14px; font-weight: 500; cursor: pointer;">Apple</button>
+</div>
+<div style="display: flex; align-items: center; gap: 12px; font-size: 12px; color: #9C9693;"><span style="flex: 1; height: 1px; background: #26262A;"></span>or sign up with email<span style="flex: 1; height: 1px; background: #26262A;"></span></div>
+<form style="display: flex; flex-direction: column; gap: 16px;">
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px;">
+<div style="display: flex; flex-direction: column; gap: 6px; min-width: 0;"><label for="first" style="font-size: 13px; color: #9C9693;">First Name</label><input id="first" class="fs-in" type="text" autocomplete="given-name" value="{{ first }}" onChange="{{ setFirst }}" aria-invalid="{{ firstBad }}" style="min-width: 0; height: 48px; box-sizing: border-box; background: #111113; border-radius: 4px; padding: 0 14px; color: #F4F2F1; font: inherit; font-size: 15px; border-color: {{ firstBd }};"><sc-if value="{{ firstBad }}" hint-placeholder-val="{{ false }}"><span style="font-size: 13px; color: #F2777F;">Required.</span></sc-if></div>
+<div style="display: flex; flex-direction: column; gap: 6px; min-width: 0;"><label for="last" style="font-size: 13px; color: #9C9693;">Last Name</label><input id="last" class="fs-in" type="text" autocomplete="family-name" value="{{ last }}" onChange="{{ setLast }}" aria-invalid="{{ lastBad }}" style="min-width: 0; height: 48px; box-sizing: border-box; background: #111113; border-radius: 4px; padding: 0 14px; color: #F4F2F1; font: inherit; font-size: 15px; border-color: {{ lastBd }};"><sc-if value="{{ lastBad }}" hint-placeholder-val="{{ false }}"><span style="font-size: 13px; color: #F2777F;">Required.</span></sc-if></div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px;"><label for="email" style="font-size: 13px; color: #9C9693;">Email</label><input id="email" class="fs-in" type="email" autocomplete="email" placeholder="you@example.com" value="{{ email }}" onChange="{{ setEmail }}" aria-invalid="{{ emailBad }}" style="height: 48px; box-sizing: border-box; background: #111113; border-radius: 4px; padding: 0 14px; color: #F4F2F1; font: inherit; font-size: 15px; border-color: {{ emailBd }};"><sc-if value="{{ emailBad }}" hint-placeholder-val="{{ false }}"><span style="font-size: 13px; color: #F2777F;">Enter a valid email address.</span></sc-if></div>
+<div style="display: flex; flex-direction: column; gap: 8px;">
+<label for="pw" style="font-size: 13px; color: #9C9693;">Password</label>
+<div style="position: relative;"><input id="pw" class="fs-in" type="{{ pwType }}" autocomplete="new-password" value="{{ pw }}" onChange="{{ setPw }}" aria-invalid="{{ pwBad }}" aria-describedby="pw-rules" style="width: 100%; height: 48px; box-sizing: border-box; background: #111113; border-radius: 4px; padding: 0 14px; color: #F4F2F1; font: inherit; font-size: 15px; padding-right: 64px; border-color: {{ pwBd }};"><button type="button" onClick="{{ toggleShow }}" aria-label="{{ showLabel }}" style="position: absolute; right: 4px; top: 4px; height: 40px; padding: 0 12px; background: transparent; border: 0; color: #9C9693; font: inherit; font-size: 13px; font-weight: 500; cursor: pointer;">{{ showText }}</button></div>
+<ul id="pw-rules" style="margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px;">
+<sc-for list="{{ rules }}" as="r" hint-placeholder-count="3"><li style="display: flex; align-items: center; gap: 6px; color: {{ r.color }};"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ r.icon }}"></path></svg>{{ r.label }}</li></sc-for>
+</ul>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px;"><label for="country" style="font-size: 13px; color: #9C9693;">Country of Residence</label><select id="country" class="fs-in" style="height: 48px; box-sizing: border-box; background: #111113; border-radius: 4px; padding: 0 14px; color: #F4F2F1; font: inherit; font-size: 15px;"><option>United States</option><option>Canada</option><option>United Kingdom</option></select></div>
+<div style="display: flex; flex-direction: column; gap: 6px;">
+<label style="display: flex; align-items: flex-start; gap: 12px; font-size: 14px; line-height: 20px; color: #D4CFCD; cursor: pointer;"><input type="checkbox" class="fs-check" checked="{{ agreed }}" onChange="{{ toggleAgree }}"><span>I agree to the <a href="/terms">Terms</a> and <a href="/privacy">Privacy Policy</a>, and I'm 18 or older.</span></label>
+<sc-if value="{{ agreeBad }}" hint-placeholder-val="{{ false }}"><span style="font-size: 13px; color: #F2777F; padding-left: 32px;">Please accept to continue.</span></sc-if>
+<label style="display: flex; align-items: center; gap: 12px; font-size: 14px; color: #D4CFCD; cursor: pointer;"><input type="checkbox" class="fs-check">Send Me Product Updates and Offers</label>
+</div>
+<sc-if value="{{ valid }}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{ submit }}" disabled="{{ busy }}" style="width: 100%; border: 0; cursor: pointer; font: inherit; height: 48px; display: flex; align-items: center; justify-content: center; background: #FFFFFF; color: #111113; border-radius: 4px; font-size: 15px; font-weight: 600; font-stretch: 112%; text-decoration: none;">{{ cta }}</button></sc-if>
+<sc-if value="{{ invalid }}" hint-placeholder-val="{{ true }}"><button type="button" onClick="{{ submit }}" style="height: 48px; background: #FFFFFF; color: #111113; border: 0; border-radius: 4px; font: inherit; font-size: 15px; font-weight: 600; font-stretch: 112%; cursor: pointer;">Create Account</button></sc-if><sc-if value="{{ err }}"><p role="alert" style="margin: 10px 0 0; font-size: 13.5px; line-height: 19px; color: #F2777F;">{{ err }}</p></sc-if>
+</form>
+<p style="margin: 0; font-size: 14px; color: #9C9693; text-align: center;">Already have an account? <a href="{{ loginHref }}" style="font-weight: 500;">Log In</a></p>
+</div>
+<p style="margin: 24px 0 0; display: flex; align-items: center; gap: 6px; font-size: 12px; color: #9C9693;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg>Your details are encrypted · <a href="/privacy">Privacy</a></p>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"mobileLinks":{"editor":"boolean","default":false},"$preview":{"width":1280,"height":1100}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { first: '', last: '', email: '', pw: '', show: false, agreed: false, submitted: false, busy: false, err: '' }; }
+  async submit() {
+    this.setState({ submitted: true });
+    const v = this.renderVals(); if (!v.valid || this.state.busy) return;
+    const st = this.state; this.setState({ busy: true, err: '' });
+    try { await DC.api('/api/auth/signup', { email: st.email.trim(), password: st.pw, first: st.first.trim(), last: st.last.trim(), ref: DC.qs('ref') || undefined }); const n = DC.qs('next'); location.href = '/verify-email' + (n ? '?next=' + encodeURIComponent(n) : ''); }
+    catch (e) { this.setState({ busy: false, err: e.message }); }
+  }
+  renderVals() {
+    const st = this.state;
+    const checks = [{ label: '8+ Characters', ok: st.pw.length >= 8 }, { label: 'One Number', ok: /[0-9]/.test(st.pw) }, { label: 'One Uppercase Letter', ok: /[A-Z]/.test(st.pw) }];
+    const rules = checks.map((c) => ({ label: c.label, color: c.ok ? '#5FD39B' : (st.submitted ? '#F2777F' : '#9C9693'), icon: c.ok ? 'M5 12l5 5L20 7' : 'M12 12h.01' }));
+    const ok = { first: st.first.trim().length > 0, last: st.last.trim().length > 0, email: /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(st.email), pw: checks.every((c) => c.ok), agree: st.agreed };
+    const bad = (k) => st.submitted && !ok[k];
+    const valid = Object.keys(ok).every((k) => ok[k]);
+    const set = (k) => (e) => this.setState({ [k]: e.target.value, err: '' });
+    return {
+      first: st.first, last: st.last, email: st.email, pw: st.pw, agreed: st.agreed, rules,
+      setFirst: set('first'), setLast: set('last'), setEmail: set('email'), setPw: set('pw'),
+      toggleShow: () => this.setState({ show: !st.show }), toggleAgree: () => this.setState({ agreed: !st.agreed }),
+      pwType: st.show ? 'text' : 'password', showText: st.show ? 'Hide' : 'Show', showLabel: st.show ? 'Hide password' : 'Show password',
+      firstBad: bad('first'), lastBad: bad('last'), emailBad: bad('email'), pwBad: bad('pw'), agreeBad: bad('agree'),
+      firstBd: bad('first') ? '#F2777F' : '', lastBd: bad('last') ? '#F2777F' : '', emailBd: bad('email') ? '#F2777F' : '', pwBd: bad('pw') ? '#F2777F' : '',
+      valid, invalid: !valid, submit: () => this.submit(), busy: st.busy, cta: st.busy ? 'Creating…' : 'Create Account', err: st.err,
+      loginHref: '/login' + (DC.qs('next') ? '?next=' + encodeURIComponent(DC.qs('next')) : ''), verifyHref: '/verify-email'
+    };
+  }
+}
+</script>
+</body>
+</html>
