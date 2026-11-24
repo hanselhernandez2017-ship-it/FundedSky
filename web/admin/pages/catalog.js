@@ -1,71 +1,44 @@
+/*LIVE*/
 
 function startCatalog(root) {
-  const NOW = new Date('2026-11-22T13:00:00-05:00');
+  const NOW = new Date();
   const ME = '[Your Name]';
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const money = (v) => (v < 0 ? '−' : '') + '$' + Math.abs(Math.round(v * 100) / 100).toLocaleString('en-US', { minimumFractionDigits: v % 1 ? 2 : 0, maximumFractionDigits: 2 });
   const K = (n) => '$' + (n / 1000) + 'K';
-  let seq = 100; const uid = (p) => p + (++seq);
+  let seq = 100; const uid = (p) => p + Date.now().toString(36) + (++seq);
   const fmtD = (d) => d ? new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
-  const SIZES = [25000, 50000, 100000, 150000];
-
-  const S = {
-    view: 'overview', planId: 'pa', drawer: null, sideOpen: false, promoFilter: 'all', ruleFilter: 'all', toast: '',
-    plans: [
-      { id: 'pa', name: '[Plan A Name]', slug: 'plan-a', badge: '', billing: 'one-time', status: 'live', sort: 1, desc: '[One-line description of this account]',
-        sizes: [{ size: 25000, price: 99, compare: null, floor: 49, active: true, sched: null }, { size: 50000, price: 149, compare: null, floor: 79, active: true, sched: null }, { size: 100000, price: 0, compare: null, floor: 0, active: false, sched: null }, { size: 150000, price: 0, compare: null, floor: 0, active: false, sched: null }],
-        platforms: { tradovate: true, ninja: true, tv: true, rithmic: false }, defPlatform: 'tradovate', addons: { reset: true, daily: false, noact: false, split: false }, bundles: { tier: true, starter: true, mix: false } },
-      { id: 'pb', name: '[Plan B Name]', slug: 'plan-b', badge: 'Most Popular', billing: 'one-time', status: 'live', sort: 2, desc: '[One-line description of this account]',
-        sizes: [{ size: 25000, price: 0, compare: null, floor: 0, active: false, sched: null }, { size: 50000, price: 169, compare: null, floor: 89, active: true, sched: null }, { size: 100000, price: 259, compare: null, floor: 139, active: true, sched: null }, { size: 150000, price: 349, compare: null, floor: 189, active: true, sched: { price: 329, date: '2026-12-01' } }],
-        platforms: { tradovate: true, ninja: true, tv: true, rithmic: true }, defPlatform: 'tradovate', addons: { reset: true, daily: true, noact: true, split: false }, bundles: { tier: true, starter: false, mix: true } },
-      { id: 'pc', name: '[Plan C Name]', slug: 'plan-c', badge: '', billing: 'monthly', status: 'live', sort: 3, desc: '[One-line description of this account]',
-        sizes: [{ size: 25000, price: 79, compare: null, floor: 39, active: true, sched: null }, { size: 50000, price: 119, compare: null, floor: 59, active: true, sched: null }, { size: 100000, price: 189, compare: 229, floor: 99, active: true, sched: null }, { size: 150000, price: 0, compare: null, floor: 0, active: false, sched: null }],
-        platforms: { tradovate: true, ninja: true, tv: false, rithmic: false }, defPlatform: 'ninja', addons: { reset: false, daily: false, noact: true, split: true }, bundles: { tier: false, starter: false, mix: true } }
-    ],
-    platforms: [
-      { id: 'tradovate', name: 'Tradovate', adapter: 'Simulator', visible: true },
-      { id: 'ninja', name: 'NinjaTrader', adapter: 'Simulator', visible: true },
-      { id: 'tv', name: 'TradingView', adapter: 'Simulator', visible: true },
-      { id: 'rithmic', name: 'Rithmic', adapter: 'Simulator', visible: true }
-    ],
-    addons: [
-      { id: 'reset', name: 'Free Reset', pricing: 'percent', value: 15, discountable: false, effect: 'One free reset after a breach', status: 'live' },
-      { id: 'daily', name: 'Daily Payouts', pricing: 'percent', value: 25, discountable: true, effect: 'Payout cycle shortened to 1 day', status: 'live' },
-      { id: 'noact', name: 'No Activation Fee', pricing: 'flat', value: 79, discountable: true, effect: 'Activation fee waived when funded', status: 'live' },
-      { id: 'split', name: 'Bigger Split', pricing: 'percent', value: 20, discountable: false, effect: 'Profit split raised to [X]%', status: 'live' }
-    ],
-    bundles: [
-      { id: 'tier', name: 'Multi-Account Savings', type: 'tier', tiers: [{ min: 2, pct: 10 }, { min: 3, pct: 15 }], samePlan: true, stacks: true, status: 'live', uses: 0 },
-      { id: 'starter', name: 'Starter Pack', type: 'fixed', items: [{ plan: 'pa', size: 50000, qty: 2 }], price: 249, stacks: false, status: 'live', uses: 0 },
-      { id: 'mix', name: 'Mix and Match', type: 'mix', mixPlans: ['pb', 'pc'], min: 2, pct: 12, stacks: false, status: 'live', uses: 0 }
-    ],
-    promos: [
-      { id: 'p1', name: 'Black Friday', kind: 'code', code: 'BLACKFRIDAY', vtype: 'percent', value: 40, freeAddon: '', plans: ['pa', 'pb'], sizes: [], lines: { base: true, addon: false, reset: false }, withBundles: false, first: false, affiliate: false, minCart: 0, countries: '', start: '2026-11-24', end: '2026-11-30', total: 0, perTrader: 1, maxOff: 0, priority: 10, exclusive: true, status: 'on', uses: 0 },
-      { id: 'p2', name: 'Affiliate Code', kind: 'code', code: 'AFF10', vtype: 'percent', value: 10, freeAddon: '', plans: [], sizes: [], lines: { base: true, addon: true, reset: false }, withBundles: true, first: true, affiliate: true, minCart: 0, countries: '', start: '2026-11-01', end: '', total: 0, perTrader: 1, maxOff: 0, priority: 20, exclusive: false, status: 'on', uses: 2 },
-      { id: 'p3', name: 'Reset After Breach', kind: 'auto', code: '', vtype: 'percent', value: 50, freeAddon: '', plans: [], sizes: [], lines: { base: false, addon: false, reset: true }, withBundles: true, first: false, affiliate: false, minCart: 0, countries: '', start: '2026-11-01', end: '', total: 0, perTrader: 0, maxOff: 0, priority: 5, exclusive: false, status: 'on', uses: 0 },
-      { id: 'p4', name: '150K Perk', kind: 'auto', code: '', vtype: 'free', value: 0, freeAddon: 'daily', plans: ['pb'], sizes: [150000], lines: { base: false, addon: true, reset: false }, withBundles: true, first: false, affiliate: false, minCart: 0, countries: '', start: '2026-11-15', end: '2026-12-15', total: 0, perTrader: 0, maxOff: 0, priority: 8, exclusive: false, status: 'on', uses: 1 }
-    ],
-    rules: [],
-    changes: [
-      { id: 'c1', area: 'Prices', text: '[Plan B Name] $150K scheduled price for Dec 1, 2026', who: ME, when: 'Today, 11:42 AM', before: '$349', after: '$329', approve: true, approved: false },
-      { id: 'c2', area: 'Promotions', text: 'Created Black Friday (BLACKFRIDAY, 40% off)', who: ME, when: 'Today, 11:58 AM' }
-    ],
-    history: [
-      { v: 12, text: 'Added Mix and Match bundle; [Plan C Name] $100K compare-at price', who: ME, when: 'Nov 18, 2026, 4:10 PM', count: 3 },
-      { v: 11, text: 'New rule set versions for [Plan B Name]', who: ME, when: 'Nov 10, 2026, 9:32 AM', count: 2 },
-      { v: 10, text: 'Launched catalog: 3 plans, 4 add-ons, 2 bundles', who: ME, when: 'Nov 3, 2026, 2:05 PM', count: 21 }
-    ],
-    version: 12,
-    tester: { lines: [{ plan: 'pb', size: 100000, platform: 'tradovate', addons: ['daily'], qty: 2 }], code: 'AFF10', newTrader: true, affiliate: false }
-  };
-  // rule sets: one live version per active plan size
-  const ruleBase = { 25000: [1500, 500, 1500, 3], 50000: [3000, 1100, 2500, 5], 100000: [6000, 2200, 3000, 10], 150000: [9000, 3300, 4500, 15] };
-  S.plans.forEach((p) => p.sizes.forEach((z) => {
-    const r = ruleBase[z.size];
-    S.rules.push({ id: uid('r'), plan: p.id, size: z.size, version: p.id === 'pb' ? 3 : 1, status: z.active ? 'live' : 'retired', target: r[0], daily: r[1], dd: r[2], ddType: 'Trailing EOD', contracts: r[3], minDays: 5, consistency: 40, split: 90, payoutMin: 250, accounts: z.active ? Math.round(z.size / 25000) * 3 + (p.id === 'pb' ? 11 : 2) : 0 });
-    if (p.id === 'pb' && z.active) S.rules.push({ id: uid('r'), plan: p.id, size: z.size, version: 2, status: 'retired', target: r[0], daily: r[1], dd: r[2] - 500, ddType: 'Trailing EOD', contracts: r[3], minDays: 5, consistency: 30, split: 80, payoutMin: 250, accounts: 4 });
-  }));
-
+  // ---------- live catalog: the server's catalog plus the design-only settings kept in catalog.x ----------
+  const F = window.FSG; const BO = F.BO; const LIVE = JSON.parse(JSON.stringify(BO.catalog));
+  const SIZES = [...new Set([25000, 50000, 100000, 150000].concat(...LIVE.plans.map((p) => p.sizes.map((z) => z.size))))].sort((a, b) => a - b);
+  const PLAT_ID = { Tradovate: 'tradovate', NinjaTrader: 'ninja', TradingView: 'tv', Rithmic: 'rithmic' }; const PLAT_NAME = Object.fromEntries(Object.entries(PLAT_ID).map(([n, i]) => [i, n]));
+  const paidOrders = (BO.orders || []).filter((o) => o.status === 'paid');
+  function fromCat(cat) {
+    const X = cat.x || {}; const XP = X.plans || {};
+    const addonIds = [...new Set(Object.keys(cat.addons || {}).concat((X.addons || []).map((a) => a.id)))];
+    const plans = cat.plans.map((p, k) => { const xp = XP[p.id] || {};
+      return { id: p.id, name: p.short || p.name, full: p.name, kind: p.kind, slug: xp.slug || p.id, badge: p.badge || '', billing: xp.billing || 'one-time', status: p.active ? 'live' : (xp.status === 'draft' ? 'draft' : 'hidden'), sort: xp.sort || k + 1, desc: p.desc || '',
+        sizes: SIZES.map((sz) => { const z = p.sizes.find((y) => y.size === sz); const xz = (xp.sizes || {})[sz] || {}; return { size: sz, price: z ? z.price : (xz.price || 0), compare: xz.compare == null ? null : xz.compare, floor: xz.floor || 0, active: !!z, sched: xz.sched || null, act: z ? (z.activation || 0) : (xz.act || 0) }; }),
+        platforms: Object.fromEntries(Object.keys(PLAT_NAME).map((id) => [id, (p.platforms || []).includes(PLAT_NAME[id])])), defPlatform: xp.defPlatform || PLAT_ID[(p.platforms || [])[0]] || 'tradovate',
+        addons: Object.fromEntries(addonIds.map((a) => [a, (p.addons || []).includes(a)])), bundles: xp.bundles || { tier: true } }; });
+    const addons = addonIds.map((id) => { const a = (cat.addons || {})[id]; const xa = (X.addons || []).find((y) => y.id === id) || {}; return a ? { id, name: a.name, pricing: a.flat != null ? 'flat' : 'percent', value: a.flat != null ? a.flat : a.pct, discountable: a.discountable !== false, effect: a.desc || '', status: 'live' } : Object.assign({ status: 'off' }, xa); });
+    const tierB = (cat.bundles || []).slice().sort((a, b) => a.min - b.min);
+    const bundles = (X.bundles || []).filter((b) => b.type !== 'tier').concat(tierB.length || (X.bundles || []).some((b) => b.type === 'tier') ? [Object.assign({ id: 'tier', name: 'Multi-Account Savings', type: 'tier', samePlan: false, stacks: true, uses: 0 }, (X.bundles || []).find((b) => b.type === 'tier') || {}, { tiers: tierB.map((b) => ({ min: b.min, pct: b.pct })), status: tierB.length ? 'live' : 'off' })] : []);
+    const promos = (cat.promos || []).map((q, k) => { const xq = ((X.promos || []).find((y) => y.code === q.code)) || {}; return Object.assign({ id: 'p' + k, kind: 'code', vtype: 'percent', freeAddon: '', sizes: [], lines: { base: true, addon: false, reset: false }, withBundles: false, first: false, affiliate: false, minCart: 0, countries: '', total: 0, maxOff: 0, priority: 10, exclusive: false }, xq, { name: q.name, code: q.code, value: q.pct, plans: q.plans || [], start: q.starts || '', end: q.ends || '', perTrader: q.once ? 1 : 0, status: q.active ? 'on' : 'off', desc: q.desc || '' }); })
+      .concat((X.promos || []).filter((y) => y.kind === 'auto' || !(cat.promos || []).some((q) => q.code === y.code)).map((y) => Object.assign({}, y, { status: y.kind === 'auto' ? y.status : 'off' })));
+    promos.forEach((q) => { q.uses = q.code ? paidOrders.filter((o) => String(o.promo || '').toUpperCase() === q.code.toUpperCase()).length : 0; });
+    const rules = [];
+    plans.forEach((p) => p.sizes.forEach((z) => { const inst = p.kind === 'funded'; const base = (inst ? (cat.instantRules || {}) : (cat.evalRules || {}))[z.size]; if (!base) return; const o = (((cat.planRules || {})[p.id]) || {})[z.size] || {}; const com = inst ? cat.instantCommon || {} : cat.evalCommon || {}; const fc = cat.fundedCommon || {};
+      const live = { id: uid('r'), plan: p.id, size: z.size, version: o.version || 1, status: z.active ? 'live' : 'retired', target: o.target != null ? o.target : inst ? base.goal : base.target, daily: o.dll != null ? o.dll : base.dll, dd: o.maxLoss != null ? o.maxLoss : base.maxLoss, ddType: 'Trailing EOD', contracts: o.contracts != null ? o.contracts : base.contracts, minDays: o.minDays != null ? o.minDays : (com.minDays || 0), consistency: o.consistency != null ? o.consistency : (inst ? com.consistency : (cat.evalCommon || {}).consistency), split: o.split != null ? o.split : inst ? com.splitLater : fc.split, payoutMin: o.payoutMin != null ? o.payoutMin : (inst ? com.payoutMin : fc.payoutMin), accounts: (BO.accounts || []).filter((a) => a.plan === p.id && a.size === z.size && !['breached', 'closed'].includes(a.phase)).length };
+      rules.push(live); ((X.oldRules || {})[p.id + ':' + z.size] || []).forEach((r) => rules.push(Object.assign({}, r, { id: uid('r'), status: 'retired', accounts: 0 }))); }));
+    return { plans, platforms: Object.keys(PLAT_NAME).map((id) => Object.assign({ id, name: PLAT_NAME[id], adapter: 'Simulator', visible: true }, ((X.platforms || []).find((x) => x.id === id) || {}))), addons, bundles, promos, rules, version: cat.version || 1 };
+  }
+  const VERS = F.st('catalog.versions', []);
+  const DRAFT = F.st('catalog.draft', null);
+  const S = Object.assign({ view: 'overview', planId: LIVE.plans[0].id, drawer: null, sideOpen: false, promoFilter: 'all', ruleFilter: 'all', toast: '', changes: [], history: VERS.map((v) => ({ v: v.v, text: v.text, who: v.who, when: v.when, count: v.count })) },
+    fromCat(LIVE), DRAFT && DRAFT.base === (LIVE.version || 1) ? DRAFT.s : {});
+  S.tester = S.tester || { lines: [{ plan: S.plans[0].id, size: (S.plans[0].sizes.find((z) => z.active) || S.plans[0].sizes[0]).size, platform: S.plans[0].defPlatform, addons: [], qty: 1 }], code: '', newTrader: true, affiliate: false };
+  if (!S.history.length) S.history = [{ v: S.version, text: 'Catalog as it is live now', who: 'Funded Sky', when: '', count: 0 }];
   const plan = (id) => S.plans.find((p) => p.id === id);
   const addon = (id) => S.addons.find((a) => a.id === id);
   const plat = (id) => S.platforms.find((p) => p.id === id);
@@ -200,6 +173,24 @@ function startCatalog(root) {
     return { comps, sub, savings, total: Math.round(total * 100) / 100, msgs, accounts: accounts.length };
   }
 
+  // ---------- publishing: draft to the live catalog ----------
+  const DRAFT_KEYS = ['plans', 'platforms', 'addons', 'bundles', 'promos', 'rules', 'changes', 'fees', 'upgrades', 'content', 'limits', 'agreements', 'campaigns', 'tests', 'batches', 'currencies', 'tax', 'roles', 'tester'];
+  const draftOf = () => { const o = {}; DRAFT_KEYS.forEach((k) => { o[k] = S[k]; }); o.recovery = { on: S.recovery.on, delay: S.recovery.delay, pct: S.recovery.pct, expiry: S.recovery.expiry, oneTime: S.recovery.oneTime, firstOnly: S.recovery.firstOnly }; return o; };
+  function toCat() {
+    const c = JSON.parse(JSON.stringify(LIVE)); const live = (p, z) => S.rules.filter((r) => r.plan === p && r.size === z && (r.status === 'live' || r.status === 'draft')).sort((a, b) => (a.status === 'draft' ? 1 : 0) - (b.status === 'draft' ? 1 : 0) || b.version - a.version)[0];
+    c.plans = S.plans.map((p) => { const old = LIVE.plans.find((x) => x.id === p.id) || {}; return { id: p.id, name: old.name && old.short === p.name ? old.name : p.name + ' Plan', short: p.name, kind: p.kind || old.kind || 'evaluation', desc: p.desc, badge: p.badge, active: p.status === 'live',
+      sizes: p.sizes.filter((z) => z.active && +z.price > 0).map((z) => ({ size: z.size, price: +z.price, activation: +(((S.fees[p.id] || {})[z.size] || {}).activation || 0) })), addons: Object.keys(p.addons || {}).filter((a) => p.addons[a] && S.addons.some((x) => x.id === a && x.status === 'live')), platforms: Object.keys(p.platforms || {}).filter((k) => p.platforms[k] && (S.platforms.find((x) => x.id === k) || {}).visible !== false).map((k) => PLAT_NAME[k]).filter(Boolean) }; });
+    c.addons = {}; S.addons.filter((a) => a.status === 'live').forEach((a) => { c.addons[a.id] = Object.assign({ name: a.name, desc: a.effect || '', discountable: a.discountable !== false }, a.pricing === 'flat' ? { flat: +a.value, pct: 0 } : { pct: +a.value }); });
+    const tb = S.bundles.find((b) => b.type === 'tier' && b.status === 'live'); c.bundles = tb ? (tb.tiers || []).map((t) => ({ id: 'b' + t.min, buy: `Buy ${t.min} Accounts`, get: `Save ${t.pct}%`, min: +t.min, pct: +t.pct })) : [];
+    c.promos = S.promos.filter((q) => q.kind === 'code' && q.code && q.vtype === 'percent').map((q) => ({ code: q.code.toUpperCase(), pct: +q.value, name: q.name, desc: q.desc || `${q.value}% off`, plans: q.plans || [], once: +q.perTrader === 1, active: q.status === 'on', starts: q.start || undefined, ends: q.end || undefined }));
+    c.planRules = {}; S.plans.forEach((p) => p.sizes.forEach((z) => { const r = live(p.id, z.size); if (!r || !z.active) return; const inst = p.kind === 'funded'; (c.planRules[p.id] = c.planRules[p.id] || {})[z.size] = Object.assign(inst ? { goal: +r.target } : { target: +r.target }, { dll: +r.daily, maxLoss: +r.dd, contracts: +r.contracts, minDays: +r.minDays, consistency: +r.consistency, split: +r.split, payoutMin: +r.payoutMin, version: r.version });
+      const base = inst ? (c.instantRules = c.instantRules || {}) : c.evalRules; if (!base[z.size] || p.id === (S.plans.find((x) => (x.kind === 'funded') === inst && x.sizes.some((y) => y.size === z.size && y.active)) || {}).id) base[z.size] = inst ? { dll: +r.daily, goal: +r.target, maxLoss: +r.dd, contracts: +r.contracts } : { dll: +r.daily, target: +r.target, maxLoss: +r.dd, contracts: +r.contracts }; }));
+    const rp = []; S.plans.forEach((p) => p.sizes.forEach((z) => { const f = (S.fees[p.id] || {})[z.size]; if (z.active && +z.price > 0 && f && f.reset) rp.push(f.reset / z.price * 100); })); if (rp.length) c.resetPct = Math.round(rp.reduce((a, b) => a + b, 0) / rp.length);
+    const oldRules = {}; S.rules.filter((r) => r.status === 'retired').forEach((r) => { (oldRules[r.plan + ':' + r.size] = oldRules[r.plan + ':' + r.size] || []).push({ version: r.version, target: r.target, daily: r.daily, dd: r.dd, ddType: r.ddType, contracts: r.contracts, minDays: r.minDays, consistency: r.consistency, split: r.split, payoutMin: r.payoutMin }); });
+    const xp = {}; S.plans.forEach((p) => { xp[p.id] = { slug: p.slug, billing: p.billing, status: p.status, sort: p.sort, defPlatform: p.defPlatform, bundles: p.bundles, sizes: Object.fromEntries(p.sizes.map((z) => [z.size, { compare: z.compare, floor: z.floor, sched: z.sched, price: z.price, act: z.act }])) }; });
+    c.x = Object.assign({}, draftOf(), { plans: xp, oldRules, changes: undefined, rules: undefined, tester: undefined });
+    c.version = (LIVE.version || 1) + 1; return c; }
+  function publish(text, count, cat) { const c = cat || toCat(); return F.api('/catalog', c, 'PUT').then(() => { const v = { v: c.version, text, who: ME, when: new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }), count, cat: c }; return F.put('catalog.versions', [v].concat(VERS).slice(0, 15)); }).then(() => F.put('catalog.draft', null)).then(() => { toast(`Published v${c.version}. The checkout is updated.`); setTimeout(() => location.reload(), 700); }).catch((x) => toast(x.message)); }
   // ---------- views ----------
   const sw = (on, act, data, label) => `<button type="button" class="sw ${on ? 'on' : ''}" role="switch" aria-checked="${on}" aria-label="${esc(label || '')}" data-act="${act}" ${data}></button>`;
   const badgeSt = (s) => s === 'live' ? '<span class="b live">Live</span>' : s === 'draft' ? '<span class="b draft">Draft</span>' : '<span class="b ret">Retired</span>';
@@ -351,7 +342,7 @@ function startCatalog(root) {
     <div class="card m0"><div class="ch"><h3>Cart</h3><div class="r"><button class="pill sm" data-act="tAdd">+ Add Line</button></div></div><div class="cb fg">${lines || '<div class="empty">Add a line to start.</div>'}
       <div class="fg2"><div class="fl"><label>Promo Code</label><input value="${esc(t.code)}" placeholder="e.g. BLACKFRIDAY" data-bind="t.code"></div>
       <div class="fl"><label>Trader</label><div style="display:flex;gap:16px;height:36px;align-items:center"><label class="chk"><input type="checkbox" ${t.newTrader ? 'checked' : ''} data-act="tFlag" data-k="newTrader"> First Purchase</label><label class="chk"><input type="checkbox" ${t.affiliate ? 'checked' : ''} data-act="tFlag" data-k="affiliate"> Came from an Affiliate</label></div></div></div>
-      <div class="hint">Try: 2× [Plan B] $100K for a bundle, AFF10 with or without First Purchase, or [Plan B] $150K with Daily Payouts for the automatic perk.</div></div></div>
+      <div class="hint">Try two of the same size to see the bundle, or enter a promo code to see it apply.</div></div></div>
     <div class="card m0"><div class="ch"><h3>Quote</h3><span class="lab">${q.accounts} Account${q.accounts === 1 ? '' : 's'}</span></div><div class="cb" style="padding-top:6px">
       ${q.comps.map((c) => `<div class="qrow"><span>${esc(c.label)}${c.type === 'base' && c.qty > 1 ? ' × ' + c.qty : ''}</span><span>${money(c.amt)}</span></div>`).join('')}
       <div class="qrow" style="color:var(--mu)"><span>Subtotal</span><span>${money(q.sub)}</span></div>
@@ -374,58 +365,27 @@ function startCatalog(root) {
 
 
   // ================= EXTENSIONS =================
-  const APPROVER = '[Second Approver]';
+  const APPROVER = 'a second admin'; const SOLO = (BO.users || []).filter((u) => u.role && u.role !== 'trader').length < 2;
+  const XX = LIVE.x || {}; const DX = (DRAFT && DRAFT.base === (LIVE.version || 1) && DRAFT.s) || {};
+  const pick = (k, d) => (DX[k] !== undefined ? DX[k] : XX[k] !== undefined ? XX[k] : d);
+  const AFL = (BO.lists && BO.lists.affiliates) || [];
   Object.assign(S, {
-    fees: {}, upgrades: [], content: {}, limits: { maxActive: 5, maxFunded: 3, maxFundedBalance: 450000, blocked: '[Sanctioned countries], [Countries you choose]', vpn: true, plans: {} },
-    agreements: ['Evaluation Agreement v3', 'Evaluation Agreement v2', 'Evaluation Agreement v1'],
-    campaigns: [
-      { id: 'cm1', name: 'Black Friday', start: '2026-11-27T00:00', end: '2026-11-30T23:59', promos: ['p1'], prices: [{ plan: 'pb', size: 150000, price: 299 }], bundlesOn: ['mix'], revert: true, paused: false },
-      { id: 'cm2', name: 'Holiday Bundles', start: '2026-12-20T00:00', end: '2027-01-02T23:59', promos: [], prices: [], bundlesOn: ['tier', 'mix'], revert: true, paused: false }
-    ],
-    tests: [
-      { id: 't1', name: '$100K Price Test', plan: 'pb', size: 100000, a: 259, b: 239, split: 50, status: 'running', start: 'Nov 12, 2026', va: 1840, vb: 1822, ba: 61, bb: 74 },
-      { id: 't2', name: '$25K Starter Price', plan: 'pa', size: 25000, a: 99, b: 89, split: 50, status: 'ended', start: 'Oct 20, 2026', va: 2410, vb: 2388, ba: 96, bb: 101, applied: 'Kept $99' }
-    ],
-    perfRange: 30,
-    batches: [{ id: 'cb1', promo: 'p2', prefix: 'CREATOR', count: 50, usesEach: 1, used: 12, created: 'Nov 14, 2026' }],
-    affiliates: [
-      { id: 'af1', name: '[Affiliate Name 1]', code: 'SKY10', pct: 10, commission: 15, uses: 38, revenue: 7420, status: 'active' },
-      { id: 'af2', name: '[Affiliate Name 2]', code: 'TRADEWITHX', pct: 10, commission: 20, uses: 21, revenue: 4130, status: 'active' },
-      { id: 'af3', name: '[Affiliate Name 3]', code: 'FUTURESPRO', pct: 5, commission: 10, uses: 4, revenue: 690, status: 'paused' }
-    ],
-    codeLog: [
-      { code: 'SKY10', trader: '[Trader] #1043', order: 'FS-ORD-2291', off: 25.9, when: 'Today, 10:14 AM' },
-      { code: 'AFF10', trader: '[Trader] #1040', order: 'FS-ORD-2288', off: 16.9, when: 'Today, 8:02 AM' },
-      { code: 'CREATOR-7KQ2', trader: '[Trader] #1038', order: 'FS-ORD-2285', off: 14.9, when: 'Yesterday, 9:41 PM' },
-      { code: 'TRADEWITHX', trader: '[Trader] #1031', order: 'FS-ORD-2279', off: 34.9, when: 'Yesterday, 3:20 PM' }
-    ],
-    flags: [
-      { text: 'One card used with 3 different first-purchase codes', codes: 'AFF10, SKY10, CREATOR-9PLM', level: 'hot', done: false },
-      { text: 'Same device on 2 accounts using TRADEWITHX', codes: 'TRADEWITHX', level: 'warm', done: false }
-    ],
-    currencies: [
-      { code: 'USD', name: 'US Dollar', on: true, mode: 'base', rate: 1, round: '1' },
-      { code: 'EUR', name: 'Euro', on: true, mode: 'auto', rate: 0.92, round: '.99' },
-      { code: 'GBP', name: 'British Pound', on: true, mode: 'auto', rate: 0.79, round: '.99' },
-      { code: 'CAD', name: 'Canadian Dollar', on: false, mode: 'auto', rate: 1.39, round: '1' },
-      { code: 'AUD', name: 'Australian Dollar', on: false, mode: 'fixed', rate: 1.53, round: '1' }
-    ],
-    tax: [
-      { name: 'European Union VAT', on: false, inclusive: true }, { name: 'United Kingdom VAT', on: false, inclusive: true },
-      { name: 'Australia GST', on: false, inclusive: true }, { name: 'Canada GST/HST', on: false, inclusive: false }, { name: 'US Sales Tax', on: false, inclusive: false }
-    ],
-    recovery: { on: true, delay: 2, pct: 10, expiry: 48, oneTime: true, firstOnly: true, sent: 214, opened: 131, recovered: 37, revenue: 6290 },
-    roles: { names: ['Owner', 'Finance', 'Marketing', 'Support', 'Risk'], caps: ['View the Catalog', 'Edit Plans and Sizes', 'Change Prices', 'Change Rule Sets', 'Create Promotions and Codes', 'Manage Affiliates', 'Run Price Tests and Campaigns', 'Approve Price and Rule Changes', 'Publish', 'Export and Import'],
-      grid: { Finance: [1, 0, 1, 0, 0, 1, 0, 1, 1, 1], Marketing: [1, 0, 0, 0, 1, 1, 1, 0, 0, 0], Support: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0], Risk: [1, 0, 0, 1, 0, 0, 0, 1, 0, 0] } },
-    preview: { device: 'desktop', plan: 'pb', size: 100000, platform: 'tradovate', addons: [], qty: 1, code: '', drafts: false }
+    fees: pick('fees', {}), upgrades: pick('upgrades', []), content: pick('content', {}), limits: pick('limits', { maxActive: 5, maxFunded: 3, maxFundedBalance: 450000, blocked: '', vpn: true, plans: {} }),
+    agreements: pick('agreements', ['Evaluation Agreement v1']), campaigns: pick('campaigns', []), tests: pick('tests', []), perfRange: 30, batches: pick('batches', []),
+    affiliates: AFL.map((x, k) => { const u = (F.user && F.user(x.user)) || {}; const os = paidOrders.filter((o) => String(o.promo || '').toUpperCase() === String(x.code || '').toUpperCase() || (BO.users || []).some((y) => y.id === o.user && y.referred_by === x.user)); return { id: 'af' + k, user: x.user, name: u.first ? `${u.first} ${String(u.last || '').slice(0, 1)}.` : 'Affiliate', code: String(x.code || u.ref_code || '').toUpperCase(), pct: x.pct || 10, commission: x.rate || 10, uses: os.length, revenue: Math.round(os.reduce((a, o) => a + o.total, 0)), status: x.status || 'active' }; }),
+    codeLog: paidOrders.filter((o) => o.promo).sort((a, b) => new Date(b.paid || b.created) - new Date(a.paid || a.created)).slice(0, 12).map((o) => ({ code: String(o.promo).toUpperCase(), trader: `${String(o.name || '').split(' ')[0]} ${(String(o.name || '').split(' ')[1] || '').slice(0, 1)}. · ${o.tid}`, order: o.code, off: o.discount, when: F.when ? F.when(o.paid || o.created) : F.ago(o.paid || o.created) })),
+    flags: (() => { const by = {}; paidOrders.filter((o) => o.promo).forEach((o) => { const k = o.method || o.user; (by[k] = by[k] || new Set()).add(String(o.promo).toUpperCase()); }); return Object.entries(by).filter(([, v]) => v.size >= 3).map(([, v]) => ({ text: `One payment method used with ${v.size} different codes`, codes: [...v].join(', '), level: 'hot', done: false })); })(),
+    currencies: pick('currencies', [{ code: 'USD', name: 'US Dollar', on: true, mode: 'base', rate: 1, round: '1' }, { code: 'EUR', name: 'Euro', on: false, mode: 'auto', rate: 0.92, round: '.99' }, { code: 'GBP', name: 'British Pound', on: false, mode: 'auto', rate: 0.79, round: '.99' }, { code: 'CAD', name: 'Canadian Dollar', on: false, mode: 'auto', rate: 1.39, round: '1' }, { code: 'AUD', name: 'Australian Dollar', on: false, mode: 'fixed', rate: 1.53, round: '1' }]),
+    tax: pick('tax', [{ name: 'European Union VAT', on: false, inclusive: true }, { name: 'United Kingdom VAT', on: false, inclusive: true }, { name: 'Australia GST', on: false, inclusive: true }, { name: 'Canada GST/HST', on: false, inclusive: false }, { name: 'US Sales Tax', on: false, inclusive: false }]),
+    recovery: Object.assign({ on: true, delay: 2, pct: 10, expiry: 48, oneTime: true, firstOnly: true }, pick('recovery', {}), (() => { const ob = (BO.outbox || []).filter((m) => ['abandon1', 'abandon2'].includes(m.template)); const rec = paidOrders.filter((o) => ob.some((m) => m.to_email === o.email && new Date(m.created_at) < new Date(o.paid || o.created))); return { sent: ob.length, opened: ob.filter((m) => ['opened', 'clicked'].includes(m.status)).length, recovered: rec.length, revenue: Math.round(rec.reduce((a, o) => a + o.total, 0)) }; })()),
+    roles: pick('roles', { names: ['Owner', 'Finance', 'Marketing', 'Support', 'Risk'], caps: ['View the Catalog', 'Edit Plans and Sizes', 'Change Prices', 'Change Rule Sets', 'Create Promotions and Codes', 'Manage Affiliates', 'Run Price Tests and Campaigns', 'Approve Price Changes', 'Publish', 'Export'], grid: { Finance: [1, 0, 1, 0, 0, 1, 0, 1, 1, 1], Marketing: [1, 0, 0, 0, 1, 1, 1, 0, 0, 0], Support: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0], Risk: [1, 0, 0, 1, 0, 0, 0, 1, 0, 0] } }),
+    preview: { device: 'desktop', plan: S.plans[0].id, size: (S.plans[0].sizes.find((z) => z.active) || S.plans[0].sizes[0]).size, platform: S.plans[0].defPlatform, addons: [], qty: 1, code: '', drafts: false }
   });
   S.plans.forEach((p) => {
-    S.fees[p.id] = {}; p.sizes.forEach((z) => { S.fees[p.id][z.size] = { reset: z.price ? Math.round(z.price * 0.55) : 0, activation: p.id === 'pc' ? 0 : (z.size >= 100000 ? 149 : 99), renewal: p.billing === 'monthly' ? z.price : 0, resetDiscountable: true }; });
-    S.content[p.id] = { agreement: S.agreements[0], tagline: p.desc, bullets: ['[Profit target rule, in plain words]', '[Drawdown rule, in plain words]', '[Daily loss rule, in plain words]', '[Payout rule, in plain words]'], faq: [{ q: '[How long do I have to pass?]', a: '[Answer]' }, { q: '[When can I request a payout?]', a: '[Answer]' }] };
-    S.limits.plans[p.id] = { perTrader: p.id === 'pb' ? 5 : 3, cap: p.id === 'pa' ? 500 : 0, sold: p.id === 'pa' ? 212 : p.id === 'pb' ? 488 : 133, countries: '' };
+    S.fees[p.id] = S.fees[p.id] || {}; p.sizes.forEach((z) => { S.fees[p.id][z.size] = Object.assign({ reset: z.price ? Math.round(z.price * (LIVE.resetPct || 50) / 100) : 0, renewal: 0, resetDiscountable: true }, S.fees[p.id][z.size] || {}, { activation: z.act || 0 }); });
+    S.content[p.id] = S.content[p.id] || { agreement: S.agreements[0], tagline: p.desc, bullets: [], faq: [] };
+    S.limits.plans[p.id] = Object.assign({ perTrader: 5, cap: 0, countries: '' }, S.limits.plans[p.id] || {}, { sold: paidOrders.filter((o) => (o.items || []).some((it) => it.plan === p.id)).reduce((a, o) => a + (o.items || []).filter((it) => it.plan === p.id).reduce((x, it) => x + (it.qty || 1), 0), 0) });
   });
-  S.upgrades = [{ plan: 'pb', from: 50000, to: 100000, price: 99 }, { plan: 'pb', from: 100000, to: 150000, price: 99 }, { plan: 'pc', from: 25000, to: 50000, price: 49 }];
-
   const pending = () => S.changes.filter((c) => c.approve && !c.approved);
   const campState = (c) => { if (c.paused) return ['Paused', 'ret']; const s = new Date(c.start), e = new Date(c.end); if (s > NOW) return ['Scheduled', 'sched']; if (e < NOW) return ['Ended', 'ended']; return ['Running', 'live']; };
   const fmtDT = (v) => v ? new Date(v).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—';
@@ -433,7 +393,7 @@ function startCatalog(root) {
   const curPrice = (c, usd) => { if (c.mode === 'base') return usd; let v = usd * c.rate; if (c.round === '.99') v = Math.ceil(v) - 0.01; else if (c.round === '1') v = Math.round(v); else if (c.round === '5') v = Math.ceil(v / 5) * 5; return v; };
   const sym = { USD: '$', EUR: '€', GBP: '£', CAD: 'C$', AUD: 'A$' };
   const cm = (c, v) => sym[c.code] + (Math.round(v * 100) / 100).toLocaleString('en-US', { minimumFractionDigits: v % 1 ? 2 : 0, maximumFractionDigits: 2 });
-  const perfOf = (p, z) => { const f = S.perfRange / 30; const base = { pa: 1, pb: 1.6, pc: 0.8 }[p.id] || 0.5; const o = Math.round((z.size / 25000 <= 2 ? 22 : 14) * base * f); return { orders: o, revenue: o * z.price, pass: [14, 11, 9, 7][SIZES.indexOf(z.size)], refunds: Math.round(o * 0.03), cb: Math.floor((o + 8) / 30) }; };
+  const perfOf = (p, z) => { const os = paidOrders.concat((BO.orders || []).filter((o) => o.status === 'refunded')).filter((o) => F.within(o.paid || o.created, S.perfRange) && (o.items || []).some((it) => it.plan === p.id && +it.size === z.size)); const n = os.reduce((a, o) => a + (o.items || []).filter((it) => it.plan === p.id && +it.size === z.size).reduce((x, it) => x + (it.qty || 1), 0), 0); const acc = (BO.accounts || []).filter((a) => a.plan === p.id && a.size === z.size && a.kind !== 'funded'); const fin = acc.filter((a) => a.passed || a.breached); return { orders: n, revenue: Math.round(os.reduce((a, o) => a + o.total, 0)), pass: fin.length ? Math.round(acc.filter((a) => a.passed).length / fin.length * 100) : 0, refunds: os.filter((o) => o.status === 'refunded').length, cb: (BO.disputes || []).filter((d) => os.some((o) => o.code === d.order)).length }; };
 
   function vFees() {
     const rows = S.plans.map((p) => p.sizes.filter((z) => z.active).map((z) => { const f = S.fees[p.id][z.size]; return `<tr><td class="nw"><b>${esc(p.name)}</b></td><td>${K(z.size)}</td><td class="num">${money(z.price)}</td>
@@ -485,7 +445,7 @@ function startCatalog(root) {
   }
 
   function vCurrency() {
-    const ex = sizeOf('pb', 100000).price;
+    const ex = (S.plans[0].sizes.find((z) => z.active) || S.plans[0].sizes[0]).price;
     const rows = S.currencies.map((c, i) => `<tr><td class="swc">${c.mode === 'base' ? '<span class="b live plain">Base</span>' : sw(c.on, 'curOn', `data-i="${i}"`, 'Sell in ' + c.code)}</td><td><span class="il" style="gap:6px;align-items:baseline"><b>${c.code}</b><span class="hint">${c.name}</span></span></td>
       <td style="width:170px">${c.mode === 'base' ? '<span class="hint">All prices are set in USD</span>' : `<select data-bind="cur.mode" data-i="${i}"><option value="auto" ${c.mode === 'auto' ? 'selected' : ''}>Convert Daily</option><option value="fixed" ${c.mode === 'fixed' ? 'selected' : ''}>Fixed Rate</option></select>`}</td>
       <td style="width:110px">${c.mode === 'base' ? '' : `<input type="number" step="0.01" value="${c.rate}" data-bind="cur.rate" data-i="${i}" ${c.mode === 'auto' ? 'disabled' : ''} aria-label="Rate">`}</td>
@@ -493,7 +453,7 @@ function startCatalog(root) {
       <td class="num nw">${cm(c, curPrice(c, ex))}</td></tr>`).join('');
     const tx = S.tax.map((t, i) => `<tr><td class="swc">${sw(t.on, 'taxOn', `data-i="${i}"`, 'Collect ' + t.name)}</td><td><b>${t.name}</b></td><td><label class="chk"><input type="checkbox" ${t.inclusive ? 'checked' : ''} data-act="taxInc" data-i="${i}"> Prices Include Tax</label></td></tr>`).join('');
     return `<div class="ph"><div><h1>Currencies and Tax</h1><p>Show prices in a trader's own currency and collect tax where required. Prices are still set once, in US dollars.</p></div></div>
-    <div class="card"><div class="ch"><h3>Currencies</h3><span class="lab">Example: [Plan B Name] $100K at ${money(ex)}</span></div><div class="tsc"><table class="t"><thead><tr><th>Sell In</th><th>Currency</th><th>Rate</th><th>Rate Value</th><th>Rounding</th><th class="num">Example Price</th></tr></thead><tbody>${rows}</tbody></table></div></div>
+    <div class="card"><div class="ch"><h3>Currencies</h3><span class="lab">Example: ${esc(S.plans[0].name)} ${K((S.plans[0].sizes.find((z) => z.active) || S.plans[0].sizes[0]).size)} at ${money(ex)}</span></div><div class="tsc"><table class="t"><thead><tr><th>Sell In</th><th>Currency</th><th>Rate</th><th>Rate Value</th><th>Rounding</th><th class="num">Example Price</th></tr></thead><tbody>${rows}</tbody></table></div></div>
     <div class="card"><div class="ch"><h3>Tax Collection</h3><span class="lab">Off Until Confirmed</span></div><div class="tsc"><table class="t"><tbody>${tx}</tbody></table></div></div>
     <p class="hint">Confirm with an accountant which regions require tax on evaluation fees before switching any region on. Rates shown are examples; live rates come from the payment processor.</p>`;
   }
@@ -577,7 +537,7 @@ function startCatalog(root) {
   function vRecovery() {
     const r = S.recovery;
     return `<div class="ph"><div><h1>Abandoned Checkout</h1><p>When a signed-in trader leaves checkout without paying, send a reminder with a one-time code.</p></div><div class="act">${sw(r.on, 'recOn', '', 'Recovery emails on')}<span class="hint">${r.on ? 'On' : 'Off'}</span></div></div>
-    <div class="tiles"><div class="tile"><span>Emails Sent</span><b>${r.sent}</b><small>Last 30 days</small></div><div class="tile"><span>Opened</span><b>${Math.round(r.opened / r.sent * 100)}%</b><small>${r.opened} opens</small></div><div class="tile"><span>Recovered</span><b>${r.recovered}</b><small>${(r.recovered / r.sent * 100).toFixed(1)}% of sent</small></div><div class="tile"><span>Recovered Revenue</span><b>${money(r.revenue)}</b><small>After the code discount</small></div></div>
+    <div class="tiles"><div class="tile"><span>Emails Sent</span><b>${r.sent}</b><small>Recent sends</small></div><div class="tile"><span>Opened</span><b>${r.sent ? Math.round(r.opened / r.sent * 100) + '%' : '—'}</b><small>${r.opened} opens</small></div><div class="tile"><span>Recovered</span><b>${r.recovered}</b><small>${r.sent ? (r.recovered / r.sent * 100).toFixed(1) + '% of sent' : 'No reminders sent yet'}</small></div><div class="tile"><span>Recovered Revenue</span><b>${money(r.revenue)}</b><small>After the code discount</small></div></div>
     <div class="card"><div class="ch"><h3>Settings</h3></div><div class="cb fg"><div class="fg3">
       <div class="fl"><label>Send After (Hours)</label><input type="number" min="1" value="${r.delay}" data-bind="rec.delay"></div>
       <div class="fl"><label>Discount (%)</label><input type="number" min="0" value="${r.pct}" data-bind="rec.pct"><span class="hint">0 sends a plain reminder with no code</span></div>
@@ -658,14 +618,14 @@ function startCatalog(root) {
     if (kind === 'batch') { const b = Object.assign({}, f, { id: uid('cb'), prefix: (f.prefix || 'CODE').toUpperCase(), used: 0, created: 'Today' }); S.batches.unshift(b); log('Codes', `Generated ${b.count} codes ${b.prefix}-XXXX`); return true; }
     if (kind === 'aff') { f.code = (f.code || '').toUpperCase().replace(/\s+/g, ''); if (!f.id) { f.id = uid('af'); f.uses = 0; f.revenue = 0; S.affiliates.push(f); } else Object.assign(S.affiliates.find((x) => x.id === f.id), f); log('Affiliates', `${f.name}: code ${f.code}, ${f.pct}% off, ${f.commission}% commission`); return true; }
     if (kind === 'test') { const a = (sizeOf(f.plan, +f.size) || {}).price || 0; S.tests.unshift({ id: uid('t'), name: f.name, plan: f.plan, size: +f.size, a, b: +f.b, split: +f.split, status: 'running', start: 'Today', va: 0, vb: 0, ba: 0, bb: 0 }); log('Price Tests', `Started ${f.name}: ${money(a)} vs ${money(+f.b)}`); return true; }
-    if (kind === 'import') { log('Import', 'Imported a catalog file into the draft'); return true; }
+    if (kind === 'import') { let c; try { c = JSON.parse(f.text); } catch (e) { toast('That is not a catalog file'); return false; } if (!c || !Array.isArray(c.plans)) { toast('That file has no plans in it'); return false; } const n = fromCat(Object.assign({}, LIVE, c)); ['plans', 'platforms', 'addons', 'bundles', 'promos', 'rules'].forEach((k) => { S[k] = n[k]; }); if (c.x) ['fees', 'upgrades', 'content', 'limits', 'campaigns', 'currencies', 'tax', 'roles'].forEach((k) => { if (c.x[k]) S[k] = c.x[k]; }); log('Import', 'Imported a catalog file into the draft'); return true; }
     return false;
   }
 
   function extClick(a, el) {
     const id = el.dataset.id, i = +el.dataset.i, D = S.drawer && S.drawer.f;
     switch (a) {
-      case 'editIntg': { const x = S.integrations.find((y) => y.id === id); const f = JSON.parse(JSON.stringify(x)); f.vals = x.vals ? { ...x.vals } : Object.fromEntries(x.fields.map(([k, , , v]) => [k, v])); f.tg = x.tg ? { ...x.tg } : Object.fromEntries(x.toggles.map(([k, , v]) => [k, v])); f.show = {}; S.drawer = { kind: 'intg', f }; return true; }
+      case 'editIntg': location.href = '/admin/settings#integrations'; return 'noRender';
       case 'intgShow': D.show[el.dataset.k] = !D.show[el.dataset.k]; return true;
       case 'intgEnv': if (D.id === 'stripe' && el.dataset.k === 'live') { toast("Stripe can't be used for live payments here"); return 'noRender'; } D.env = el.dataset.k; return true;
       case 'intgCopy': toast('Webhook URL copied'); return 'noRender';
@@ -675,9 +635,9 @@ function startCatalog(root) {
       case 'upAdd': S.upgrades.push({ plan: S.plans[0].id, from: 25000, to: 50000, price: 49 }); log('Fees', 'Added an upgrade path'); return true;
       case 'upDel': S.upgrades.splice(i, 1); log('Fees', 'Removed an upgrade path'); return true;
       case 'contentPlan': S.contentPlan = el.dataset.k; return true;
-      case 'cntAddB': S.content[S.contentPlan || S.plans[0].id].bullets.push('[New highlight]'); log('Checkout Content', 'Added a rule highlight'); return true;
+      case 'cntAddB': S.content[S.contentPlan || S.plans[0].id].bullets.push('New highlight'); log('Checkout Content', 'Added a rule highlight'); return true;
       case 'cntDelB': S.content[S.contentPlan || S.plans[0].id].bullets.splice(i, 1); log('Checkout Content', 'Removed a rule highlight'); return true;
-      case 'cntAddF': S.content[S.contentPlan || S.plans[0].id].faq.push({ q: '[New question]', a: '[Answer]' }); log('Checkout Content', 'Added an FAQ question'); return true;
+      case 'cntAddF': S.content[S.contentPlan || S.plans[0].id].faq.push({ q: 'New question', a: '' }); log('Checkout Content', 'Added an FAQ question'); return true;
       case 'cntDelF': S.content[S.contentPlan || S.plans[0].id].faq.splice(i, 1); log('Checkout Content', 'Removed an FAQ question'); return true;
       case 'limVpn': S.limits.vpn = el.checked; log('Limits', `VPN blocking ${el.checked ? 'on' : 'off'}`); return true;
       case 'curOn': { const c = S.currencies[i]; c.on = !c.on; log('Currencies', `${c.code} ${c.on ? 'on' : 'off'} at checkout`); return true; }
@@ -690,23 +650,23 @@ function startCatalog(root) {
       case 'pvQty': S.preview.qty = Math.max(1, Math.min(20, S.preview.qty + +el.dataset.d)); return true;
       case 'pvDev': S.preview.device = el.dataset.k; return true;
       case 'pvDrafts': S.preview.drafts = el.checked; return true;
-      case 'editCamp': { const c = S.campaigns.find((x) => x.id === id) || { id: '', name: '[New Campaign]', start: '2026-12-01T00:00', end: '2026-12-07T23:59', promos: [], prices: [], bundlesOn: [], revert: true, paused: false }; S.drawer = { kind: 'camp', f: JSON.parse(JSON.stringify(c)) }; return true; }
+      case 'editCamp': { const c = S.campaigns.find((x) => x.id === id) || { id: '', name: 'New Campaign', start: new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10) + 'T00:00', end: new Date(Date.now() + 14 * 864e5).toISOString().slice(0, 10) + 'T23:59', promos: [], prices: [], bundlesOn: [], revert: true, paused: false }; S.drawer = { kind: 'camp', f: JSON.parse(JSON.stringify(c)) }; return true; }
       case 'campPAdd': D.prices.push({ plan: S.plans[0].id, size: 50000, price: 0 }); return true;
       case 'campPDel': D.prices.splice(i, 1); return true;
-      case 'newTest': S.drawer = { kind: 'test', f: { name: '[New Price Test]', plan: 'pb', size: 50000, b: 149, split: 50 } }; return true;
+      case 'newTest': S.drawer = { kind: 'test', f: { name: 'New Price Test', plan: S.plans[0].id, size: (S.plans[0].sizes.find((z) => z.active) || S.plans[0].sizes[0]).size, b: (S.plans[0].sizes.find((z) => z.active) || S.plans[0].sizes[0]).price, split: 50 } }; return true;
       case 'testStop': { const t = S.tests.find((x) => x.id === id); t.status = 'ended'; t.applied = 'Stopped, kept ' + money(t.a); log('Price Tests', `Stopped ${t.name}`); return true; }
       case 'testApply': { const t = S.tests.find((x) => x.id === id); const w = el.dataset.w; const z = sizeOf(t.plan, t.size); const np = w === 'B' ? t.b : t.a; const old = z.price; z.price = np; t.status = 'ended'; t.applied = 'Used ' + money(np); log('Prices', `${plan(t.plan).name} ${K(t.size)} price from ${t.name}`, { before: money(old), after: money(np), approve: old !== np }); toast('Price change added to the draft'); return 'noRender'; }
       case 'perfRange': S.perfRange = +el.dataset.k; return true;
       case 'newBatch': S.drawer = { kind: 'batch', f: { promo: 'p2', prefix: 'CREATOR', count: 50, usesEach: 1 } }; return true;
       case 'batchExport': toast('CSV of codes downloaded'); return 'noRender';
-      case 'editAff': { const af = S.affiliates.find((x) => x.id === id) || { id: '', name: '[Affiliate Name]', code: '', pct: 10, commission: 15, status: 'active' }; S.drawer = { kind: 'aff', f: JSON.parse(JSON.stringify(af)) }; return true; }
+      case 'editAff': { const af = S.affiliates.find((x) => x.id === id) || { id: '', name: 'New Affiliate', code: '', pct: 10, commission: 15, status: 'active' }; S.drawer = { kind: 'aff', f: JSON.parse(JSON.stringify(af)) }; return true; }
       case 'flagDone': S.flags[i].done = true; return true;
       case 'recOn': S.recovery.on = !S.recovery.on; log('Abandoned Checkout', `Recovery emails ${S.recovery.on ? 'on' : 'off'}`); return true;
       case 'recFlag': S.recovery[el.dataset.k] = el.checked; log('Abandoned Checkout', 'Recovery settings changed'); return true;
       case 'roleCk': { const g = S.roles.grid[el.dataset.r]; const c = +el.dataset.c; g[c] = g[c] ? 0 : 1; log('Permissions', `${el.dataset.r}: ${g[c] ? 'can' : "can't"} ${S.roles.caps[c].toLowerCase()}`); return true; }
-      case 'approveOne': { const c = S.changes.find((x) => x.id === id); c.approved = true; return true; }
-      case 'approveAll': pending().forEach((c) => { c.approved = true; }); toast(`Approved by ${APPROVER}`); return 'noRender';
-      case 'exportCat': toast('Catalog exported as funded-sky-catalog-v' + S.version + '.json'); return 'noRender';
+      case 'approveOne': { const c = S.changes.find((x) => x.id === id); if (c.who === ME && !SOLO) { toast('Someone other than ' + ME + ' must approve this'); return 'noRender'; } c.approved = true; c.by2 = ME; return true; }
+      case 'approveAll': { const mine = SOLO ? [] : pending().filter((c) => c.who === ME); pending().filter((c) => SOLO || c.who !== ME).forEach((c) => { c.approved = true; c.by2 = ME; }); toast(mine.length ? `Approved. ${mine.length} of your own changes still need someone else.` : 'Approved'); } return 'noRender';
+      case 'exportCat': { const blob = new Blob([JSON.stringify(toCat(), null, 2)], { type: 'application/json' }); const a2 = document.createElement('a'); a2.href = URL.createObjectURL(blob); a2.download = 'funded-sky-catalog-v' + S.version + '.json'; document.body.appendChild(a2); a2.click(); setTimeout(() => { URL.revokeObjectURL(a2.href); a2.remove(); }, 500); toast('Catalog downloaded'); return 'noRender'; }
       case 'importCat': S.drawer = { kind: 'import', f: { text: '' } }; return true;
     }
     return false;
@@ -727,33 +687,8 @@ function startCatalog(root) {
 
 
   // ================= INTEGRATIONS =================
-  const WH = 'https://api.fundedsky.com/webhooks/';
-  S.integrations = [
-    { id: 'card', group: 'Payments', name: 'TailoredPay', role: 'Card Processor · Primary', mono: 'TP', status: 'connected', env: 'sandbox', last: 'Today, 11:03 AM',
-      fields: [['merchantId', 'Merchant ID', 'text', 'MID-[000000]'], ['publicKey', 'Public Key', 'text', 'pk_test_[••••]8F2A'], ['secretKey', 'Secret Key', 'secret', 'sk_test_51Hx••••••••Q9'], ['webhookSecret', 'Webhook Signing Secret', 'secret', 'whsec_••••••••3kP']],
-      toggles: [['threeDS', '3-D Secure on every card payment', true], ['saveCards', 'Save Card Tokens for Resets and Renewals', true]], events: ['payment.succeeded', 'payment.failed', 'refund.created', 'dispute.opened'] },
-    { id: 'crypto', group: 'Payments', name: 'Confirmo', role: 'Crypto Payments and Payouts', mono: 'CF', status: 'connected', env: 'sandbox', last: 'Yesterday, 6:40 PM',
-      fields: [['apiKey', 'API Key', 'secret', 'cfm_••••••••••7Re'], ['callbackPassword', 'Callback Password', 'secret', '••••••••••'], ['settlement', 'Settle In', 'select:USDC,USDT,USD (bank)', 'USDC']],
-      toggles: [['btc', 'Accept BTC', true], ['eth', 'Accept ETH', true], ['stable', 'Accept USDT and USDC', true]], events: ['invoice.paid', 'invoice.expired', 'payout.completed'] },
-    { id: 'card2', group: 'Payments', name: '[Backup Card Processor]', role: 'Card Processor · Backup', mono: 'BP', status: 'off', env: 'sandbox', last: '',
-      fields: [['merchantId', 'Merchant ID', 'text', ''], ['apiKey', 'API Key', 'secret', ''], ['webhookSecret', 'Webhook Signing Secret', 'secret', '']],
-      toggles: [['failover', 'Take Over Automatically If the Primary Declines with a Processor Error', true]], events: ['payment.succeeded', 'payment.failed', 'refund.created', 'dispute.opened'] },
-    { id: 'stripe', group: 'Payments', name: 'Stripe', role: 'Example Only', mono: 'S', logo: 'assets/stripe.png', status: 'off', env: 'sandbox', last: '', note: 'Stripe\'s restricted businesses list prohibits funded prop trading, so it can\'t be used for Funded Sky. It\'s here only to show what setting up a processor looks like.',
-      fields: [['publishableKey', 'Publishable Key', 'text', ''], ['secretKey', 'Secret Key', 'secret', ''], ['webhookSecret', 'Webhook Signing Secret', 'secret', '']],
-      toggles: [['radar', 'Fraud Screening', true]], events: ['checkout.session.completed', 'charge.refunded', 'charge.dispute.created'] },
-    { id: 'rise', group: 'Payouts', name: 'Rise', role: 'Trader Payouts', mono: 'R', status: 'connected', env: 'sandbox', last: 'Today, 9:15 AM',
-      fields: [['apiKey', 'API Key', 'secret', 'rise_••••••••••2Lm'], ['companyId', 'Company ID', 'text', '[Company ID]'], ['reserveAlert', 'Alert When Payout Balance Falls Below ($)', 'text', '25000']],
-      toggles: [['autoKyc', 'Require Rise Identity Check Before the First Payout', true]], events: ['payout.sent', 'payout.failed', 'payee.onboarded'] },
-    { id: 'sumsub', group: 'Identity', name: 'Sumsub', role: 'KYC and Sanctions Checks', mono: 'SS', status: 'attention', env: 'sandbox', last: '3 days ago', warn: 'Webhook signature failed on the last 2 calls. Check the signing secret.',
-      fields: [['appToken', 'App Token', 'secret', 'sbx:••••••••••Yk'], ['secretKey', 'Secret Key', 'secret', '••••••••••'], ['level', 'Verification Level', 'text', 'funded-trader-kyc'], ['webhookSecret', 'Webhook Signing Secret', 'secret', '••••••••']],
-      toggles: [['liveness', 'Liveness Selfie', true], ['aml', 'Sanctions, PEP and Adverse Media Screening', true]], events: ['applicantReviewed', 'applicantPending', 'applicantOnHold'] },
-    { id: 'posthog', group: 'Analytics', name: 'PostHog', role: 'Product Analytics', mono: 'PH', status: 'connected', env: 'live', last: 'Just now',
-      fields: [['projectKey', 'Project API Key', 'text', 'phc_[••••]'], ['host', 'Host', 'text', 'https://us.i.posthog.com']],
-      toggles: [['replay', 'Session Replays on Checkout', true], ['server', 'Send Purchases from the Server', true]], events: [] },
-    { id: 'email', group: 'Messages', name: '[Email Provider]', role: 'Receipts and Account Emails', mono: 'EM', status: 'off', env: 'sandbox', last: '',
-      fields: [['apiKey', 'API Key', 'secret', ''], ['from', 'Send From', 'text', 'accounts@fundedsky.com']],
-      toggles: [['receipts', 'Send Receipts', true]], events: ['delivered', 'bounced', 'complained'] }
-  ];
+  const WH = location.origin + '/api/hooks/';
+  S.integrations = (BO.integrations || []).filter((x) => ['tailoredpay', 'stripe', 'confirmo', 'rise', 'sumsub', 'posthog', 'resend', 'track1099'].includes(x.id)).map((x) => ({ id: x.id, group: x.cat || 'Other', name: x.name, role: x.role || x.cat || '', mono: x.name.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase(), status: x.enabled && !x.lastError ? 'connected' : x.enabled ? 'attention' : 'off', env: x.mode === 'test' || x.sandbox ? 'sandbox' : 'live', last: x.lastCheck ? (F.ago ? F.ago(x.lastCheck) : '') : '', warn: x.lastError || '', fields: [], toggles: [], events: [], vals: {}, show: {} }));
   const istat = { connected: ['Connected', 'live', 'var(--ok)'], attention: ['Needs Attention', 'draft', 'var(--wa)'], off: ['Not Set Up', 'ret', 'var(--fa)'] };
   const logoOr = (x, cls) => x.logo ? `<img src="${x.logo}" alt="" class="${cls}">` : `<span>${esc(x.mono)}</span>`;
   const intgDot = (x) => `<button class="ig ${x.logo ? 'haslogo' : ''}" data-act="editIntg" data-id="${x.id}" title="${esc(x.name)}: ${istat[x.status][0]}" aria-label="${esc(x.name)} settings, ${istat[x.status][0]}">${logoOr(x, 'iglogo')}<i style="background:${istat[x.status][2]}"></i></button>`;
@@ -892,8 +827,8 @@ function startCatalog(root) {
       ['Integrations to Check', 'Not set up or failing', S.integrations.filter((x) => x.status === 'attention').length, 'warm', 'integrations']
     ];
     return `<h2>${esc(h)}</h2><p>${esc(p)}</p><h5>Worth a Look</h5>${items.map(([t, s, n, cls, v]) => `<button class="att" data-act="go" data-v="${v}"><div><b>${t}</b><small>${s}</small></div><em class="${n ? cls : ''}">${n}</em></button>`).join('')}
-    <h5 style="margin-top:24px">Live Version</h5><div class="qrow"><span style="color:var(--mu)">Catalog</span><span>v${S.version}</span></div><div class="qrow"><span style="color:var(--mu)">Last published</span><span>${esc(S.history[0].when)}</span></div><div class="qrow" style="border:0"><span style="color:var(--mu)">Your role</span><span>Owner</span></div>
-    <p class="hint" style="margin-top:14px">Sample data: names, prices and rule amounts are placeholders until the real plans are set.</p>`;
+    <h5 style="margin-top:24px">Live Version</h5><div class="qrow"><span style="color:var(--mu)">Catalog</span><span>v${S.version}</span></div><div class="qrow"><span style="color:var(--mu)">Last published</span><span>${esc(S.history[0].when || '—')}</span></div><div class="qrow" style="border:0"><span style="color:var(--mu)">Your role</span><span>${esc(String((BO.me || {}).role || 'admin').replace(/^./, (c) => c.toUpperCase()))}</span></div>
+    <p class="hint" style="margin-top:14px">Publishing updates the live checkout right away. Accounts already sold keep the rules they were bought with until reset.</p>`;
   }
 
 
@@ -953,19 +888,19 @@ function startCatalog(root) {
         else if (k === 'addon') { pl.addons[id] = !pl.addons[id]; on = pl.addons[id]; name = addon(id).name; }
         else { pl.bundles[id] = !pl.bundles[id]; on = pl.bundles[id]; name = S.bundles.find((b) => b.id === id).name; }
         log('Availability', `${name} ${on ? 'switched on for' : 'switched off for'} ${pl.name}`); break; }
-      case 'sched': { const z = p.sizes[i]; openDrawer('sched', { i, price: z.price, date: '2026-12-01' }); return; }
+      case 'sched': { const z = p.sizes[i]; openDrawer('sched', { i, price: z.price, date: new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10) }); return; }
       case 'unsched': { const z = p.sizes[i]; z.sched = null; log('Prices', `Cancelled scheduled price for ${p.name} ${K(z.size)}`); break; }
       case 'dupPlan': { const c = JSON.parse(JSON.stringify(p)); c.id = uid('p'); c.name = p.name.replace(']', ' Copy]'); c.slug = p.slug + '-copy'; c.status = 'draft'; c.sort = S.plans.length + 1; S.plans.push(c); c.sizes.forEach((z) => { const r = liveRule(p.id, z.size); if (r) S.rules.push(Object.assign({}, r, { id: uid('r'), plan: c.id, version: 1, status: 'draft', accounts: 0 })); }); S.planId = c.id; log('Plans', `Created ${c.name} as a copy of ${p.name}`); toast('Plan duplicated as a draft'); return; }
       case 'retirePlan': p.status = 'retired'; log('Plans', `${p.name} retired`); toast('Plan retired: hidden at checkout after publish'); return;
       case 'restorePlan': p.status = 'draft'; log('Plans', `${p.name} restored as a draft`); break;
-      case 'newPlan': openDrawer('newplan', { name: '[New Plan Name]', billing: 'one-time', copy: '' }); return;
+      case 'newPlan': openDrawer('newplan', { name: '', billing: 'one-time', copy: '' }); return;
       case 'ruleFilter': S.ruleFilter = el.dataset.k; break;
       case 'promoFilter': S.promoFilter = el.dataset.k; break;
       case 'newRule': { const r = S.rules.find((x) => x.id === id); const max = Math.max(...S.rules.filter((x) => x.plan === r.plan && x.size === r.size).map((x) => x.version)); openDrawer('rule', Object.assign({}, r, { version: max + 1 })); return; }
       case 'delRule': S.rules = S.rules.filter((x) => x.id !== id); log('Rule Sets', 'Discarded a draft rule set version'); break;
       case 'editAddon': { const ad = addon(id) || { id: '', name: '[New Add-On]', pricing: 'flat', value: 0, discountable: true, effect: '', status: 'draft' }; openDrawer('addon', Object.assign({}, ad, { on: Object.fromEntries(S.plans.map((x) => [x.id, !!x.addons[ad.id]])) })); return; }
       case 'editBundle': editBundle(id); return;
-      case 'editPromo': { const pr = S.promos.find((x) => x.id === id) || { id: '', name: '[New Promotion]', kind: 'code', code: '', vtype: 'percent', value: 10, freeAddon: 'daily', plans: [], sizes: [], lines: { base: true, addon: false, reset: false }, withBundles: false, first: false, affiliate: false, minCart: 0, countries: '', start: '2026-11-22', end: '', total: 0, perTrader: 1, maxOff: 0, priority: 10, exclusive: false, status: 'on', uses: 0 }; openDrawer('promo', pr); return; }
+      case 'editPromo': { const pr = S.promos.find((x) => x.id === id) || { id: '', name: '', kind: 'code', code: '', vtype: 'percent', value: 10, freeAddon: 'daily', plans: [], sizes: [], lines: { base: true, addon: false, reset: false }, withBundles: false, first: false, affiliate: false, minCart: 0, countries: '', start: '2026-11-22', end: '', total: 0, perTrader: 1, maxOff: 0, priority: 10, exclusive: false, status: 'on', uses: 0 }; openDrawer('promo', pr); return; }
       case 'bType': D.type = el.dataset.k; if (D.type === 'tier' && !D.tiers) D.tiers = [{ min: 2, pct: 10 }]; if (D.type === 'mix' && !D.mixPlans) { D.mixPlans = []; D.min = 2; D.pct = 10; } if (D.type === 'fixed' && !D.items) { D.items = [{ plan: S.plans[0].id, size: 50000, qty: 2 }]; D.price = 0; } break;
       case 'tierAdd': D.tiers.push({ min: (D.tiers.at(-1) || { min: 1 }).min + 1, pct: 10 }); break;
       case 'tierDel': D.tiers.splice(i, 1); break;
@@ -977,20 +912,20 @@ function startCatalog(root) {
       case 'saveDrw': saveDrawer(); return;
       case 'delDrw': { const k = S.drawer.kind; if (k === 'promo') S.promos = S.promos.filter((x) => x.id !== D.id); if (k === 'bundle') { S.bundles = S.bundles.filter((x) => x.id !== D.id); S.plans.forEach((x) => delete x.bundles[D.id]); } if (k === 'addon') { S.addons = S.addons.filter((x) => x.id !== D.id); S.plans.forEach((x) => delete x.addons[D.id]); } if (k === 'camp') S.campaigns = S.campaigns.filter((x) => x.id !== D.id); if (k === 'aff') S.affiliates = S.affiliates.filter((x) => x.id !== D.id); log({ promo: 'Promotions', bundle: 'Bundles', addon: 'Add-Ons', camp: 'Campaigns', aff: 'Affiliates' }[k], `Deleted ${D.name}`); S.drawer = null; toast('Deleted from the draft'); return; }
       case 'platVis': { const x = plat(id); x.visible = !x.visible; log('Platforms', `${x.name} ${x.visible ? 'shown' : 'hidden'} at checkout`); break; }
-      case 'tAdd': S.tester.lines.push({ plan: 'pa', size: 50000, platform: 'tradovate', addons: [], qty: 1 }); break;
+      case 'tAdd': S.tester.lines.push({ plan: S.plans[0].id, size: (S.plans[0].sizes.find((z) => z.active) || S.plans[0].sizes[0]).size, platform: S.plans[0].defPlatform, addons: [], qty: 1 }); break;
       case 'tDel': S.tester.lines.splice(i, 1); break;
       case 'tAddon': { const ln = S.tester.lines[i]; ln.addons = el.checked ? [...ln.addons, id] : ln.addons.filter((x) => x !== id); break; }
       case 'tFlag': S.tester[el.dataset.k] = el.checked; break;
       case 'dropChange': S.changes = S.changes.filter((x) => x.id !== id); break;
-      case 'discardAll': S.changes = []; toast('Draft list cleared'); return;
-      case 'publish': { const n = S.changes.length; S.version += 1; S.history.unshift({ v: S.version, text: S.changes.slice(0, 2).map((x) => x.text).join('; ') + (n > 2 ? `; and ${n - 2} more` : ''), who: ME, when: 'Just now', count: n }); S.changes = []; S.rules.forEach((r) => { if (r.status === 'draft') { S.rules.filter((o) => o.plan === r.plan && o.size === r.size && o.status === 'live').forEach((o) => { o.status = 'retired'; }); r.status = 'live'; } }); toast(`Published v${S.version}. The checkout is updated.`); return; }
-      case 'rollback': { const v = +el.dataset.v; S.version += 1; S.history.unshift({ v: S.version, text: `Rolled back to the catalog from v${v}`, who: ME, when: 'Just now', count: 1 }); toast(`Rolled back. v${S.version} matches v${v}.`); return; }
+      case 'discardAll': F.put('catalog.draft', null).then(() => { toast('Draft discarded'); setTimeout(() => location.reload(), 500); }).catch((x) => toast(x.message)); return;
+      case 'publish': { if (pending().length) { toast('Price changes need a second person to approve them first'); return; } const n = S.changes.length; publish(S.changes.slice(0, 2).map((x) => x.text).join('; ') + (n > 2 ? `; and ${n - 2} more` : '') || 'Published the catalog', n); return; }
+      case 'rollback': { const v = +el.dataset.v; const old = VERS.find((x) => x.v === v); if (!old || !old.cat) { toast('That version was not saved here, so it cannot be restored'); return; } const c = JSON.parse(JSON.stringify(old.cat)); c.version = (LIVE.version || 1) + 1; publish(`Rolled back to the catalog from v${v}`, 1, c); return; }
       case 'pvFrom': S.preview.plan = id; S.view = 'preview'; S.drawer = null; break;
       default: { const r = extClick(a, el); if (!r || r === 'noRender') return; }
     }
     render();
   });
-  function editBundle(id) { const b = S.bundles.find((x) => x.id === id) || { id: '', name: '[New Bundle]', type: 'tier', tiers: [{ min: 2, pct: 10 }], samePlan: true, stacks: false, status: 'draft', uses: 0 }; openDrawer('bundle', Object.assign({ tiers: [{ min: 2, pct: 10 }], mixPlans: [], min: 2, pct: 10, items: [{ plan: 'pa', size: 50000, qty: 2 }], price: 0, samePlan: true }, b, { on: Object.fromEntries(S.plans.map((x) => [x.id, !!x.bundles[b.id]])) })); }
+  function editBundle(id) { const b = S.bundles.find((x) => x.id === id) || { id: '', name: '', type: 'tier', tiers: [{ min: 2, pct: 10 }], samePlan: true, stacks: false, status: 'draft', uses: 0 }; openDrawer('bundle', Object.assign({ tiers: [{ min: 2, pct: 10 }], mixPlans: [], min: 2, pct: 10, items: [{ plan: S.plans[0].id, size: (S.plans[0].sizes.find((z) => z.active) || S.plans[0].sizes[0]).size, qty: 2 }], price: 0, samePlan: true }, b, { on: Object.fromEntries(S.plans.map((x) => [x.id, !!x.bundles[b.id]])) })); }
 
   root.addEventListener('change', (e) => {
     const el = e.target;
@@ -1048,5 +983,6 @@ function startCatalog(root) {
     S.drawer = null; toast('Saved to the draft'); render();
   }
 
+  F.watch(() => ({ base: LIVE.version || 1, s: draftOf() }), 'catalog.draft');
   render();
 }

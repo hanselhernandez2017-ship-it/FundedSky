@@ -2,6 +2,13 @@
 const { round2 } = require('./util');
 
 function rulesFor(cat, a) {
+  const R0 = rulesBase(cat, a); const o = (((cat.planRules || {})[a.plan]) || {})[a.size];
+  if (!o) return R0;
+  const R = Object.assign({}, R0); ['target', 'goal', 'dll', 'maxLoss', 'minDays', 'consistency', 'split', 'payoutMin'].forEach((k) => { if (o[k] != null && R0[k] != null) R[k] = Number(o[k]); });
+  if (o.contracts != null) { R.fullContracts = Number(o.contracts); R.contracts = R0.fullContracts && R0.contracts < R0.fullContracts ? Math.max(1, Math.floor(o.contracts / 2)) : Number(o.contracts); }
+  return R;
+}
+function rulesBase(cat, a) {
   const size = a.size;
   if (a.plan === 'instant') {
     const r = cat.instantRules[size]; const c = cat.instantCommon; const cap = cat.instantCaps[size];

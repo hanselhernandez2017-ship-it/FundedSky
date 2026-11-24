@@ -48,7 +48,7 @@ async function priceCart(items, { promo, coupon, userId } = {}) {
     const base = s.price * qty; subtotal += base; count += qty;
     lines.push({ label: `${p.short} ${kLabel(s.size)}${qty > 1 ? ' × ' + qty : ''}`, amount: base, kind: 'plan' });
     for (const ad of addons) {
-      const a = cat.addons[ad]; const amt = round2(Math.round(s.price * a.pct / 100) * qty);
+      const a = cat.addons[ad]; const amt = round2((a.flat != null ? Number(a.flat) : Math.round(s.price * a.pct / 100)) * qty);
       subtotal += amt; lines.push({ label: `${a.name}${qty > 1 ? ' × ' + qty : ''}`, amount: amt, kind: 'addon' });
     }
     const pr = promoRow && promoFor(cat, promoRow.code, p.id);
