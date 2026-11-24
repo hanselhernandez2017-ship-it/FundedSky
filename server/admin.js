@@ -216,6 +216,27 @@ function router(h) {
     return db.all(`SELECT t.*, a.user_id, a.plan, a.size FROM trades t JOIN accounts a ON a.id=t.account_id ${q.length ? 'WHERE ' + q.join(' AND ') : ''} ORDER BY t.ts DESC LIMIT 500`, v); }));
   // ---- Support ----
   r.post('/tickets/:id/assign', h(async (req) => { const to = req.body.to === 'me' ? req.user.id : req.body.to ? +req.body.to : null; await db.q('UPDATE tickets SET assignee=$2, updated_at=now() WHERE id=$1', [+req.params.id, to]); }));
+  // Analytics: compact daily facts for the last 2 years (days counted in Eastern Time from 'start')
+  let anCache = null;
+  r.get('/analytics', h(async () => {
+    if (anCache && Date.now() - anCache.t < 60e3) return anCache.v;
+    const start = (await db.one("SELECT ((now() AT TIME ZONE 'America/New_York')::date - 729)::text d")).d;
+    const D = (col) => `((${col} AT TIME ZONE 'America/New_York')::date - '${start}'::date)`;
+    const [visits, users, orders, accts, pays, disp, styles, pages, tickets] = await Promise.all([
+      db.all(`SELECT (day - '${start}'::date) d, src, camp, country, dev, n FROM visits WHERE day >= '${start}'::date`),
+      db.all(`SELECT id, ${D('created_at')} d, country, settings->'src' src, settings->'lsrc' lsrc, email LIKE '%@demo.fundedsky.test' demo, referred_by FROM users WHERE role='trader'`),
+      db.all(`SELECT o.user_id u, ${D('o.created_at')} c, CASE WHEN o.paid_at IS NULL THEN NULL ELSE ${D('o.paid_at')} END p, CASE WHEN o.refunded_at IS NULL THEN NULL ELSE ${D('o.refunded_at')} END rf, o.kind, o.status, o.items, o.lines, o.discount::float disc, o.total::float tot, o.promo, o.pay_method m, o.provider pv, EXTRACT(HOUR FROM o.paid_at AT TIME ZONE 'America/New_York')::int hr, EXTRACT(ISODOW FROM o.paid_at AT TIME ZONE 'America/New_York')::int dw, o.meta->>'refundNote' rn FROM orders o WHERE o.created_at > now() - interval '731 days'`),
+      db.all(`SELECT a.id, a.user_id u, a.plan, a.size, a.platform, a.kind, a.phase, ${D('a.created_at')} c, CASE WHEN a.passed_at IS NULL THEN NULL ELSE ${D('a.passed_at')} END pa, CASE WHEN a.breached_at IS NULL THEN NULL ELSE ${D('a.breached_at')} END br, a.breach_reason why, a.payout_count pc, a.parent_id par FROM accounts a WHERE a.created_at > now() - interval '731 days'`),
+      db.all(`SELECT user_id u, ${D('paid_at')} d, amount::float a, account_id ac FROM payouts WHERE status='paid' AND paid_at > now() - interval '731 days'`),
+      db.all("SELECT v FROM kv WHERE k LIKE 'dispute.%'"),
+      db.all("SELECT account_id ac, count(*)::int n, avg(hold_min)::float hold, avg(CASE WHEN tag ILIKE '%news%' THEN 1 ELSE 0 END)::float news FROM trades WHERE ts > now() - interval '180 days' GROUP BY account_id"),
+      db.all(`SELECT (day - '${start}'::date) d, path, n FROM pageviews WHERE day >= '${start}'::date`),
+      db.all("SELECT u.id, a.platform FROM tickets t JOIN users u ON u.id=t.user_id LEFT JOIN LATERAL (SELECT platform FROM accounts WHERE user_id=u.id ORDER BY created_at DESC LIMIT 1) a ON true WHERE t.created_at > now() - interval '90 days'")]);
+    const v = { start, visits, users, orders, accts, pays, disputes: disp.map((x) => x.v).filter((x) => x && x.opened).map((x) => ({ d: Math.floor((new Date(x.opened) - new Date(start + 'T05:00:00Z')) / 864e5), a: Number(x.amount) || 0, st: x.status })), styles, pages, tickets };
+    anCache = { t: Date.now(), v }; return v; }));
+  r.post('/analytics/send', h(async (req) => { const to = String(req.body.to || req.user.email).split(/[,;\s]+/).filter((x) => /^\S+@\S+\.\S+$/.test(x)).slice(0, 10); if (!to.length) bad('Add at least one email address');
+    const csv = Array.isArray(req.body.csv) ? '\n\n' + req.body.csv.map((r2) => r2.join(',')).join('\n') : ''; for (const t of to) await require('./mail').send(t, clean(req.body.subject, 140) || 'Funded Sky report', clean(req.body.body, 20000) + csv, 'report');
+    if (req.body.slack) require('./integrations').alert('report', `*${clean(req.body.subject, 140)}*\n${clean(req.body.body, 3000)}`); return { to: to.join(', ') }; }));
   // Emails board: designs, sending numbers and logs
   r.get('/emails', h(async (req) => { const M = require('./mail');
     const [byDay, logs, users] = await Promise.all([

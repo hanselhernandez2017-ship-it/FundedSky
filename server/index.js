@@ -147,6 +147,32 @@ const DIST = path.join(__dirname, '..', 'web', 'dist');
 const page = (f) => (req, res) => res.sendFile(path.join(DIST, f));
 const needPage = (staff) => (req, res, next) => { if (!req.user) return res.redirect('/login?next=' + encodeURIComponent(req.originalUrl)); if (staff && !auth.STAFF.includes(req.user.role)) return res.redirect('/app'); next(); };
 app.use('/static', express.static(path.join(DIST, 'static'), { maxAge: '1h' }));
+// Visitor counting for Analytics: one count per browser per day on public pages, with the traffic source (first touch kept in fs_src).
+const VPAGES = new Set(['/', '/checkout', '/checkout/payment', '/signup', '/login', '/terms', '/privacy', '/refund-policy', '/rules', '/faq', '/status']);
+function srcOf(req) {
+  const q = req.query || {}; const ref = String(req.get('referer') || ''); let host = ''; try { host = ref ? new URL(ref).hostname.replace(/^www\./, '') : ''; } catch (e) { /* bad referer */ }
+  const us = String(q.utm_source || '').toLowerCase(), um = String(q.utm_medium || '').toLowerCase();
+  if (q.ref) return 'aff'; if (um === 'email' || us === 'email') return 'email'; if (q.gclid || q.msclkid || ['cpc', 'ppc', 'paid', 'paidsearch'].includes(um)) return 'paid';
+  const h = us || host; if (!h || (req.get('host') && host === req.get('host').split(':')[0])) return 'direct';
+  if (/google|bing|duckduckgo|yahoo|ecosia|brave/.test(h)) return 'organic'; if (/youtube|youtu\.be/.test(h)) return 'youtube'; if (/discord/.test(h)) return 'discord';
+  if (/facebook|instagram|t\.co|twitter|x\.com|tiktok|reddit|linkedin|threads|fb/.test(h)) return 'social'; if (/mail|newsletter/.test(h)) return 'email'; return 'direct';
+}
+app.use((req, res, next) => {
+  if (req.method !== 'GET' || !VPAGES.has(req.path)) return next();
+  if (!/bot|crawl|spider|preview|headless/i.test(req.get('user-agent') || '')) db.q('INSERT INTO pageviews(day,path,n) VALUES((now() AT TIME ZONE \'America/New_York\')::date,$1,1) ON CONFLICT (day,path) DO UPDATE SET n=pageviews.n+1', [req.path]).catch(() => {});
+  try {
+    const ck = auth.parseCookies(req.headers.cookie); const day = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' }); const src = srcOf(req); const camp = String(req.query.utm_campaign || '').slice(0, 60).replace(/[^\w .-]/g, '');
+    const set = []; if (!ck.fs_src) set.push(`fs_src=${encodeURIComponent(JSON.stringify({ s: src, c: camp, at: day }))}; Path=/; Max-Age=${90 * 86400}; SameSite=Lax`);
+    if (src !== 'direct') set.push(`fs_lsrc=${encodeURIComponent(JSON.stringify({ s: src, c: camp, at: day }))}; Path=/; Max-Age=${30 * 86400}; SameSite=Lax`);
+    if (ck.fs_vd !== day && !/bot|crawl|spider|preview|headless/i.test(req.get('user-agent') || '')) {
+      set.push(`fs_vd=${day}; Path=/; Max-Age=${2 * 86400}; SameSite=Lax`);
+      const dev = /mobile|iphone|android/i.test(req.get('user-agent') || '') ? 'phone' : 'desktop'; const country = String(req.get('cf-ipcountry') || req.get('x-vercel-ip-country') || req.get('x-country-code') || '').slice(0, 2).toUpperCase();
+      db.q('INSERT INTO visits(day,src,camp,country,dev,n) VALUES($1,$2,$3,$4,$5,1) ON CONFLICT (day,src,camp,country,dev) DO UPDATE SET n=visits.n+1', [day, src, camp, country, dev]).catch(() => {});
+    }
+    if (set.length) res.append('Set-Cookie', set);
+  } catch (e) { /* never block a page for counting */ }
+  next();
+});
 app.get('/', async (req, res) => {
   if (req.query.ref) {
     const code = clean(req.query.ref, 40); res.setHeader('Set-Cookie', `fs_ref=${encodeURIComponent(code)}; Path=/; Max-Age=${30 * 86400}; SameSite=Lax`);

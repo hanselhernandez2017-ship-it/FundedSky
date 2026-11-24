@@ -7,7 +7,7 @@
   "title": "Funded Sky admin: affiliates"
  },
  "analytics": {
-  "boot": "startAnalytics(root); startGlobal(root, 'an');",
+  "boot": "window.__AN = await fetch('/api/admin/analytics', { credentials: 'same-origin' }).then((r) => r.json()).catch(() => null); startAnalytics(root); startGlobal(root, 'an');",
   "links": [
    "<link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css2?family=Mona+Sans:wdth,wght@100..125,400..700&amp;display=swap\">"
   ],

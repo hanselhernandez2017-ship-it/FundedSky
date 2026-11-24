@@ -57,7 +57,7 @@ async function signup(req, res) {
   if (inv) await db.q("UPDATE kv SET v=$1 WHERE k='store.team.invites'", [JSON.stringify(invs.filter((x) => x !== inv))]);
   const u = await db.one(`INSERT INTO users(tid,email,pass_hash,first,last,country,role,ref_code,referred_by,settings,agreements) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
     ['T-' + n, email, await bcrypt.hash(pass, 10), first, last, country, role, 't' + n, ref,
-      { nEmail: true, nSms: false, nPush: true, nNews: true, nMkt: false, nComp: true, mfaPay: true },
+      Object.assign({ nEmail: true, nSms: false, nPush: true, nNews: true, nMkt: false, nComp: true, mfaPay: true }, (() => { try { const c = parseCookies(req.headers.cookie); const f = c.fs_src ? JSON.parse(c.fs_src) : null; const l = c.fs_lsrc ? JSON.parse(c.fs_lsrc) : null; return f || l ? { src: f || l, lsrc: l || f } : {}; } catch (e) { return {}; } })()),
       { terms: new Date().toISOString(), privacy: new Date().toISOString(), risk: new Date().toISOString(), refund: new Date().toISOString() }]);
   await sendVerify(u);
   await startSession(req, res, u);
@@ -120,4 +120,4 @@ async function changePassword(req) {
   await db.q('DELETE FROM sessions WHERE user_id=$1 AND token<>$2', [u.id, req.sess]);
   return { ok: true };
 }
-module.exports = { blockedReq, loadUser, needUser, needStaff, needAdmin, signup, login, logout, forgot, resetPassword, verifyEmail, resendVerify, changePassword, STAFF, BASE };
+module.exports = { parseCookies, blockedReq, loadUser, needUser, needStaff, needAdmin, signup, login, logout, forgot, resetPassword, verifyEmail, resendVerify, changePassword, STAFF, BASE };

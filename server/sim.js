@@ -162,6 +162,11 @@ function start() {
     list.filter((x) => x.enabled).forEach((x) => worse(x.name, x.status === 'live' ? 'ok' : x.lastError ? 'w' : 'ok'));
     Object.keys(v).sort().slice(0, -90).forEach((k) => delete v[k]); await db.q("INSERT INTO kv(k,v) VALUES('store.health.days',$1) ON CONFLICT (k) DO UPDATE SET v=$1, updated_at=now()", [JSON.stringify(v)]); } catch (e) { console.error('health day', e.message); } };
   setInterval(healthDay, 5 * 60000); setTimeout(healthDay, 15000);
+  // Payout liability snapshot once a day (what funded traders could ask for right now), for Analytics
+  const liabDay = async () => { try { const d = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' }); const row = await db.one("SELECT v FROM kv WHERE k='store.analytics.liab'"); const L = (row && row.v) || []; if (L.length && L[L.length - 1].d === d) return;
+    const cat = await core.catalog(); const R = require('./rules'); const acc = await db.all("SELECT * FROM accounts WHERE kind='funded' AND phase NOT IN ('breached','closed')"); let v = 0; for (const a of acc) { try { const q = R.payoutQuote ? R.payoutQuote(cat, a) : null; v += q ? q.max : Math.max(0, (Number(a.balance) - Number(a.start_bal)) * 0.9); } catch (e) { /* skip */ } }
+    L.push({ d, v: Math.round(v), n: acc.length }); await db.q("INSERT INTO kv(k,v) VALUES('store.analytics.liab',$1) ON CONFLICT (k) DO UPDATE SET v=$1", [JSON.stringify(L.slice(-400))]); } catch (e) { console.error('liab', e.message); } };
+  setInterval(liabDay, 60 * 60000); setTimeout(liabDay, 20000);
   setInterval(() => db.q("DELETE FROM jobs_log WHERE created_at < now() - interval '3 days'").catch(() => {}), 3600000);
   setTimeout(() => tick().catch((e) => console.error('sim tick', e.message)), 3000);
 }
