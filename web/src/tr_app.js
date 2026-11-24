@@ -29,6 +29,8 @@
   const go = (p, q) => (p === 'accounts' ? homeHref() : FILE[p] ? fileOf(p) + (q ? `?${q}` : '') : `#${p}`);
   const linkify = (html) => html.replace(/href="#(\w+)(\?[^"]*)?"/g, (m, p, q) => (FILE[p] || p === 'accounts' ? `href="${go(p, q ? q.slice(1) : '')}"` : m));
   const NEWT = root.dataset.newt === '1';
+  const FLAG = (id) => !(FS.flags && FS.flags[id] === false);
+  PAGES.forEach((g) => { g.items = g.items.filter((x) => FLAG(x[0])); });
   const navItem = ([id, label, bf, cls]) => { const bdg = NEWT && id !== 'competitions' && id !== 'education' ? null : bf ? bf() : null; const on = S.page === id || (id === 'accounts' && (S.page === 'account' || S.page === 'empty'));
     return `<a class="ni${on ? ' on' : ''}" href="${go(id)}"${on ? ' aria-current="page"' : ''}>${ico(id)}${label}${bdg ? `<em class="${cls || ''}">${bdg}</em>` : ''}</a>`; };
   function clockParts() { const p = {}; new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour12: false, weekday: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit' }).formatToParts(new Date()).forEach((x) => { p[x.type] = x.value; });

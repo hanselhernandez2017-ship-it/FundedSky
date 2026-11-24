@@ -205,6 +205,7 @@ async function requestPayout(userId, accountId, amount, methodId) {
     // Hold the gross amount out of the account while in review
     await c.q('UPDATE accounts SET balance=balance-$2 WHERE id=$1', [a.id, gross]);
     await notify(c, userId, `Payout ${code} requested`, `${money(net)} to ${m.label}. Reviewed in 1 to 2 business days.`, 'payouts');
+    require('./integrations').alert('payout', `:hourglass: Payout ${code} requested: ${money(net)} from ${a.id} (${m.rail})`);
     return { code, net, gross };
   });
 }
@@ -231,6 +232,7 @@ async function reviewPayout(actorId, code, action, note) {
       await c.q(`UPDATE accounts SET payout_count=$2, paid_total=paid_total+$3, floor=LEAST(floor, start_bal), cycle_profit_start=balance, cycle_win_days=0, cycle_best=0, phase=$4 WHERE id=$1`, [a.id, count, p.amount, phase]);
       await points(c, p.user_id, 250, 'Payout ' + p.code);
       await notify(c, p.user_id, `Payout ${p.code} sent`, `${money(p.amount)} sent to ${p.method}.`, 'payouts');
+      const I2 = require('./integrations'); I2.alert('payout', `:white_check_mark: Payout ${p.code} sent: ${money(p.amount)}`); I2.announce(`Another payout sent: ${money(p.amount)} to a ${a.size / 1000}K ${a.plan === 'instant' ? 'Instant' : 'funded'} trader. Congrats!`);
     } else if (action === 'deny') {
       if (!['requested', 'approved'].includes(p.status)) bad('This payout can no longer be denied');
       await c.q("UPDATE payouts SET status='denied', denied_at=now(), reviewed_by=$2, note=$3 WHERE id=$1", [p.id, actorId, note || '']);

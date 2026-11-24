@@ -3,6 +3,8 @@ const db = require('./db');
 const core = require('./core');
 const R = require('./rules');
 const content = require('./content');
+const I = require('./integrations');
+const flows = require('./flows');
 const { shortDate, longDate, ago, tradeDate, round2 } = require('./util');
 
 const K = (s) => s / 1000 + 'K';
@@ -141,8 +143,8 @@ async function boot(user, sessToken, host) {
   const PROMOS = (cat.promos || []).filter((p) => p.active && (!p.ends || p.ends >= nowIso)).map((p) => ({ code: p.code, n: p.name, d: p.desc, pct: p.pct, plans: p.plans, when: (p.starts ? shortDate(p.starts + 'T12:00:00Z') : '') + (p.ends ? ' to ' + shortDate(p.ends + 'T12:00:00Z') : ''), ends: p.ends ? shortDate(p.ends + 'T12:00:00Z') : '', live: !p.starts || p.starts <= nowIso, note: p.once ? 'One use per trader. Not combined with bundles.' : '' }));
 
   return {
-    now: new Date().toISOString(), today, payMode: require('./payments').mode(),
-    ME: { first: user.first, last: (user.last || '').slice(0, 1) + '.', lastFull: user.last, full: `${user.first} ${user.last}`, ini: ((user.first || '')[0] || '') + ((user.last || '')[0] || ''), email: user.email, country: user.country, phone: user.phone || '', since: new Date(user.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }), tid: user.tid, ref: `${host}/?ref=${user.ref_code}`, refCode: user.ref_code, verified: user.verified, kyc: user.kyc_status, role: user.role, pts: user.points, settings: user.settings || {}, refs: { list: refs.map((r) => ({ n: (r.first || '?')[0] + '•••• ' + (r.last || '?')[0] + '.', joined: shortDate(r.created_at), bought: r.bought ? shortDate(r.bought) : '' })), clicks: Array.from({ length: 30 }, (_, i) => { const d = new Date(Date.now() - (29 - i) * 86400000).toISOString().slice(0, 10); return clicksMap[d] || 0; }), pts: refPts.n } },
+    now: new Date().toISOString(), today, payMode: require('./payments').mode(), flags: Object.assign({ competitions: true, rewards: true, affiliates: true, education: true, cryptoPayouts: true }, ((await db.one("SELECT v FROM kv WHERE k='settings.flags'")) || {}).v || {}), integ: { sumsub: await I.on('sumsub'), track1099: await I.on('track1099'), rise: await I.on('rise'), crisp: await I.on('crisp') },
+    ME: { first: user.first, last: (user.last || '').slice(0, 1) + '.', lastFull: user.last, full: `${user.first} ${user.last}`, ini: ((user.first || '')[0] || '') + ((user.last || '')[0] || ''), email: user.email, country: user.country, phone: user.phone || '', since: new Date(user.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }), tid: user.tid, ref: `${host}/?ref=${user.ref_code}`, refCode: user.ref_code, verified: user.verified, kyc: user.kyc_status, tax: await flows.taxSync(user), rise: user.rise_status, role: user.role, pts: user.points, settings: user.settings || {}, refs: { list: refs.map((r) => ({ n: (r.first || '?')[0] + '•••• ' + (r.last || '?')[0] + '.', joined: shortDate(r.created_at), bought: r.bought ? shortDate(r.bought) : '' })), clicks: Array.from({ length: 30 }, (_, i) => { const d = new Date(Date.now() - (29 - i) * 86400000).toISOString().slice(0, 10); return clicksMap[d] || 0; }), pts: refPts.n } },
     PLANS, RULESET, RULE_ALL, ADDONS: Object.fromEntries(Object.entries(cat.addons).map(([k, a]) => [k, [a.name, '+' + a.pct + '%', a.desc]])), PROMOS, BUNDLES: (cat.bundles || []).map((b) => [b.buy, b.get]),
     ACC, HIST, DAYS, TRADES, PAYOUTS, ORDERS, NOTES, COURSES, LESSONS: C.lessons, REWARDS: C.rewards, EARN: C.earn, PTS_LOG, CERTS,
     LB: C.leaderboard, COMPS: C.competitions, CPRIZES: C.cprizes, ARTICLES: C.articles, TOPICS: C.topics, TICKETS, SESS, AGREE, NEWS: C.news, PLANRULES,

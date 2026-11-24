@@ -36,7 +36,7 @@ async function ingestTrade(c, a, t, day) {
   await c.q('INSERT INTO trades(account_id,ts,day,instrument,side,qty,pnl,hold_min,tag) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)', [a.id, t.ts, day, t.instrument, t.side, t.qty, t.pnl, t.hold_min, t.tag]);
   await c.q('UPDATE accounts SET balance=$2, today_pnl=$3, halted_today=$4, phase=$5, breached_at=$6, breach_reason=$7 WHERE id=$1', [a.id, na.balance, na.today_pnl, na.halted_today, na.phase, na.breached_at || null, na.breach_reason || null]);
   for (const e of events) {
-    if (e.type === 'breach') await core.notify(c, a.user_id, `${a.id} breached`, e.msg + '. You can reset it from the account page.', 'account?acct=' + a.id);
+    if (e.type === 'breach') { await core.notify(c, a.user_id, `${a.id} breached`, e.msg + '. You can reset it from the account page.', 'account?acct=' + a.id); if (a.kind === 'funded') require('./integrations').alert('breach', `:red_circle: Funded account ${a.id} breached`); }
     if (e.type === 'dll') await core.notify(c, a.user_id, `Daily loss limit reached on ${a.id}`, e.msg, 'account?acct=' + a.id);
   }
   return na;
@@ -54,6 +54,7 @@ async function closeAccountDay(c, a, dayIso) {
     const pd = core.sizeDef(cat, a.plan, a.size);
     await core.notify(c, a.user_id, `You passed ${a.id}!`, pd && pd.activation ? `Sign the funded agreement and pay the $${pd.activation} activation fee to get your funded account.` : 'Sign the funded agreement to get your funded account.', 'account?acct=' + a.id);
     await core.points(c, a.user_id, 500, 'Passed ' + a.id);
+    require('./integrations').alert('pass', `:tada: ${a.id} passed the evaluation`);
   }
   return { ...na, today_pnl: 0, halted_today: false };
 }

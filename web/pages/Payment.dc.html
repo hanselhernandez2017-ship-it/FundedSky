@@ -90,7 +90,7 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 <button type="button" class="fs-opt" aria-pressed="{{ m.on }}" onClick="{{ m.pick }}" style="height: 48px; background: {{ m.bg }}; border: 1px solid {{ m.bd }}; border-radius: 8px; color: {{ m.fg }}; font: inherit; font-size: 14px; font-weight: 500; cursor: pointer;">{{ m.label }}</button>
 </sc-for>
 </div>
-<sc-if value="{{ isCard }}" hint-placeholder-val="{{ true }}"><sc-if value="{{ stripe }}"><p style="margin: 0; background: #111113; border: 1px solid #26262A; border-radius: 8px; padding: 18px; font-size: 14px; line-height: 20px; color: #D4CFCD;">You enter your card on our payment processor\'s secure page after you press Pay.</p></sc-if><sc-if value="{{ testMode }}">
+<sc-if value="{{ isCard }}" hint-placeholder-val="{{ true }}"><sc-if value="{{ stripe }}"><p style="margin: 0; background: #111113; border: 1px solid #26262A; border-radius: 8px; padding: 18px; font-size: 14px; line-height: 20px; color: #D4CFCD;">{{ secureNote }}</p></sc-if><sc-if value="{{ testMode }}">
 <div style="background: #111113; border: 1px solid #26262A; border-radius: 8px; padding: 18px; display: flex; flex-direction: column; gap: 14px;">
 <div style="display: flex; flex-direction: column; gap: 6px;"><label for="card" style="font-size: 13px; color: #9C9693;">Card Number</label><input id="card" class="fs-in" value="{{ card }}" onChange="{{ set_card }}" type="text" inputmode="numeric" autocomplete="cc-number" placeholder="1234 1234 1234 1234" style="height: 48px; box-sizing: border-box; background: #08080A; border-radius: 4px; padding: 0 14px; color: #F4F2F1; font-family: 'Geist Mono', monospace; font-size: 15px;"></div>
 <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px;">
@@ -100,7 +100,7 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 </div>
 <p style="margin: 10px 0 0; font-size: 12.5px; color: #9C9693;">Test mode: use 4242 4242 4242 4242, any future date and any CVC. No real charge.</p></sc-if></sc-if>
 <sc-if value="{{ isApple }}" hint-placeholder-val="{{ false }}"><p style="margin: 0; background: #111113; border: 1px solid #26262A; border-radius: 8px; padding: 18px; font-size: 14px; line-height: 20px; color: #D4CFCD;">{{ appleNote }}</p></sc-if>
-<sc-if value="{{ isCrypto }}" hint-placeholder-val="{{ false }}"><p style="margin: 0; background: #111113; border: 1px solid #26262A; border-radius: 8px; padding: 18px; font-size: 14px; line-height: 20px; color: #D4CFCD;">Crypto checkout is coming soon. Use a card for now.</p></sc-if>
+<sc-if value="{{ isCrypto }}" hint-placeholder-val="{{ false }}"><p style="margin: 0; background: #111113; border: 1px solid #26262A; border-radius: 8px; padding: 18px; font-size: 14px; line-height: 20px; color: #D4CFCD;">{{ cryptoNote }}</p></sc-if>
 </fieldset>
 
 <label style="display: flex; gap: 12px; align-items: flex-start; font-size: 14px; line-height: 20px; color: #D4CFCD; cursor: pointer;"><input type="checkbox" class="fs-check" checked="{{ agreed }}" onChange="{{ toggleAgree }}"><span>I've read the <a href="/checkout#order">Trading Rules</a> and agree to the <a href="/terms" target="_blank">Terms</a> and <a href="/refund-policy" target="_blank">Refund Policy</a>.</span></label>
@@ -122,7 +122,7 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 <div class="fs-cta" style="display: flex; flex-direction: column; gap: 8px;">
 <sc-if value="{{ agreed }}" hint-placeholder-val="{{ true }}"><button type="button" onClick="{{ submit }}" disabled="{{ busy }}" style="width: 100%; border: 0; cursor: pointer; font: inherit; text-align: center; background: #FFFFFF; color: #111113; border-radius: 4px; padding: 14px; font-size: 15px; font-weight: 600; font-stretch: 112%; text-decoration: none;">{{ payLabel }}</button></sc-if>
 <sc-if value="{{ notAgreed }}" hint-placeholder-val="{{ false }}"><button type="button" disabled style="width: 100%; background: #26262A; color: #9C9693; border: 0; border-radius: 4px; padding: 14px; font: inherit; font-size: 15px; font-weight: 600; font-stretch: 112%;">{{ payLabel0 }}</button><p style="margin: 0; font-size: 12px; color: #9C9693; text-align: center;">Tick the box to agree to the rules and terms first.</p></sc-if>
-<sc-if value="{{ err }}"><p role="alert" style="margin: 10px 0 0; font-size: 13.5px; line-height: 19px; color: #F2777F;">{{ err }}</p></sc-if></div>
+<sc-if value="{{ err }}"><p role="alert" style="margin: 10px 0 0; font-size: 13.5px; line-height: 19px; color: #F2777F;">{{ err }}</p></sc-if><sc-if value="{{ fallback }}"><button type="button" onClick="{{ payBackup }}" style="width: 100%; margin-top: 10px; background: transparent; color: #F4F2F1; border: 1px solid #3A3A40; border-radius: 4px; padding: 13px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;">Pay With Backup Processor</button></sc-if></div>
 <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; font-size: 13px; color: #9C9693; border-top: 1px solid #26262A; padding-top: 16px;">
 <li style="display: flex; gap: 10px; align-items: center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7CC4FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"></path></svg>{{ trust1 }}</li>
 <li style="display: flex; gap: 10px; align-items: center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7CC4FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"></path></svg>{{ trust2 }}</li>
@@ -150,23 +150,24 @@ class Component extends DCLogic {
   }
   async componentDidMount() {
     const me = await FSX.me(); if (me) { location.replace('/checkout/payment' + location.search); return; }
+    FSPAY.config().then((cfg) => { this.setState({ cfg }); FSPAY.boot(null); });
     try { const sum = await FSX.checkout.load(false); if (sum.empty) { location.replace('/checkout'); return; } this.setState({ sum }); } catch (e) { this.setState({ err: e.message }); }
   }
-  async submit() {
+  async submit(backup) {
     const st = this.state; if (st.busy) return;
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(st.email)) return this.setState({ err: 'Enter a valid email address' });
     if (st.pw.length < 8) return this.setState({ err: 'Use at least 8 characters for your password' });
     if (!st.first.trim() || !st.last.trim()) return this.setState({ err: 'Enter your first and last name' });
-    if (st.method === 'crypto') return this.setState({ err: 'Crypto checkout is coming soon. Use a card for now.' });
+    if (st.method === 'crypto') return this.setState({ err: '{{ cryptoNote }}' });
     if (st.method === 'apple' && st.sum.cat.payments === 'test') return this.setState({ err: 'Apple Pay is not available in test mode. Use the test card.' });
-    this.setState({ busy: true, err: '' });
+    this.setState({ busy: true, err: '', fallback: false }); st.backup = !!backup;
     try {
       await DC.api('/api/auth/signup', { email: st.email.trim(), password: st.pw, first: st.first.trim(), last: st.last.trim(), country: st.country });
       location.href = await FSX.checkout.pay(st.sum, st);
-    } catch (e) { this.setState({ busy: false, err: e.message }); }
+    } catch (e) { this.setState({ busy: false, err: e.message, fallback: !!e.fallback }); }
   }
   renderVals() {
-    const st = this.state; const sum = st.sum; const test = !sum || sum.cat.payments === 'test';
+    const st = this.state; const sum = st.sum; const cfg = st.cfg || { card: 'test' }; const test = cfg.card === 'test' && !cfg.live; const tp = cfg.card === 'tailoredpay';
     const methods = [['card', 'Card'], ['apple', 'Apple Pay'], ['crypto', 'Crypto']].map(([id, label]) => {
       const sel = st.method === id;
       return { label, on: sel, bg: sel ? '#13202E' : '#111113', bd: sel ? '#7CC4FF' : '#26262A', fg: sel ? '#F4F2F1' : '#D4CFCD', pick: () => this.setState({ method: id, err: '' }) };
@@ -175,14 +176,16 @@ class Component extends DCLogic {
     const total = sum ? FSX.money(sum.total) : '…';
     return {
       methods, isCard: st.method === 'card', isApple: st.method === 'apple', isCrypto: st.method === 'crypto', stripe: !test, testMode: test,
-      appleNote: test ? 'Apple Pay is available once live payments are switched on. Use the test card for now.' : "You'll confirm with Apple Pay on our payment processor's secure page.",
+      appleNote: cfg.card === 'stripe' || cfg.stripeBackup ? "You'll confirm with Apple Pay on Stripe's secure page." : 'Apple Pay is not available yet. Use a card.',
       agreed: st.agreed, notAgreed: !st.agreed, toggleAgree: () => this.setState({ agreed: !st.agreed }),
       f_email: st.email, f_pw: st.pw, f_first: st.first, f_last: st.last, card: st.card, exp: st.exp, cvc: st.cvc,
       set_email: set('email'), set_pw: set('pw'), set_first: set('first'), set_last: set('last'), set_country: set('country'), set_card: set('card'), set_exp: set('exp'), set_cvc: set('cvc'),
       countries: COUNTRIES.map((n) => ({ n, on: n === st.country })),
       sumTitle: sum ? sum.title : 'Loading…', sumSub: sum ? sum.sub : '', lines: sum ? sum.lines : [], total,
-      payLabel: st.busy ? 'Working…' : 'Pay ' + total, payLabel0: 'Pay ' + total, payShort: st.busy ? '…' : 'Pay', busy: st.busy, err: st.err, submit: () => this.submit(),
-      trust1: 'Your accounts appear in your dashboard as soon as payment clears', trust2: test ? 'Test mode: no real charge' : 'Card payments processed by Stripe',
+      payLabel: st.busy ? 'Working…' : 'Pay ' + total, payLabel0: 'Pay ' + total, payShort: st.busy ? '…' : 'Pay', busy: st.busy, err: st.err, submit: () => this.submit(), fallback: !!st.fallback, payBackup: () => this.submit(true),
+      secureNote: tp ? 'Press Pay and enter your card in the secure payment window. Funded Sky never sees your card number.' : 'You enter your card on our payment processor\'s secure page after you press Pay.',
+      cryptoNote: cfg.crypto ? 'Pay with USDC, USDT or other coins on Confirmo\'s secure page. Crypto payments are final.' : 'Crypto checkout is not available yet. Use a card.',
+      trust1: 'Your accounts appear in your dashboard as soon as payment clears', trust2: test ? 'Test mode: no real charge' : tp ? 'Cards processed securely by TailoredPay' : 'Card payments processed by Stripe',
       backHref: '/checkout', loginHref: '/login?next=' + encodeURIComponent('/checkout/payment' + location.search)
     };
   }

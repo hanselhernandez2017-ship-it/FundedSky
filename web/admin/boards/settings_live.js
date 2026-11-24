@@ -1,0 +1,70 @@
+  // ===== Settings (live) =====
+  const SET = BO.settings || {};
+  const CO = Object.assign({ legal: '', brand: 'Funded Sky', address: '', taxId: '', support: 'support@fundedsky.com', tz: 'Eastern Time', currency: 'USD' }, SET.company || {});
+  const FLAGS = [['competitions', 'Competitions', 'Trading contests page in the dashboard'], ['rewards', 'Rewards Points', 'Points and the rewards catalog'], ['affiliates', 'Affiliates', 'Refer-a-friend page in the dashboard'], ['education', 'Education', 'Courses in the dashboard'], ['cryptoPayouts', 'Crypto Payouts', 'USDC as a payout method']];
+  const FL = Object.assign({ competitions: true, rewards: true, affiliates: true, education: true, cryptoPayouts: true }, SET.flags || {});
+  const MT = Object.assign({ on: false, msg: 'Funded Sky is getting an upgrade. Trading accounts are not affected. Back in about 30 minutes.' }, SET.maint || {});
+  const AL = Object.assign({ order: true, payout: true, breach: true, pass: false, dispute: true, kyc: true, decline: true }, (S.intData && S.intData.alerts) || {});
+  S.intData = S.intData || null;
+  const loadInt = async () => { S.intData = await API('/integrations'); render(); };
+  if (!S.intData) loadInt().catch((e) => toast(e.message));
+  const istat = (x) => (x.enabled && x.status === 'live' ? b('Connected', 'live') : x.enabled && x.status === 'error' ? b('Needs Attention', 'draft') : x.enabled ? b('On, Not Tested', 'sched') : b('Not Set Up', 'ret'));
+  const GROUPS = ['Payments', 'Payouts', 'Identity', 'Tax', 'Email', 'Support', 'Analytics', 'Alerts'];
+  const saveSet = (key, val, ok) => L.act(() => API('/settings/' + key, val, 'PUT'), ok, () => { BO.settings = Object.assign(BO.settings || {}, { [key]: val }); });
+  function vCompany() { return `${ph('Company Details', 'Shown on receipts, emails and legal pages.')}
+      <div class="two">${card('Company', '', cb(`<div class="fg">${fld('c1', 'Legal Name', CO.legal)}${fld('c2', 'Brand Name', CO.brand)}${fld('c3', 'Address', CO.address)}${fld('c4', 'Tax Number', CO.taxId)}${fld('c5', 'Support Email', CO.support)}<button class="pill pri" data-act="saveCo" style="align-self:flex-start">Save</button></div>`))}
+      ${card('Regional', '', cb(`<div class="fg"><div class="srow"><span>Time Zone</span><span>Eastern Time</span></div><div class="srow"><span>Currency</span><span>USD</span></div><div class="srow"><span>Trading Day Ends</span><span>5:00 PM ET</span></div><p class="hint" style="margin:6px 0 0">Rules, daily loss limits and payouts all run on Eastern Time.</p></div>`))}</div>`; }
+  function vBrand() { return `${ph('Branding', 'Logo and colors used in emails, the dashboard and certificates.')}
+      <div class="two">${card('Brand', '', cb(`<div class="fg"><div class="srow"><span>Logo</span><span class="il"><span class="brandmk">Funded Sky</span></span></div><div class="srow"><span>Accent Color</span><span class="il"><i class="swc" style="background:#7CC4FF"></i><span class="mono">#7CC4FF</span></span></div><div class="srow"><span>Background</span><span class="il"><i class="swc" style="background:#08080A"></i><span class="mono">#08080A</span></span></div><div class="srow"><span>Font</span><span>Mona Sans</span></div></div>`))}
+      ${card('Email Preview', '', cb(`<div class="preview"><span class="brandmk">Funded Sky</span><p class="lead" style="margin:12px 0 8px">Your evaluation is ready.</p><span class="hint">Open your dashboard to see your rules and progress.</span><div style="margin-top:12px"><span class="pill pri nb">Open Dashboard</span></div></div>`))}</div>`; }
+  function vDomains() { const base = (S.intData && S.intData.base) || location.origin; return `${ph('Domains', 'Where Funded Sky is served. Add a custom domain in Railway, then set it as the public address.')}
+      <div class="card m0">${table(['Domain', 'Used For', 'Status'], [[esc(base.replace(/^https?:\/\//, '')), 'Website, checkout, dashboard and back office', b('Connected', 'live')], ['Email sending domain', `Set it up in Resend. ${XL('Settings', 'int', 'Integrations')}`, (S.intData && S.intData.list.find((x) => x.id === 'resend' && x.status === 'live')) ? b('Connected', 'live') : b('Not Set Up', 'ret')]])}</div>`; }
+  function vInt() {
+    if (!S.intData) return ph('Integrations', 'Loading…');
+    const list = S.intData.list; const live = list.filter((x) => x.enabled && x.status === 'live').length;
+    return `${ph('Integrations', `Paste each provider's keys here. Secret keys are stored encrypted and never shown again. ${live} of ${list.length} connected.`)}
+      ${GROUPS.map((g) => { const xs = list.filter((x) => x.cat === g); if (!xs.length) return ''; return `<h6 class="grp" style="margin:18px 0 8px;color:var(--fa);font-size:11px;letter-spacing:.06em;text-transform:uppercase">${g}</h6><div class="card m0">${xs.map((x) => `<div class="srow pad src"><span><b>${esc(x.name)}</b> <span class="hint">${esc(x.role)} · ${esc(x.desc)}</span>${x.lastError ? `<span class="hint" style="display:block;color:var(--no);margin-top:4px">${esc(x.lastError)}</span>` : ''}</span><span class="il">${istat(x)}<button class="pill sm${x.enabled ? '' : ' pri'}" data-act="intOpen" data-k="${x.id}">${x.enabled ? 'Settings' : 'Set Up'}</button></span></div>`).join('')}</div>`; }).join('')}
+      <p class="hint" style="margin:16px 0 0">Not offered yet: price feed (needed once a trading platform is connected), CRM and data warehouse.</p>`; }
+  function vHooks() { const base = (S.intData && S.intData.base) || location.origin; const list = S.intData ? S.intData.list.filter((x) => x.webhook) : [];
+    return `${ph('Webhooks', 'Paste these addresses into each provider so they can tell Funded Sky when payments, checks and payouts change.')}
+      <div class="card m0">${table(['Provider', 'Paste This Address', 'Status'], list.map((x) => [`<b>${esc(x.name)}</b>`, `<span class="mono">${esc(base + x.webhook)}</span> <button class="lnk" data-act="copy" data-k="${esc(base + x.webhook)}">Copy</button>`, x.enabled ? b('Listening', 'live') : b('Not Set Up', 'ret')]), { empty: 'Loading…' })}</div>`; }
+  function vDel() { const h = S.intData ? S.intData.hooks : [];
+    return `${ph('Delivery Log', 'The last 100 webhooks Funded Sky received.')}<div class="card m0">${table(['When', 'From', 'Event', 'Result', 'Detail'], h.map((d) => [`<span class="hint nw">${L.dtt(d.created_at)}</span>`, esc(d.provider), `<span class="mono">${esc(d.event)}</span>`, d.ok ? b('Accepted', 'live') : b('Rejected', 'err'), `<span class="hint">${esc(d.detail)}</span>`]), { empty: 'No webhooks yet.' })}</div>`; }
+  function vFlags() { return `${ph('Feature Switches', 'Turn parts of the trader dashboard on or off without a new release.')}
+      <div class="card m0">${table(['Feature', 'What It Does', 'On'], FLAGS.map(([k, n, d]) => [`<b>${n}</b>`, `<span class="hint">${d}</span>`, `<button class="sw ${FL[k] ? 'on' : ''}" role="switch" aria-checked="${!!FL[k]}" aria-label="${n}" data-act="flag" data-k="${k}"></button>`]))}</div>`; }
+  function vMaint() { return `${ph('Maintenance Mode', 'Shows a message on the website and dashboard and stops new purchases. Accounts keep trading.')}
+      <div class="two">${card('Maintenance', MT.on ? 'On' : 'Off', cb(`<div class="fg"><div class="srow"><span>Turn On Maintenance Mode</span><button class="sw ${MT.on ? 'on' : ''}" role="switch" aria-checked="${MT.on}" aria-label="Maintenance mode" data-act="maint"></button></div><div class="fl"><label for="mm">Message</label><textarea id="mm" rows="3">${esc(MT.msg)}</textarea></div><button class="pill" data-act="maintMsg" style="align-self:flex-start">Save Message</button></div>`))}
+      ${card('Preview', '', cb(`<div class="preview"><span class="brandmk">Funded Sky</span><p class="lead" style="margin:12px 0 0">${esc(MT.msg)}</p></div>`))}</div>`; }
+  function vNotif() { const slack = S.intData && S.intData.list.find((x) => x.id === 'slack');
+    return `${ph('Staff Notifications', `Alerts go to Slack. ${slack && slack.enabled ? 'Slack is connected.' : `Connect Slack in ${XL('Settings', 'int', 'Integrations')} first.`}`)}
+      <div class="card m0">${table(['Event', 'What Gets Posted', 'Send to Slack'], [['order', 'New Order', 'Every paid order with amount and plan'], ['payout', 'Payouts', 'Payout requested and payout sent'], ['breach', 'Funded Breaches', 'When a funded account breaks a rule'], ['pass', 'Evaluation Passed', 'When a trader passes'], ['dispute', 'Chargebacks', 'When a card dispute opens'], ['kyc', 'Failed Identity Checks', 'When Sumsub rejects a trader'], ['decline', 'Card Declines', 'Each declined card payment']].map(([k, n, d]) => [`<b>${n}</b>`, `<span class="hint">${d}</span>`, `<button class="sw ${AL[k] !== false ? 'on' : ''}" role="switch" aria-checked="${AL[k] !== false}" aria-label="${n}" data-act="alert" data-k="${k}"></button>`]))}</div>`; }
+  function intDrawer(id) {
+    const x = S.intData && S.intData.list.find((y) => y.id === id); if (!x) return null;
+    const f = x.fields.map((fd) => fd.type === 'select' ? `<div class="fl"><label for="if_${fd.k}">${esc(fd.label)}</label><select id="if_${fd.k}" data-int="${fd.k}">${fd.opts.map((o) => `<option ${o === fd.value ? 'selected' : ''}>${o}</option>`).join('')}</select></div>`
+      : `<div class="fl"><label for="if_${fd.k}">${esc(fd.label)}</label><input id="if_${fd.k}" data-int="${fd.k}" ${fd.type === 'secret' ? 'type="password" autocomplete="off"' : ''} value="${fd.type === 'secret' ? '' : esc(fd.value)}" placeholder="${fd.type === 'secret' ? (fd.set ? 'Saved (' + esc(fd.hint) + '). Leave blank to keep it.' : 'Paste here') : ''}"></div>`).join('');
+    const base = S.intData.base || location.origin;
+    return { title: x.name, body: `<div class="fg"><div class="srow"><span>${esc(x.role)}</span>${istat(x)}</div><p class="hint" style="margin:0">${esc(x.desc)} <a class="lnk" href="${esc(x.docs)}" target="_blank" rel="noopener">Where to find the keys</a></p>
+        ${x.webhook ? `<div class="srow"><span>Webhook address</span><span class="mono" style="font-size:12px">${esc(base + x.webhook)}</span></div>` : ''}
+        ${f}<div class="srow"><span>Turn On</span><button class="sw ${x.enabled ? 'on' : ''}" role="switch" aria-checked="${x.enabled}" aria-label="Turn on" data-act="intOn" data-k="${x.id}"></button></div>
+        ${x.lastCheck ? `<p class="hint" style="margin:0">Last checked ${L.ago(x.lastCheck)}${x.lastError ? ': ' + esc(x.lastError) : ''}</p>` : ''}</div>`,
+      foot: `<button class="pill pri" data-act="intSave" data-k="${x.id}">Save</button><button class="pill" data-act="intTest" data-k="${x.id}">Test Connection</button>` };
+  }
+  const intVals = () => { const o = {}; root.querySelectorAll('[data-int]').forEach((el) => { o[el.dataset.int] = el.value; }); return o; };
+  const APP = { title: 'Settings',
+    stats: () => [['Services', S.intData ? `${S.intData.list.filter((x) => x.enabled && x.status === 'live').length} Connected` : '…'], ['Payments', BO.payments === 'test' ? 'Test Mode' : 'Live', BO.payments === 'test' ? 'warnt' : ''], ['Maintenance', MT.on ? 'On' : 'Off', MT.on ? 'warnt' : '']],
+    banner: () => (MT.on ? '<div class="impb"><span class="il"><i></i><b>Maintenance Mode Is On</b></span><span class="hint">Purchases are stopped. Traders see the maintenance message.</span><button class="pill sm" data-act="maint">Turn Off</button></div>' : ''),
+    areas: [{ h: 'Company' }, { id: 'co', n: 'Company', tabs: [['company', 'Company Details'], ['brand', 'Branding'], ['domains', 'Domains']] }, { h: 'Systems' }, { id: 'int', n: 'Integrations', b: () => (S.intData ? S.intData.list.filter((x) => x.enabled && x.status === 'error').length || null : null), bad: true, tabs: [['int', 'Connected Services']] }, { id: 'hooks', n: 'Webhooks', tabs: [['hooks', 'Addresses'], ['del', 'Delivery Log']] }, { id: 'flags', n: 'Feature Switches', tabs: [['flags', 'Feature Switches']] }, { id: 'maint', n: 'Maintenance', tabs: [['maint', 'Maintenance Mode']] }, { id: 'nf', n: 'Notifications', tabs: [['notif', 'Staff Notifications']] }],
+    views: { company: vCompany, brand: vBrand, domains: vDomains, int: vInt, hooks: vHooks, del: vDel, flags: vFlags, maint: vMaint, notif: vNotif },
+    click: (a, el, id, k) => { switch (a) {
+      case 'saveCo': { const v = (i) => (root.querySelector('#' + i) || {}).value || ''; saveSet('company', Object.assign(CO, { legal: v('c1'), brand: v('c2'), address: v('c3'), taxId: v('c4'), support: v('c5') }), 'Saved. New receipts use these details.'); return 0; }
+      case 'flag': FL[k] = !FL[k]; saveSet('flags', FL, `${FLAGS.find((f) => f[0] === k)[1]} ${FL[k] ? 'on' : 'off'}`); return 1;
+      case 'maint': MT.on = !MT.on; saveSet('maint', MT, MT.on ? 'Maintenance mode on. Purchases are stopped.' : 'Maintenance mode off'); return 1;
+      case 'maintMsg': MT.msg = (root.querySelector('#mm') || {}).value || MT.msg; saveSet('maint', MT, 'Message saved'); return 1;
+      case 'alert': AL[k] = AL[k] === false; S.intData.alerts = AL; L.act(() => API('/settings/alerts', AL, 'PUT'), 'Saved'); return 1;
+      case 'copy': try { navigator.clipboard.writeText(k); } catch (e) { /* blocked */ } toast('Copied'); return 0;
+      case 'intOpen': S.drawer = { k: 'int', id: k }; return 1;
+      case 'intOn': { const x = S.intData.list.find((y) => y.id === k); API('/integrations/' + k, { config: intVals(), enabled: !x.enabled }, 'PUT').then((r) => { S.intData.list = r.list; toast(`${x.name} ${!x.enabled ? 'on' : 'off'}`); render(); }).catch((e) => toast(e.message)); return 0; }
+      case 'intSave': API('/integrations/' + k, { config: intVals() }, 'PUT').then((r) => { S.intData.list = r.list; toast('Saved'); render(); }).catch((e) => toast(e.message)); return 0;
+      case 'intTest': toast('Testing…'); API('/integrations/' + k, { config: intVals() }, 'PUT').then(() => API('/integrations/' + k + '/test', {})).then((r) => { toast(r.msg); return loadInt(); }).catch((e) => { toast(e.message); loadInt(); }); return 0;
+      default: return 0; } },
+    drawer: (d) => (d.k === 'int' ? intDrawer(d.id) : null) };

@@ -36,12 +36,16 @@
         title: o.kind === 'activation' ? 'Activation Fee' : o.kind === 'reset' ? 'Account Reset' : 'Order ' + o.code, sub: o.kind === 'activation' ? 'For ' + (o.account || '') : o.lines.filter((l) => l.kind === 'plan').map((l) => l.label).join(', ') };
     },
     async pay(sum, st) {
-      let code = sum.code;
       if (sum.source === 'cart') {
         const o = await DC.api('/api/orders', { items: sum.items, promo: sum.promo || undefined });
-        code = o.code; if (o.paid) return '/checkout/confirmed?order=' + code;
+        sum.code = o.code; sum.source = 'order'; if (o.paid) { FSX.cart.clear(); return '/checkout/confirmed?order=' + o.code; }
       }
-      const r = await DC.api('/api/orders/' + code + '/pay', { card: st.card, exp: st.exp, cvc: st.cvc });
+      const code = sum.code; const cfg = await FSPAY.config();
+      const method = st.backup ? 'stripe' : (st.method || 'card');
+      const body = { method };
+      if (method === 'card' && cfg.card === 'tailoredpay') body.token = await FSPAY.cardToken(sum.total);
+      if (method === 'card' && cfg.card === 'test') Object.assign(body, { card: st.card, exp: st.exp, cvc: st.cvc });
+      const r = await DC.api('/api/orders/' + code + '/pay', body);
       if (r.redirect) return r.redirect;
       FSX.cart.clear();
       return '/checkout/confirmed?order=' + code;

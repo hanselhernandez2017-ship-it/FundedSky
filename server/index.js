@@ -9,6 +9,8 @@ const trader = require('./trader');
 const admin = require('./admin');
 const pay = require('./payments');
 const content = require('./content');
+const I = require('./integrations');
+const flows = require('./flows');
 const { migrate } = require('./migrate');
 const { HttpError, bad, clean, round2 } = require('./util');
 
@@ -16,7 +18,11 @@ const app = express();
 app.set('trust proxy', 1);
 app.disable('x-powered-by');
 app.use((req, res, next) => { res.setHeader('X-Content-Type-Options', 'nosniff'); res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin'); res.setHeader('X-Frame-Options', 'SAMEORIGIN'); next(); });
-app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), (req, res) => pay.webhook(req, res));
+const raw = express.raw({ type: '*/*', limit: '1mb' });
+app.post(['/api/stripe/webhook', '/api/hooks/stripe'], raw, (req, res) => pay.webhook(req, res));
+app.post('/api/hooks/confirmo', raw, (req, res) => pay.confirmoHook(req, res).catch((e) => { console.error(e); res.status(500).end(); }));
+app.post('/api/hooks/sumsub', raw, (req, res) => flows.sumsubHook(req, res).catch((e) => { console.error(e); res.status(500).end(); }));
+app.post('/api/hooks/rise', raw, (req, res) => flows.riseHook(req, res).catch((e) => { console.error(e); res.status(500).end(); }));
 app.use(express.json({ limit: '200kb' }));
 app.use((req, res, next) => auth.loadUser(req, res, next).catch(next));
 
@@ -27,12 +33,15 @@ setInterval(() => hits.clear(), 10 * 60 * 1000).unref();
 
 const h = (fn) => async (req, res) => {
   try { const out = await fn(req, res); if (!res.headersSent) res.json(out || { ok: true }); }
-  catch (e) { const st = e instanceof HttpError ? e.status : 500; if (st === 500) console.error(req.method, req.path, e); res.status(st).json({ error: st === 500 ? 'Something went wrong on our side. Try again.' : e.message }); }
+  catch (e) { const st = e instanceof HttpError ? e.status : e.status === 402 ? 402 : 500; if (st === 500) console.error(req.method, req.path, e); res.status(st).json({ error: st === 500 ? 'Something went wrong on our side. Try again.' : e.message, fallback: e.fallback || undefined }); }
 };
 
 // ---------- public ----------
 app.get('/api/health', h(async () => ({ ok: true, db: !!(await db.one('SELECT 1 AS x')), stripe: pay.enabled(), market: sim.marketOpen() })));
 app.get('/api/catalog', h(async () => { const c = await core.catalog(); return { plans: c.plans.filter((p) => p.active), evalRules: c.evalRules, evalCommon: c.evalCommon, fundedCommon: c.fundedCommon, fundedCaps: c.fundedCaps, instantRules: c.instantRules, instantCommon: c.instantCommon, instantCaps: c.instantCaps, addons: c.addons, resetPct: c.resetPct, bundles: c.bundles, promos: (c.promos || []).filter((p) => p.active && (!p.ends || p.ends >= new Date().toISOString().slice(0, 10))).map(({ code, name, pct, plans, starts, ends, desc }) => ({ code, name, pct, plans, starts, ends, desc })), payments: pay.mode() }; }));
+app.get('/api/public-config', h(async () => { const m = await pay.refreshMode(); const crisp = await I.cfg('crisp'); const ph = await I.cfg('posthog'); const ss = await I.cfg('sumsub');
+  const kv2 = await db.all("SELECT k, v FROM kv WHERE k IN ('settings.flags','settings.maint')"); const g = (k) => (kv2.find((r) => r.k === k) || {}).v || {};
+  return { flags: g('settings.flags'), maint: g('settings.maint').on ? g('settings.maint').msg : '', card: m.card, stripeBackup: m.stripe && m.card !== 'stripe', crypto: m.crypto, live: m.live, tokenizationKey: m.tokenizationKey || '', gatewayUrl: m.gatewayUrl || '', crisp: crisp ? crisp.websiteId : '', posthog: ph ? { key: ph.projectKey, host: ph.host } : null, sumsub: !!ss }; }));
 app.get('/api/me', h(async (req) => (req.user ? { user: { email: req.user.email, first: req.user.first, last: req.user.last, role: req.user.role, verified: req.user.verified, country: req.user.country } } : { user: null })));
 app.post('/api/auth/signup', limit(8, 60000), h((req, res) => auth.signup(req, res)));
 app.post('/api/auth/login', limit(10, 60000), h((req, res) => auth.login(req, res)));
@@ -46,7 +55,8 @@ app.post('/api/cart/price', h(async (req) => core.priceCart(req.body.items, { pr
 // ---------- trader ----------
 const T = express.Router(); T.use(auth.needUser);
 T.get('/trader/boot', h(async (req) => { const host = (process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`).replace(/^https?:\/\//, ''); return trader.boot(req.user, req.sess, host); }));
-T.post('/orders', h((req) => pay.createOrder(req.user, req.body)));
+const maintOn = async () => { const r = await db.one("SELECT v FROM kv WHERE k='settings.maint'"); return r && r.v.on ? r.v.msg : ''; };
+T.post('/orders', h(async (req) => { const m = await maintOn(); if (m) bad(m, 503); return pay.createOrder(req.user, req.body); }));
 T.post('/orders/reset', h((req) => pay.createResetOrder(req.user, req.body)));
 T.post('/orders/activation', h((req) => pay.createActivationOrder(req.user, req.body)));
 T.get('/orders/:code', h((req) => pay.getOrder(req.user, req.params.code, req.query.session_id)));
@@ -61,6 +71,7 @@ T.post('/payout-methods', h(async (req) => {
   const n = (await db.one('SELECT count(*)::int n FROM payout_methods WHERE user_id=$1', [req.user.id])).n; if (n >= 5) bad('You can keep up to 5 payout methods');
   await db.q("INSERT INTO payout_methods(user_id,rail,label,is_default,unlock_at) VALUES($1,$2,$3,$4, now() + interval '48 hours')", [req.user.id, rail, label, n === 0]);
   await core.notify(null, req.user.id, 'New payout method added', `${label}. It can be used in 48 hours. If this wasn't you, contact support now.`, 'settings?tab=pay');
+  if (rail === 'Rise') { const r = await flows.riseInvite(req.user); if (r === 'invited') await core.notify(null, req.user.id, 'Check your email for a Rise invite', 'Finish Rise onboarding so we can send your payouts.', 'settings?tab=pay'); }
 }));
 T.post('/payout-methods/:id/default', h(async (req) => { await db.q('UPDATE payout_methods SET is_default=(id=$2) WHERE user_id=$1', [req.user.id, +req.params.id]); }));
 T.post('/notifications/read', h(async (req) => { if (req.body.all) await db.q('UPDATE notifications SET read=true WHERE user_id=$1', [req.user.id]); else await db.q('UPDATE notifications SET read=true WHERE user_id=$1 AND id=$2', [req.user.id, +req.body.id]); }));
@@ -106,6 +117,8 @@ T.post('/rewards/:id/redeem', h(async (req) => {
   });
 }));
 T.post('/competitions/:id/join', h(async (req) => { await db.q("UPDATE users SET settings = jsonb_set(settings, '{comps}', COALESCE(settings->'comps','{}'::jsonb) || jsonb_build_object($2::text, true)) WHERE id=$1", [req.user.id, clean(req.params.id, 20)]); }));
+T.post('/kyc/sumsub', h((req) => flows.sumsubToken(req.user)));
+T.post('/tax/form', h((req) => flows.taxForm(req.user)));
 T.post('/kyc', h(async (req) => {
   const b = req.body; const k = { name: clean(b.name, 120), dob: clean(b.dob, 12), country: clean(b.country, 60), idType: clean(b.idType, 40), idLast4: clean(b.idNumber, 40).slice(-4), at: new Date().toISOString() };
   if (!k.name || !k.dob) bad('Fill in every field');
@@ -145,7 +158,7 @@ app.get('/reset-password', page('reset-password.html'));
 app.get('/verify-email', page('verify.html'));
 app.get('/reset', needPage(false), page('reset.html'));
 app.get(['/app', '/app/*'], needPage(false), page('app.html'));
-app.get(['/admin', '/admin/*'], needPage(true), page('admin/home.html'));
+app.get(['/admin', '/admin/*'], needPage(true), (req, res) => { const b = ((req.params[0] || 'home').split('/')[0] || 'home').replace(/[^a-z]/g, ''); const f = path.join(DIST, 'admin', b + '.html'); res.sendFile(fs.existsSync(f) ? f : path.join(DIST, 'admin', 'ops.html')); });
 app.use((req, res) => res.status(404).sendFile(path.join(DIST, '404.html'), (e) => e && res.status(404).send('Not found')));
 
 const PORT = process.env.PORT || 3000;

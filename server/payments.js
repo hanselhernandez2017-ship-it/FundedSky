@@ -6,10 +6,19 @@ const R = require('./rules');
 const { bad, clean, money2, longDate, round2 } = require('./util');
 const { BASE } = require('./auth');
 
-let stripe = null;
-if (process.env.STRIPE_SECRET_KEY) stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-const enabled = () => !!stripe;
-const mode = () => (stripe ? (process.env.STRIPE_SECRET_KEY.startsWith('sk_live') ? 'stripe-live' : 'stripe-test') : 'test');
+const I = require('./integrations');
+let MODE = { card: 'test', stripe: false, crypto: false, live: false };
+const stripeCache = {};
+async function stripeClient() { const c = await I.cfg('stripe'); const key = (c && c.secretKey) || process.env.STRIPE_SECRET_KEY; if (!key) return null; return stripeCache[key] || (stripeCache[key] = require('stripe')(key)); }
+async function refreshMode() {
+  const tp = await I.cfg('tailoredpay'); const st = await stripeClient(); const cf = await I.cfg('confirmo');
+  MODE = { card: tp && tp.securityKey && tp.tokenizationKey ? 'tailoredpay' : st ? 'stripe' : 'test', stripe: !!st, crypto: !!(cf && cf.apiKey), live: !!(tp || st || cf), tokenizationKey: tp ? tp.tokenizationKey : '', gatewayUrl: tp ? tp.gatewayUrl : '' };
+  return MODE;
+}
+setInterval(() => refreshMode().catch(() => {}), 15000).unref();
+const enabled = () => MODE.live;
+const mode = () => (MODE.live ? 'live' : 'test');
+const methods = () => MODE;
 
 async function insertOrder(user, kind, priced, meta) {
   const code = await core.ordCode();
@@ -80,26 +89,52 @@ async function markPaid(o, provider, ref, method) {
   const r = await db.one("UPDATE orders SET status='paid', paid_at=now(), provider=$2, provider_ref=$3, pay_method=$4 WHERE id=$1 AND status='pending' RETURNING *", [o.id, provider, ref || null, method || '']);
   if (!r) return; // already paid
   await core.fulfilOrder(o.id);
+  I.alert('order', `:moneybag: New order ${o.code}: $${Number(o.total).toFixed(2)} (${o.lines.filter((l) => l.kind === 'plan').map((l) => l.label).join(', ')}) via ${provider}`);
   if (o.kind === 'reset' && o.meta.useFree) await db.q('UPDATE accounts SET free_resets=GREATEST(0,free_resets-1) WHERE id=$1', [o.meta.account]);
   const u = await db.one('SELECT email, first FROM users WHERE id=$1', [o.user_id]);
   await require('./mail').send(u.email, `Receipt for ${o.code}`, `Hi ${u.first},\n\nThanks for your order.\n\n${o.lines.map((l) => `${l.label}: ${money2(l.amount)}`).join('\n')}\nTotal: ${money2(o.total)}\n\nYour accounts are on your dashboard: ${BASE()}/app`, 'receipt');
 }
 
 async function payOrder(user, code, body) {
+  await refreshMode();
   const o = await db.one('SELECT * FROM orders WHERE code=$1 AND user_id=$2', [clean(code, 30), user.id]);
   if (!o) bad('Order not found', 404);
   if (o.status === 'paid') return { paid: true, code: o.code };
   if (o.status !== 'pending') bad('This order can no longer be paid');
-  if (stripe) {
-    const s = await stripe.checkout.sessions.create({
+  const method = body.method || 'card';
+  const total = Number(o.total);
+  // Crypto through Confirmo
+  if (method === 'crypto') {
+    const c = await I.cfg('confirmo'); if (!c) bad('Crypto checkout is not available right now. Use a card.');
+    const r = await fetch('https://confirmo.net/api/v3/invoices', { method: 'POST', headers: { Authorization: 'Bearer ' + c.apiKey, 'Content-Type': 'application/json' }, body: JSON.stringify({ invoice: { amount: total, currencyFrom: 'USD' }, settlement: { currency: c.settlement || null }, product: { name: `Funded Sky ${o.code}`, description: o.lines.map((l) => l.label).join(', ').slice(0, 200) }, reference: o.code, customerEmail: user.email, notifyUrl: `${BASE()}/api/hooks/confirmo`, returnUrl: `${BASE()}/checkout/confirmed?order=${o.code}` }) });
+    const j = await r.json().catch(() => ({})); if (!r.ok || !j.url) bad('Crypto checkout failed to start: ' + (j.message || r.status));
+    await db.q("UPDATE orders SET provider='confirmo', provider_ref=$2 WHERE id=$1", [o.id, j.id]);
+    return { redirect: j.url };
+  }
+  // Cards through TailoredPay (NMI gateway) with a Collect.js token
+  if (MODE.card === 'tailoredpay' && method === 'card') {
+    if (!body.token) bad('Card details are missing. Enter your card again.');
+    const c = await I.cfg('tailoredpay');
+    const u = await db.one('SELECT * FROM users WHERE id=$1', [user.id]);
+    const r = await I.nmi(c, { type: 'sale', amount: total.toFixed(2), currency: 'USD', payment_token: body.token, orderid: o.code, order_description: o.lines.map((l) => l.label).join(', ').slice(0, 250), email: u.email, first_name: u.first, last_name: u.last, country: u.country, ipaddress: body.ip || '', descriptor: c.descriptor || '' });
+    if (r.response === '1') { await markPaid(o, 'tailoredpay', r.transactionid, `Card ${r.cc_number ? '•••• ' + String(r.cc_number).slice(-4) : ''}`.trim()); return { paid: true, code: o.code }; }
+    await db.q("UPDATE orders SET meta = meta || $2 WHERE id=$1", [o.id, JSON.stringify({ lastDecline: r.responsetext || 'Declined', declinedAt: new Date().toISOString() })]);
+    I.alert('decline', `:warning: Card declined on ${o.code} (${user.email}): ${r.responsetext || 'declined'}`);
+    const e = new Error((r.response === '2' ? 'Your card was declined: ' : 'The payment could not be processed: ') + (r.responsetext || 'try another card') + (MODE.stripe ? '. You can also pay with our backup processor.' : '')); e.status = 402; e.fallback = MODE.stripe; throw e;
+  }
+  // Stripe: main processor if TailoredPay is off, or backup when the trader picks it
+  const stripe = await stripeClient();
+  if (stripe && (MODE.card === 'stripe' || method === 'stripe' || method === 'apple')) {
+    const sess = await stripe.checkout.sessions.create({
       mode: 'payment', customer_email: user.email, client_reference_id: o.code,
-      line_items: [{ quantity: 1, price_data: { currency: 'usd', unit_amount: Math.round(Number(o.total) * 100), product_data: { name: `Funded Sky ${o.code}`, description: o.lines.map((l) => l.label).join(', ').slice(0, 300) } } }],
+      line_items: [{ quantity: 1, price_data: { currency: 'usd', unit_amount: Math.round(total * 100), product_data: { name: `Funded Sky ${o.code}`, description: o.lines.map((l) => l.label).join(', ').slice(0, 300) } } }],
       metadata: { order: o.code }, success_url: `${BASE()}/checkout/confirmed?order=${o.code}&session_id={CHECKOUT_SESSION_ID}`, cancel_url: `${BASE()}/checkout/payment?order=${o.code}&canceled=1`
     });
-    await db.q('UPDATE orders SET provider_ref=$2, provider=$3 WHERE id=$1', [o.id, s.id, 'stripe']);
-    return { redirect: s.url };
+    await db.q('UPDATE orders SET provider_ref=$2, provider=$3 WHERE id=$1', [o.id, sess.id, 'stripe']);
+    return { redirect: sess.url };
   }
-  // built-in test mode
+  if (MODE.live) bad('Card payments are not available right now. Try crypto, or contact support.');
+  // Built-in test mode: only while no payment provider is connected
   const num = String(body.card || '').replace(/\D/g, '');
   if (num !== '4242424242424242') bad('Test mode: use the test card 4242 4242 4242 4242 with any future date and any CVC');
   if (!/^\d{2}\s*\/\s*\d{2}$/.test(String(body.exp || '').trim())) bad('Enter the expiry as MM / YY');
@@ -110,33 +145,60 @@ async function payOrder(user, code, body) {
 async function getOrder(user, code, sessionId) {
   let o = await db.one('SELECT * FROM orders WHERE code=$1 AND user_id=$2', [clean(code, 30), user.id]);
   if (!o) bad('Order not found', 404);
+  const stripe = o.provider === 'stripe' ? await stripeClient() : null;
   if (o.status === 'pending' && stripe && (sessionId || o.provider_ref)) {
     const s = await stripe.checkout.sessions.retrieve(sessionId || o.provider_ref).catch(() => null);
     if (s && s.payment_status === 'paid' && s.metadata && s.metadata.order === o.code) { await markPaid(o, 'stripe', s.payment_intent || s.id, 'Card via Stripe'); o = await db.one('SELECT * FROM orders WHERE id=$1', [o.id]); }
   }
-  return { code: o.code, kind: o.kind, status: o.status, lines: o.lines, items: o.items, subtotal: Number(o.subtotal), discount: Number(o.discount), total: Number(o.total), accounts: (o.meta && o.meta.accounts) || [], account: o.meta && o.meta.account, mode: mode(), email: user.email };
+  return { code: o.code, kind: o.kind, status: o.status, provider: o.provider, lines: o.lines, items: o.items, subtotal: Number(o.subtotal), discount: Number(o.discount), total: Number(o.total), accounts: (o.meta && o.meta.accounts) || [], account: o.meta && o.meta.account, mode: mode(), email: user.email };
 }
 
+async function hookLog(provider, event, ok, detail) { await db.q('INSERT INTO webhook_log(provider,event,ok,detail) VALUES($1,$2,$3,$4)', [provider, event || '', ok, String(detail || '').slice(0, 500)]).catch(() => {}); }
 async function webhook(req, res) {
-  if (!stripe || !process.env.STRIPE_WEBHOOK_SECRET) return res.status(400).send('webhook not configured');
+  const c = await I.cfg('stripe'); const secret = (c && c.webhookSecret) || process.env.STRIPE_WEBHOOK_SECRET; const stripe = await stripeClient();
+  if (!stripe || !secret) return res.status(400).send('webhook not configured');
   let ev;
-  try { ev = stripe.webhooks.constructEvent(req.body, req.headers['stripe-signature'], process.env.STRIPE_WEBHOOK_SECRET); } catch (e) { return res.status(400).send('bad signature'); }
+  try { ev = stripe.webhooks.constructEvent(req.body, req.headers['stripe-signature'], secret); } catch (e) { await hookLog('stripe', 'bad signature', false, e.message); return res.status(400).send('bad signature'); }
   try {
     if (ev.type === 'checkout.session.completed' && ev.data.object.payment_status === 'paid') {
       const s = ev.data.object; const o = await db.one('SELECT * FROM orders WHERE code=$1', [s.metadata && s.metadata.order]);
       if (o) await markPaid(o, 'stripe', s.payment_intent || s.id, 'Card via Stripe');
     }
-    res.json({ received: true });
-  } catch (e) { console.error('webhook', e); res.status(500).send('error'); }
+    if (ev.type === 'charge.dispute.created') { const d = ev.data.object; await recordDispute('stripe', d.payment_intent || d.charge, Number(d.amount) / 100, d.reason, d.id); }
+    await hookLog('stripe', ev.type, true, ''); res.json({ received: true });
+  } catch (e) { console.error('webhook', e); await hookLog('stripe', ev.type, false, e.message); res.status(500).send('error'); }
+}
+async function confirmoHook(req, res) {
+  const c = await I.cfg('confirmo'); if (!c) return res.status(400).send('not configured');
+  const raw = req.body.toString('utf8'); const sig = String(req.headers['bp-signature'] || '').toLowerCase();
+  const exp = require('crypto').createHash('sha256').update(raw + (c.callbackPassword || ''), 'utf8').digest('hex');
+  if (!c.callbackPassword || exp !== sig) { await hookLog('confirmo', 'bad signature', false, ''); return res.status(400).send('bad signature'); }
+  const inv = JSON.parse(raw);
+  const o = await db.one('SELECT * FROM orders WHERE code=$1 OR provider_ref=$2', [inv.reference || '', inv.id || '']);
+  if (o && inv.status === 'paid') await markPaid(o, 'confirmo', inv.id, 'Crypto via Confirmo');
+  if (o && ['expired', 'error', 'blocked'].includes(inv.status) && o.status === 'pending') await db.q("UPDATE orders SET meta = meta || $2 WHERE id=$1", [o.id, JSON.stringify({ cryptoStatus: inv.status })]);
+  await hookLog('confirmo', inv.status, true, inv.reference || inv.id); res.json({ ok: true });
+}
+async function recordDispute(provider, ref, amount, reason, id) {
+  const o = await db.one('SELECT * FROM orders WHERE provider_ref=$1 OR provider_ref LIKE $2', [ref, '%' + ref]);
+  await db.q("INSERT INTO kv(k,v) VALUES($1,$2) ON CONFLICT (k) DO UPDATE SET v=$2", ['dispute.' + id, JSON.stringify({ id, provider, order: o ? o.code : null, user: o ? o.user_id : null, amount, reason, status: 'open', opened: new Date().toISOString() })]);
+  I.alert('dispute', `:rotating_light: Chargeback opened: ${o ? o.code : ref} for $${amount} (${reason})`);
 }
 
 async function refund(actorId, code, note) {
   const o = await db.one('SELECT * FROM orders WHERE code=$1', [clean(code, 30)]);
   if (!o) bad('Order not found', 404);
   if (o.status !== 'paid') bad('Only paid orders can be refunded');
-  if (o.provider === 'stripe' && stripe && o.provider_ref) {
+  if (o.provider === 'stripe' && o.provider_ref) {
+    const stripe = await stripeClient(); if (!stripe) bad('Stripe is not connected, so this refund cannot be sent');
     const pi = o.provider_ref.startsWith('cs_') ? (await stripe.checkout.sessions.retrieve(o.provider_ref)).payment_intent : o.provider_ref;
     await stripe.refunds.create({ payment_intent: pi });
+  } else if (o.provider === 'tailoredpay' && o.provider_ref) {
+    const c = await I.cfg('tailoredpay'); if (!c) bad('TailoredPay is not connected, so this refund cannot be sent');
+    const r = await I.nmi(c, { type: 'refund', transactionid: o.provider_ref, amount: Number(o.total).toFixed(2) });
+    if (r.response !== '1') { const v = await I.nmi(c, { type: 'void', transactionid: o.provider_ref }); if (v.response !== '1') bad('The gateway refused the refund: ' + (r.responsetext || v.responsetext)); }
+  } else if (o.provider === 'confirmo') {
+    note = (note ? note + ' · ' : '') + 'Crypto refund: send it manually from Confirmo';
   }
   await db.q("UPDATE orders SET status='refunded', refunded_at=now(), meta = meta || $2 WHERE id=$1", [o.id, JSON.stringify({ refundNote: note || '' })]);
   // close accounts created by this order that have not traded
@@ -157,4 +219,4 @@ async function receipt(user, code) {
   <p>Status: ${e(o.status)}${o.pay_method ? ' · ' + e(o.pay_method) : ''}</p><p style="color:#666;font-size:13px">Evaluations and funded accounts are simulated trading accounts. Fees are not deposits and are not traded.</p><script>window.print&&setTimeout(()=>window.print(),300)</script>`;
 }
 
-module.exports = { enabled, mode, createOrder, createResetOrder, createActivationOrder, payOrder, getOrder, webhook, refund, receipt, markPaid };
+module.exports = { enabled, mode, methods, refreshMode, confirmoHook, hookLog, recordDispute, createOrder, createResetOrder, createActivationOrder, payOrder, getOrder, webhook, refund, receipt, markPaid };

@@ -19,6 +19,7 @@ const out = (f, s) => { fs.writeFileSync(path.join(DIST, f), s); console.log('bu
   const html = `${HEAD('Funded Sky', `<style>html,body{margin:0;background:#08080A}html[data-theme=light],html[data-theme=light] body{background:#F6F5F3}${css}
 .fsload{position:fixed;inset:0;display:grid;place-items:center;font:500 14px 'Mona Sans',system-ui;color:#9C9693}</style>`)}
 <body><div class="fsbo" id="fsbo"></div><div class="fsload" id="fsload">Loading your dashboard…</div>
+<script src="/static/pay.js"></script>
 <script>
 (function () {
   var t = 'dark'; try { t = localStorage.getItem('fs_theme') || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'); } catch (e) {}
@@ -48,7 +49,7 @@ ${js}
     var l = document.getElementById('fsload'); if (l) l.remove();
   }
   window.__FSrefresh = async function (keep) { var d = await load(); if (!d) return; window.__FS = d; mount(keep); };
-  load().then(function (d) { if (!d) return; window.__FS = d; mount({}); }).catch(function (e) { console.error(e); var l = document.getElementById('fsload'); if (l) l.innerHTML = 'Could not load your dashboard. <a href="" style="color:#7CC4FF">Try again</a>'; });
+  load().then(function (d) { if (!d) return; window.__FS = d; mount({}); FSPAY.boot({ email: d.ME.email, first: d.ME.first, last: d.ME.lastFull }); }).catch(function (e) { console.error(e); var l = document.getElementById('fsload'); if (l) l.innerHTML = 'Could not load your dashboard. <a href="" style="color:#7CC4FF">Try again</a>'; });
   var rt; addEventListener('resize', function () { clearTimeout(rt); rt = setTimeout(function () { if (window.__FS && (innerWidth <= MOB) !== mobileNow) mount({}); }, 200); });
   // live data: refresh balances every 60 seconds while the tab is visible
   setInterval(function () { if (document.visibilityState === 'visible' && !document.querySelector('.drw, .pal, input:focus, textarea:focus')) window.__FSrefresh(window.__FS_LAST_KEEP && window.__FS_LAST_KEEP()); }, 60000);
@@ -61,6 +62,7 @@ ${js}
 {
   const css = rd('rs.css'); const js = rd('tr_data.js') + rd('rs_app.js');
   out('reset.html', `${HEAD('Funded Sky: reset your account', `<style>html,body{margin:0;background:#08080A}${css}</style>`)}<body><div class="rs" id="rsroot" data-mobile="0"></div><div id="fsload" style="position:fixed;inset:0;display:grid;place-items:center;font:500 14px system-ui;color:#9C9693">Loading…</div>
+<script src="/static/pay.js"></script>
 <script>
 function startReset(root) {
 ${js}
@@ -85,7 +87,7 @@ for (const [src, dst] of Object.entries(DCP)) {
   const jsStart = s.indexOf('class Component'); const js = s.slice(jsStart, s.indexOf('</script>', jsStart));
   const helmNoFont = helm.replace(/<link[^>]+fonts\.googleapis[^>]+>/g, '');
   out(dst, `${HEAD(title.replace(/^Funded Sky( mobile)?( checkout)?:\s*/i, 'Funded Sky: '), helmNoFont)}<body><div id="dc-root"></div><template id="dc-tpl">${tpl}</template>
-<script src="/static/morphdom.js"></script><script src="/static/dc.js"></script><script src="/static/site.js"></script>
+<script src="/static/morphdom.js"></script><script src="/static/dc.js"></script><script src="/static/site.js"></script><script src="/static/pay.js"></script>
 <script>
 ${js}
 DC.mount(Component, { mobileLinks: false });

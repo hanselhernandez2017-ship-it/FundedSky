@@ -125,7 +125,7 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 <div class="fs-cta" style="display: flex; flex-direction: column; gap: 8px;">
 <sc-if value="{{ agreed }}" hint-placeholder-val="{{ true }}"><button type="button" onClick="{{ submit }}" disabled="{{ busy }}" style="width: 100%; border: 0; cursor: pointer; font: inherit; text-align: center; background: #FFFFFF; color: #111113; border-radius: 4px; padding: 14px; font-size: 15px; font-weight: 600; font-stretch: 112%; text-decoration: none;">{{ payLabel }}</button></sc-if>
 <sc-if value="{{ notAgreed }}" hint-placeholder-val="{{ false }}"><button type="button" disabled style="width: 100%; background: #26262A; color: #9C9693; border: 0; border-radius: 4px; padding: 14px; font: inherit; font-size: 15px; font-weight: 600; font-stretch: 112%;">{{ payLabel0 }}</button><p style="margin: 0; font-size: 12px; color: #9C9693; text-align: center;">Tick the box to agree to the rules and terms first.</p></sc-if>
-<sc-if value="{{ err }}"><p role="alert" style="margin: 10px 0 0; font-size: 13.5px; line-height: 19px; color: #F2777F;">{{ err }}</p></sc-if></div>
+<sc-if value="{{ err }}"><p role="alert" style="margin: 10px 0 0; font-size: 13.5px; line-height: 19px; color: #F2777F;">{{ err }}</p></sc-if><sc-if value="{{ fallback }}"><button type="button" onClick="{{ payBackup }}" style="width: 100%; margin-top: 10px; background: transparent; color: #F4F2F1; border: 1px solid #3A3A40; border-radius: 4px; padding: 13px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;">Pay With Backup Processor</button></sc-if></div>
 <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; font-size: 13px; color: #9C9693; border-top: 1px solid #26262A; padding-top: 16px;">
 <li style="display: flex; gap: 10px; align-items: center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7CC4FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"></path></svg>{{ trust1 }}</li>
 <li style="display: flex; gap: 10px; align-items: center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7CC4FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"></path></svg>{{ trust2 }}</li>
@@ -153,6 +153,7 @@ class Component extends DCLogic {
   }
   async componentDidMount() {
     const me = await FSX.me(); if (!me) { location.replace('/login?next=' + encodeURIComponent('/checkout/payment' + location.search)); return; }
+    FSPAY.config().then((cfg) => { this.setState({ cfg }); FSPAY.boot(me); });
     try {
       const [sum, boot] = await Promise.all([FSX.checkout.load(true), DC.api('/api/trader/boot').catch(() => null)]);
       if (sum.empty) { location.replace('/checkout'); return; }
@@ -161,19 +162,19 @@ class Component extends DCLogic {
     } catch (e) { this.setState({ me, err: e.message }); }
     if (DC.qs('canceled')) this.setState({ err: 'Payment was canceled. You can try again.' });
   }
-  async submit() {
+  async submit(backup) {
     const st = this.state; if (st.busy || !st.sum) return;
-    if (st.method === 'crypto') return this.setState({ err: 'Crypto checkout is coming soon. Use a card for now.' });
+    if (st.method === 'crypto') return this.setState({ err: '{{ cryptoNote }}' });
     if (st.method === 'apple' && st.sum.cat.payments === 'test') return this.setState({ err: 'Apple Pay is not available in test mode. Use the test card.' });
-    this.setState({ busy: true, err: '' });
-    try { location.href = await FSX.checkout.pay(st.sum, st); } catch (e) { this.setState({ busy: false, err: e.message }); }
+    this.setState({ busy: true, err: '', fallback: false }); st.backup = !!backup;
+    try { location.href = await FSX.checkout.pay(st.sum, st); } catch (e) { this.setState({ busy: false, err: e.message, fallback: !!e.fallback }); }
   }
   renderVals() {
-    const st = this.state; const sum = st.sum; const me = st.me || {}; const test = !sum || sum.cat.payments === 'test';
+    const st = this.state; const sum = st.sum; const me = st.me || {}; const cfg = st.cfg || { card: 'test' }; const test = cfg.card === 'test' && !cfg.live; const tp = cfg.card === 'tailoredpay';
     const defs = [
-      { id: 'card', label: test ? 'Test Card' : 'Card', sub: test ? 'Test mode, no real charge' : 'On our payment processor\'s secure page', isDefault: true },
-      { id: 'apple', label: 'Apple Pay or Google Pay', sub: test ? 'Available with live payments' : 'On the secure page', isDefault: false },
-      { id: 'crypto', label: 'Crypto', sub: 'Coming soon', isDefault: false }
+      { id: 'card', label: test ? 'Test Card' : 'Card', sub: test ? 'Test mode, no real charge' : tp ? 'Secure card window' : 'On our payment processor\'s secure page', isDefault: true },
+      { id: 'apple', label: 'Apple Pay or Google Pay', sub: cfg.card === 'stripe' || cfg.stripeBackup ? 'On Stripe\'s secure page' : 'Not available yet', isDefault: false },
+      { id: 'crypto', label: 'Crypto', sub: cfg.crypto ? 'USDC, USDT and more through Confirmo' : 'Not available yet', isDefault: false }
     ];
     const methods = defs.map((d) => { const sel = st.method === d.id; return Object.assign({}, d, { on: sel, bg: sel ? '#13202E' : '#111113', bd: sel ? '#7CC4FF' : '#26262A', pick: () => this.setState({ method: d.id, err: '' }) }); });
     const set = (k) => (e) => this.setState({ [k]: e.target.value, err: '' });
@@ -185,8 +186,10 @@ class Component extends DCLogic {
       ini: ((me.first || '')[0] || '') + ((me.last || '')[0] || ''), firstName: me.first || '', fullName: `${me.first || ''} ${me.last || ''}`, emailLine: `${me.email || ''}${me.country ? ' · ' + me.country : ''}`,
       activeLabel: st.n + (st.n === 1 ? ' Active Account' : ' Active Accounts'),
       sumTitle: sum ? sum.title : 'Loading…', sumSub: sum ? sum.sub : '', lines: sum ? sum.lines : [], total,
-      payLabel: st.busy ? 'Working…' : 'Pay ' + total, payLabel0: 'Pay ' + total, payShort: st.busy ? '…' : 'Pay', busy: st.busy, err: st.err, submit: () => this.submit(),
-      trust1: 'Your accounts appear in your dashboard as soon as payment clears', trust2: test ? 'Test mode: no real charge' : 'Card payments processed by Stripe',
+      payLabel: st.busy ? 'Working…' : 'Pay ' + total, payLabel0: 'Pay ' + total, payShort: st.busy ? '…' : 'Pay', busy: st.busy, err: st.err, submit: () => this.submit(), fallback: !!st.fallback, payBackup: () => this.submit(true),
+      secureNote: tp ? 'Press Pay and enter your card in the secure payment window. Funded Sky never sees your card number.' : 'You enter your card on our payment processor\'s secure page after you press Pay.',
+      cryptoNote: cfg.crypto ? 'Pay with USDC, USDT or other coins on Confirmo\'s secure page. Crypto payments are final.' : 'Crypto checkout is not available yet. Use a card.',
+      trust1: 'Your accounts appear in your dashboard as soon as payment clears', trust2: test ? 'Test mode: no real charge' : tp ? 'Cards processed securely by TailoredPay' : 'Card payments processed by Stripe',
       backHref: sum && sum.source === 'order' ? '/app/billing' : '/checkout', guestHref: '/logout?next=' + encodeURIComponent('/checkout/payment' + location.search)
     };
   }
