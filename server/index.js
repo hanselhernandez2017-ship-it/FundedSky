@@ -213,7 +213,7 @@ app.get('/reset-password', page('reset-password.html'));
 app.get('/verify-email', page('verify.html'));
 app.get('/reset', needPage(false), page('reset.html'));
 app.get(['/app', '/app/*'], needPage(false), page('app.html'));
-app.get(['/admin', '/admin/*'], needPage(true), (req, res) => { const b = ((req.params[0] || 'home').split('/')[0] || 'home').replace(/[^a-z]/g, ''); const f = path.join(DIST, 'admin', b + '.html'); res.sendFile(fs.existsSync(f) ? f : path.join(DIST, 'admin', 'ops.html')); });
+app.get(['/admin', '/admin/*'], needPage(true), (req, res) => { const b = ((req.params[0] || 'home').split('/')[0] || 'home').replace(/[^a-z]/g, ''); const f = path.join(DIST, 'admin', b + '.html'); if (fs.existsSync(f)) return res.sendFile(f); res.redirect('/admin/home'); });
 app.use((req, res) => res.status(404).sendFile(path.join(DIST, '404.html'), (e) => e && res.status(404).send('Not found')));
 
 const PORT = process.env.PORT || 3000;

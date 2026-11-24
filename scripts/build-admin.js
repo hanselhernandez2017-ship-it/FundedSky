@@ -64,5 +64,4 @@ ${js}
     const key = f.replace('_live.js', ''); if (built.includes(key)) continue;
     out('admin/' + key + '.html', page('Funded Sky Back Office', kit(f)));
   }
-  out('admin/ops.html', page('Funded Sky Operations', rd('viz.js') + rd('kit_a.js') + rd('ops.js') + rd('kit_b.js')));
 };

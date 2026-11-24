@@ -48,6 +48,14 @@ function router(h) {
     const pulseRows = await db.all(`SELECT floor(extract(epoch FROM now() - t)/60)::int m, count(*)::int n FROM (
       SELECT ts t FROM trades WHERE ts > now() - interval '60 minutes' UNION ALL SELECT created_at FROM orders WHERE created_at > now() - interval '60 minutes'
       UNION ALL SELECT created_at FROM users WHERE created_at > now() - interval '60 minutes' UNION ALL SELECT created_at FROM audit WHERE created_at > now() - interval '60 minutes') x GROUP BY 1`);
+    const T0 = "(date_trunc('day', now() AT TIME ZONE 'America/New_York') AT TIME ZONE 'America/New_York')";
+    live.geo = await db.all(`SELECT c country, sum(o)::int orders, sum(su)::int signups, sum(po)::int payouts, sum(li)::int logins, sum(tr)::int trades FROM (
+      SELECT u.country c, 1 o, 0 su, 0 po, 0 li, 0 tr FROM orders x JOIN users u ON u.id=x.user_id WHERE x.status='paid' AND x.paid_at >= ${T0}
+      UNION ALL SELECT country, 0, 1, 0, 0, 0 FROM users WHERE role='trader' AND created_at >= ${T0}
+      UNION ALL SELECT u.country, 0, 0, 1, 0, 0 FROM payouts x JOIN users u ON u.id=x.user_id WHERE x.requested_at >= ${T0}
+      UNION ALL SELECT u.country, 0, 0, 0, 1, 0 FROM (SELECT DISTINCT user_id FROM sessions WHERE seen_at >= ${T0}) s JOIN users u ON u.id=s.user_id WHERE u.role='trader'
+      UNION ALL SELECT u.country, 0, 0, 0, 0, count(*) FROM trades t JOIN accounts a ON a.id=t.account_id JOIN users u ON u.id=a.user_id WHERE t.ts >= ${T0} GROUP BY u.country
+    ) z WHERE c IS NOT NULL AND c <> '' GROUP BY c ORDER BY 1`);
     live.pulse = Array.from({ length: 60 }, (_, i) => { const r = pulseRows.find((x) => x.m === 59 - i); return r ? r.n : 0; });
     return {
       settings, disputes, lists, store: storeV, clicks, integrations, hooks, live, staffSessions: await db.all("SELECT s.user_id, s.ua, s.ip, s.created_at, s.seen_at FROM sessions s JOIN users u ON u.id=s.user_id WHERE u.role<>'trader' ORDER BY s.seen_at DESC LIMIT 100"), taxOn: await I.on('track1099'), contentDefault: require('./content-seed.json'),
