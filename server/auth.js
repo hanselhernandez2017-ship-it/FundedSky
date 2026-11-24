@@ -41,6 +41,7 @@ async function signup(req, res) {
   if (!emailOk(email)) bad('Enter a valid email address');
   if (pass.length < 8) bad('Use at least 8 characters for your password');
   if (!first || !last) bad('Enter your first and last name');
+  const rc = await db.one("SELECT v FROM kv WHERE k='list.countries'"); if (rc && (rc.v || []).some((c) => c.blocked && c.name === country)) bad('Funded Sky is not available in ' + country + ' yet.');
   if (await db.one('SELECT 1 FROM users WHERE email=$1', [email])) bad('An account with this email already exists. Log in instead.');
   const n = (await db.one("SELECT nextval('seq_tid') n")).n;
   let ref = null; const refCode = req.body.ref || parseCookies(req.headers.cookie).fs_ref; if (refCode) { const r = await db.one('SELECT id FROM users WHERE ref_code=$1', [clean(refCode, 40)]); ref = r ? r.id : null; }

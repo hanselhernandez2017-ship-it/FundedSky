@@ -150,7 +150,9 @@ async function redate(c, accountId, today) {
 let timer = null;
 function start() {
   if (timer || process.env.SIM_FEED === 'off') return;
-  timer = setInterval(() => { tick().catch((e) => console.error('sim tick', e.message)); }, 60000);
+  const run = () => tick().then((n) => db.q('INSERT INTO jobs_log(job,ok,detail) VALUES($1,true,$2)', ['feed.tick', n + ' trades'])).catch((e) => { console.error('sim tick', e.message); db.q('INSERT INTO jobs_log(job,ok,detail) VALUES($1,false,$2)', ['feed.tick', e.message]).catch(() => {}); });
+  timer = setInterval(run, 60000);
+  setInterval(() => db.q("DELETE FROM jobs_log WHERE created_at < now() - interval '3 days'").catch(() => {}), 3600000);
   setTimeout(() => tick().catch((e) => console.error('sim tick', e.message)), 3000);
 }
 module.exports = { start, tick, rollover, fastForward, ingestTrade, closeAccountDay, marketOpen, makeTrade };

@@ -15,6 +15,8 @@
     },
     async boot(user) {
       const c = await P.config();
+      const msgs = [].concat(c.maint ? [{ t: c.maint, tone: 'wa' }] : [], (c.announcements || []).filter((a) => a.where !== 'admin').map((a) => ({ t: a.title + (a.body ? ' · ' + a.body : ''), tone: a.tone || 'sk', link: a.link })));
+      if (msgs.length && !document.getElementById('fs-ann')) { const d = document.createElement('div'); d.id = 'fs-ann'; d.style.cssText = 'position:relative;z-index:60;font:500 13px "Mona Sans",system-ui;text-align:center'; d.innerHTML = msgs.map((m) => `<div style="padding:9px 16px;background:${m.tone === 'wa' ? '#3A2A10' : '#13202E'};color:${m.tone === 'wa' ? '#F2C46D' : '#A9D8FF'};border-bottom:1px solid #26262A">${String(m.t).replace(/[<>&]/g, '')}${m.link ? ` <a href="${String(m.link).replace(/"/g, '')}" style="color:inherit;text-decoration:underline">Learn more</a>` : ''}</div>`).join(''); document.body.prepend(d); }
       if (c.crisp) { window.$crisp = window.$crisp || []; window.CRISP_WEBSITE_ID = c.crisp; if (user && user.email) { window.$crisp.push(['set', 'user:email', [user.email]]); if (user.first) window.$crisp.push(['set', 'user:nickname', [user.first + ' ' + (user.last || '')]]); } P.loadScript('https://client.crisp.chat/l.js').catch(() => {}); }
       if (c.posthog && c.posthog.key) { const host = c.posthog.host || 'https://us.i.posthog.com'; P.loadScript(host.replace('.i.posthog', '-assets.i.posthog') + '/static/array.js').then(() => { if (window.posthog && window.posthog.init) { window.posthog.init(c.posthog.key, { api_host: host, person_profiles: 'identified_only' }); if (user && user.email) window.posthog.identify(user.email); } }).catch(() => {}); }
     },

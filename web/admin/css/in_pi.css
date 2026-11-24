@@ -1,6 +1,6 @@
 
 /* ===== plan profitability ===== */
-.lgd{display:inline-block;width:8px;height:8px;border-radius:2px;margin:0 4px 0 10px;vertical-align:0}.lr{background:rgba(124,196,255,.55)}.lp{background:rgba(242,196,109,.75)}.lc{background:#4A4A52}
+.lgd{display:inline-block;width:8px;height:8px;border-radius:2px;margin:0 4px 0 10px;vertical-align:0}.lr{background:rgba(124,196,255,.55)}.lp{background:rgba(242,196,109,.75)}
 .pbar{all:unset;box-sizing:border-box;display:block;width:100%;cursor:pointer;padding:12px;margin:-12px;border-radius:10px;transition:background .15s}.pbar:hover{background:#141416}.pbar:focus-visible{outline:2px solid var(--sky)}
 .cb.fg .pbar+.pbar{margin-top:4px}
 .pbh{display:flex;align-items:center;gap:10px;margin-bottom:10px}.pbh b{font-size:14px;font-weight:600}.pbh>b:last-child{margin-left:auto}

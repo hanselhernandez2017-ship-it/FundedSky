@@ -33,7 +33,7 @@ setInterval(() => hits.clear(), 10 * 60 * 1000).unref();
 
 const h = (fn) => async (req, res) => {
   try { const out = await fn(req, res); if (!res.headersSent) res.json(out || { ok: true }); }
-  catch (e) { const st = e instanceof HttpError ? e.status : e.status === 402 ? 402 : 500; if (st === 500) console.error(req.method, req.path, e); res.status(st).json({ error: st === 500 ? 'Something went wrong on our side. Try again.' : e.message, fallback: e.fallback || undefined }); }
+  catch (e) { const st = e instanceof HttpError ? e.status : e.status === 402 ? 402 : 500; if (st === 500) { console.error(req.method, req.path, e); db.q('INSERT INTO error_log(path,msg) VALUES($1,$2)', [req.method + ' ' + req.path, String(e.message || e).slice(0, 500)]).catch(() => {}); } res.status(st).json({ error: st === 500 ? 'Something went wrong on our side. Try again.' : e.message, fallback: e.fallback || undefined }); }
 };
 
 // ---------- public ----------
@@ -41,7 +41,8 @@ app.get('/api/health', h(async () => ({ ok: true, db: !!(await db.one('SELECT 1 
 app.get('/api/catalog', h(async () => { const c = await core.catalog(); return { plans: c.plans.filter((p) => p.active), evalRules: c.evalRules, evalCommon: c.evalCommon, fundedCommon: c.fundedCommon, fundedCaps: c.fundedCaps, instantRules: c.instantRules, instantCommon: c.instantCommon, instantCaps: c.instantCaps, addons: c.addons, resetPct: c.resetPct, bundles: c.bundles, promos: (c.promos || []).filter((p) => p.active && (!p.ends || p.ends >= new Date().toISOString().slice(0, 10))).map(({ code, name, pct, plans, starts, ends, desc }) => ({ code, name, pct, plans, starts, ends, desc })), payments: pay.mode() }; }));
 app.get('/api/public-config', h(async () => { const m = await pay.refreshMode(); const crisp = await I.cfg('crisp'); const ph = await I.cfg('posthog'); const ss = await I.cfg('sumsub');
   const kv2 = await db.all("SELECT k, v FROM kv WHERE k IN ('settings.flags','settings.maint')"); const g = (k) => (kv2.find((r) => r.k === k) || {}).v || {};
-  return { flags: g('settings.flags'), maint: g('settings.maint').on ? g('settings.maint').msg : '', card: m.card, stripeBackup: m.stripe && m.card !== 'stripe', crypto: m.crypto, live: m.live, tokenizationKey: m.tokenizationKey || '', gatewayUrl: m.gatewayUrl || '', crisp: crisp ? crisp.websiteId : '', posthog: ph ? { key: ph.projectKey, host: ph.host } : null, sumsub: !!ss }; }));
+  const ann = await db.one("SELECT v FROM kv WHERE k='list.announcements'"); const now = new Date().toISOString().slice(0, 10);
+  return { announcements: ((ann && ann.v) || []).filter((a) => a.live && (!a.ends || a.ends >= now)), flags: g('settings.flags'), maint: g('settings.maint').on ? g('settings.maint').msg : '', card: m.card, stripeBackup: m.stripe && m.card !== 'stripe', crypto: m.crypto, live: m.live, tokenizationKey: m.tokenizationKey || '', gatewayUrl: m.gatewayUrl || '', crisp: crisp ? crisp.websiteId : '', posthog: ph ? { key: ph.projectKey, host: ph.host } : null, sumsub: !!ss }; }));
 app.get('/api/me', h(async (req) => (req.user ? { user: { email: req.user.email, first: req.user.first, last: req.user.last, role: req.user.role, verified: req.user.verified, country: req.user.country } } : { user: null })));
 app.post('/api/auth/signup', limit(8, 60000), h((req, res) => auth.signup(req, res)));
 app.post('/api/auth/login', limit(10, 60000), h((req, res) => auth.login(req, res)));

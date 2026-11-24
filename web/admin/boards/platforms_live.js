@@ -1,0 +1,11 @@
+  // ===== Trading Platforms (live) =====
+  const PL = ['Tradovate', 'NinjaTrader', 'TradingView', 'Rithmic'];
+  function vOverview() { const A = L.accounts.filter((a) => ['active', 'passed'].includes(a.phase));
+    return `${ph('Trading Platforms', 'No trading platform is connected yet. Accounts trade on the simulated feed until one is.')}<div class="card m0" style="margin-bottom:14px;border-color:var(--wa)">${cb('<b>Not connected.</b> <span class="hint">When you sign with a platform or data provider, its keys go in Settings and live accounts move over. Until then, every account trades on the built-in simulated feed.</span>')}</div>
+      ${tiles(PL.map((p) => [p, num(A.filter((a) => a.platform === p).length), 'Open accounts', '', '']))}
+      <div class="card" style="margin-top:14px"><div class="ch"><h3>Platforms</h3></div>${table(['Platform', 'Connection', ['Open Accounts', 'num'], ['All Accounts', 'num']], PL.map((p) => [`<b>${p}</b>`, b('Not Connected', 'ret'), num(A.filter((a) => a.platform === p).length), num(L.accounts.filter((a) => a.platform === p).length)]))}</div>`; }
+  function vReady() { const P = L.accounts.filter((a) => a.phase === 'passed'); return `${ph('Ready to Fund', 'Passed evaluations waiting for a funded account. Fund them in Risk.')}<div class="card m0">${table(['Account', 'Trader', 'Plan', 'Platform', 'Passed'], P.map((a) => [XL('Risk', 'accounts?acct=' + a.id, `<span class="mono">${a.id}</span>`), esc(a.name), L.plan(a.plan).short + ' ' + L.K(a.size), esc(a.platform), L.dt(a.passed)]), { empty: 'None waiting.' })}</div>`; }
+  function vFeed() { const d = BO.daily || []; return `${ph('Simulated Feed', 'Trades placed on the practice feed each day.')}<div class="card m0">${cb(vbars(d.slice(-30).map((x) => [String(x.day).slice(5), x.n]), num, { h: 200 }))}</div>`; }
+  const APP = { title: 'Trading Platforms', stats: () => [['Connection', 'Not Connected', 'warnt'], ['Feed', 'Simulated']],
+    areas: [{ h: 'Platforms' }, { id: 'ov', n: 'Platforms', tabs: [['overview', 'Platforms']] }, { id: 'rd', n: 'Ready to Fund', tabs: [['ready', 'Ready to Fund']] }, { id: 'fd', n: 'Feed', tabs: [['feed', 'Simulated Feed']] }],
+    views: { overview: vOverview, ready: vReady, feed: vFeed }, route: () => {}, click: () => 0, drawer: () => null };

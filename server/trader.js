@@ -26,7 +26,7 @@ async function boot(user, sessToken, host) {
     db.all('SELECT * FROM orders WHERE user_id=$1 AND status<>$2 ORDER BY created_at DESC', [uid, 'canceled']),
     db.all('SELECT * FROM notifications WHERE user_id=$1 ORDER BY created_at DESC LIMIT 30', [uid]),
     db.all('SELECT * FROM tickets WHERE user_id=$1 ORDER BY updated_at DESC', [uid]),
-    db.all('SELECT m.*, u.first AS afirst FROM ticket_msgs m JOIN tickets t ON t.id=m.ticket_id LEFT JOIN users u ON u.id=m.author_id WHERE t.user_id=$1 ORDER BY m.created_at', [uid]),
+    db.all('SELECT m.*, u.first AS afirst FROM ticket_msgs m JOIN tickets t ON t.id=m.ticket_id LEFT JOIN users u ON u.id=m.author_id WHERE t.user_id=$1 AND m.internal=false ORDER BY m.created_at', [uid]),
     db.all('SELECT * FROM sessions WHERE user_id=$1 AND expires_at > now() ORDER BY seen_at DESC LIMIT 8', [uid]),
     db.all('SELECT * FROM points_log WHERE user_id=$1 ORDER BY created_at DESC LIMIT 40', [uid]),
     db.all('SELECT * FROM coupons WHERE user_id=$1 ORDER BY created_at DESC', [uid]),
