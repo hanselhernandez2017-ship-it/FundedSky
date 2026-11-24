@@ -89,7 +89,7 @@
       case 'search': S.pal = true; S.pq = ''; S.prof = false; S.bell = false; render(); setTimeout(() => { const n = root.querySelector('#palq'); if (n) n.focus(); }, 20); return;
       case 'palClose': if (ev.target !== el) return; S.pal = false; break;
       case 'palGo': S.pal = false; return;
-      case 'theme': S.theme = LIGHT() ? 'dark' : 'light'; try { localStorage.setItem('fs_theme', S.theme); } catch (e) { /* private mode */ } document.documentElement.dataset.theme = S.theme; break;
+      case 'theme': S.theme = LIGHT() ? 'dark' : 'light'; try { localStorage.setItem('fs_theme', S.theme); document.cookie = 'fs_theme=' + S.theme + '; Path=/; Max-Age=31536000; SameSite=Lax'; } catch (e) { /* private mode */ } document.documentElement.dataset.theme = S.theme; break;
       case 'bell': S.bell = !S.bell; S.prof = false; break;
       case 'readAll': NOTES.forEach((n) => S.read.add(n.id)); API('/api/notifications/read', { all: true }).catch(() => {}); break;
       case 'readOne': S.read.add(id); S.bell = false; { const n = NOTES.find((x) => x.id === id); if (n) API('/api/notifications/read', { id: n.nid }).catch(() => {}); } return;

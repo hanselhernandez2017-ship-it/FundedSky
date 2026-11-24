@@ -182,9 +182,10 @@ app.get('/', async (req, res) => {
   }
   res.redirect(req.user ? '/app' : '/checkout');
 });
-app.get('/checkout', page('checkout.html'));
-app.get('/checkout/payment', (req, res) => res.sendFile(path.join(DIST, req.user ? 'payment-member.html' : 'payment.html')));
-app.get('/checkout/confirmed', page('confirmed.html'));
+const themed = (f) => (req, res) => { const lt = /(?:^|;\s*)fs_theme=light/.test(req.headers.cookie || ''); const ff = typeof f === 'function' ? f(req) : f; res.setHeader('Vary', 'Cookie'); res.sendFile(path.join(DIST, lt ? ff.replace('.html', '-light.html') : ff)); };
+app.get('/checkout', themed('checkout.html'));
+app.get('/checkout/payment', themed((req) => (req.user ? 'payment-member.html' : 'payment.html')));
+app.get('/checkout/confirmed', themed('confirmed.html'));
 app.get('/login', (req, res, next) => (req.user && !req.query.next ? res.redirect(auth.STAFF.includes(req.user.role) && req.query.admin ? '/admin' : '/app') : next()), page('login.html'));
 app.get('/signup', page('signup.html'));
 const editable = (slug, f) => async (req, res) => {

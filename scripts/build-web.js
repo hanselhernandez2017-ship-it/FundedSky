@@ -23,7 +23,7 @@ const out = (f, s) => { fs.writeFileSync(path.join(DIST, f), s); console.log('bu
 <script>
 (function () {
   var t = 'dark'; try { t = localStorage.getItem('fs_theme') || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'); } catch (e) {}
-  document.documentElement.dataset.theme = t;
+  document.documentElement.dataset.theme = t; try { document.cookie = 'fs_theme=' + t + '; Path=/; Max-Age=31536000; SameSite=Lax'; } catch (e) {}
 })();
 function startTrader(root) {
 ${js}
@@ -78,15 +78,20 @@ ${js}
 
 // ---------- design-template pages (checkout and sign-in) ----------
 const DCP = { 'Main.dc.html': 'checkout.html', 'Payment.dc.html': 'payment.html', 'PaymentLoggedIn.dc.html': 'payment-member.html', 'Confirmed.dc.html': 'confirmed.html', 'Login.dc.html': 'login.html', 'SignUp.dc.html': 'signup.html', 'ForgotPassword.dc.html': 'forgot.html', 'ResetPassword.dc.html': 'reset-password.html', 'VerifyEmail.dc.html': 'verify.html' };
-for (const [src, dst] of Object.entries(DCP)) {
-  const s = fs.readFileSync(path.join(PAGES, src), 'utf8');
+// Checkout pages also get a light version that matches the trader's dashboard theme (chosen by the fs_theme cookie on the server).
+const LIGHTP = { 'Main.dc.html': 1, 'Payment.dc.html': 1, 'PaymentLoggedIn.dc.html': 1, 'Confirmed.dc.html': 1 };
+const { lighten } = require('./lighten');
+const THEME_JS = (want) => `<script>(function(){var t='dark';try{t=localStorage.getItem('fs_theme')||(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark')}catch(e){}document.documentElement.dataset.theme='${want}';var c=(document.cookie.match(/(?:^|; )fs_theme=([^;]*)/)||[])[1];if(c!==t){document.cookie='fs_theme='+t+'; Path=/; Max-Age=31536000; SameSite=Lax';if(t!=='${want}'&&!sessionStorage.getItem('fs_th_r')){sessionStorage.setItem('fs_th_r','1');location.reload();}}else{try{sessionStorage.removeItem('fs_th_r')}catch(e){}}})();</script>`;
+for (const [src0, dst0] of Object.entries(DCP).concat(Object.keys(LIGHTP).map((k) => [k + ':light', DCP[k].replace('.html', '-light.html')]))) {
+  const lightV = src0.endsWith(':light'); const src = src0.replace(':light', ''); const dst = dst0;
+  const s0 = fs.readFileSync(path.join(PAGES, src), 'utf8'); const s = lightV ? lighten(s0) : s0;
   const title = (s.match(/<title>([^<]*)<\/title>/) || [])[1] || 'Funded Sky';
   const body = s.slice(s.indexOf('<x-dc>') + 6, s.indexOf('</x-dc>'));
   const helm = (body.match(/<helmet>([\s\S]*?)<\/helmet>/) || [])[1] || '';
   const tpl = body.replace(/<helmet>[\s\S]*?<\/helmet>/, '');
   const jsStart = s.indexOf('class Component'); const js = s.slice(jsStart, s.indexOf('</script>', jsStart));
   const helmNoFont = helm.replace(/<link[^>]+fonts\.googleapis[^>]+>/g, '');
-  out(dst, `${HEAD(title.replace(/^Funded Sky( mobile)?( checkout)?:\s*/i, 'Funded Sky: '), helmNoFont)}<body><div id="dc-root"></div><template id="dc-tpl">${tpl}</template>
+  out(dst, `${HEAD(title.replace(/^Funded Sky( mobile)?( checkout)?:\s*/i, 'Funded Sky: '), (LIGHTP[src] ? THEME_JS(lightV ? 'light' : 'dark') : '') + helmNoFont)}<body><div id="dc-root"></div><template id="dc-tpl">${tpl}</template>
 <script src="/static/morphdom.js"></script><script src="/static/dc.js"></script><script src="/static/site.js"></script><script src="/static/pay.js"></script>
 <script>
 ${js}

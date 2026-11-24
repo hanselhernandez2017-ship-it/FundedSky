@@ -14,7 +14,7 @@
 /* Checkout: load the summary (cart, an existing order, or an activation fee) and pay */
 (function () {
   const M = (v) => FSX.money(v);
-  const lineOut = (l) => ({ label: l.label, amount: l.amount < 0 ? '−' + M(-l.amount) : M(l.amount), color: l.amount < 0 ? '#5FD39B' : l.kind === 'addon' ? '#9C9693' : '#D4CFCD' });
+  const lineOut = (l) => ({ label: l.label, amount: l.amount < 0 ? '−' + M(-l.amount) : M(l.amount), color: document.documentElement.dataset.theme === 'light' ? (l.amount < 0 ? '#139A63' : l.kind === 'addon' ? '#5E636C' : '#2B2E34') : (l.amount < 0 ? '#5FD39B' : l.kind === 'addon' ? '#9C9693' : '#D4CFCD') });
   FSX.checkout = {
     async load(member) {
       const cat = await FSX.loadCatalog();
