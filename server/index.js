@@ -186,8 +186,8 @@ const themed = (f) => (req, res) => { const lt = /(?:^|;\s*)fs_theme=light/.test
 app.get('/checkout', themed('checkout.html'));
 app.get('/checkout/payment', themed((req) => (req.user ? 'payment-member.html' : 'payment.html')));
 app.get('/checkout/confirmed', themed('confirmed.html'));
-app.get('/login', (req, res, next) => (req.user && !req.query.next ? res.redirect(auth.STAFF.includes(req.user.role) && req.query.admin ? '/admin' : '/app') : next()), page('login.html'));
-app.get('/signup', page('signup.html'));
+app.get('/login', (req, res, next) => (req.user && !req.query.next ? res.redirect(auth.STAFF.includes(req.user.role) && req.query.admin ? '/admin' : '/app') : next()), themed('login.html'));
+app.get('/signup', (req, res) => themed('signup.html')(req, res));
 const editable = (slug, f) => async (req, res) => {
   const pg = ((await db.one("SELECT v FROM kv WHERE k='content.pages'").catch(() => null)) || {}).v || {}; const p = pg[slug];
   if (!p || p.status !== 'Published' || !p.txt) return res.sendFile(path.join(DIST, f));
@@ -209,9 +209,9 @@ app.get('/refund-policy', editable('refund-policy', 'refund-policy.html'));
 app.get('/rules', editable('rules', 'terms.html'));
 app.get('/faq', editable('faq', 'terms.html'));
 app.get('/logout', async (req, res) => { await auth.logout(req, res); const n = String(req.query.next || '/login'); res.redirect(n.startsWith('/') && !n.startsWith('//') ? n : '/login'); });
-app.get('/forgot-password', page('forgot.html'));
-app.get('/reset-password', page('reset-password.html'));
-app.get('/verify-email', page('verify.html'));
+app.get('/forgot-password', (req, res) => themed('forgot.html')(req, res));
+app.get('/reset-password', (req, res) => themed('reset-password.html')(req, res));
+app.get('/verify-email', (req, res) => themed('verify.html')(req, res));
 app.get('/reset', needPage(false), (req, res, next) => themed('reset.html')(req, res, next));
 app.get(['/app', '/app/*'], needPage(false), page('app.html'));
 app.get(['/admin', '/admin/*'], needPage(true), (req, res) => { const b = ((req.params[0] || 'home').split('/')[0] || 'home').replace(/[^a-z]/g, ''); const f = path.join(DIST, 'admin', b + '.html'); if (fs.existsSync(f)) return res.sendFile(f); res.redirect('/admin/home'); });

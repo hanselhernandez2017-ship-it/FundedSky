@@ -83,7 +83,7 @@ ${js}
 // ---------- design-template pages (checkout and sign-in) ----------
 const DCP = { 'Main.dc.html': 'checkout.html', 'Payment.dc.html': 'payment.html', 'PaymentLoggedIn.dc.html': 'payment-member.html', 'Confirmed.dc.html': 'confirmed.html', 'Login.dc.html': 'login.html', 'SignUp.dc.html': 'signup.html', 'ForgotPassword.dc.html': 'forgot.html', 'ResetPassword.dc.html': 'reset-password.html', 'VerifyEmail.dc.html': 'verify.html' };
 // Checkout pages also get a light version that matches the trader's dashboard theme (chosen by the fs_theme cookie on the server).
-const LIGHTP = { 'Main.dc.html': 1, 'Payment.dc.html': 1, 'PaymentLoggedIn.dc.html': 1, 'Confirmed.dc.html': 1 };
+const LIGHTP = { 'Main.dc.html': 1, 'Payment.dc.html': 1, 'PaymentLoggedIn.dc.html': 1, 'Confirmed.dc.html': 1, 'Login.dc.html': 1, 'SignUp.dc.html': 1, 'ForgotPassword.dc.html': 1, 'ResetPassword.dc.html': 1, 'VerifyEmail.dc.html': 1 };
 for (const [src0, dst0] of Object.entries(DCP).concat(Object.keys(LIGHTP).map((k) => [k + ':light', DCP[k].replace('.html', '-light.html')]))) {
   const lightV = src0.endsWith(':light'); const src = src0.replace(':light', ''); const dst = dst0;
   const s0 = fs.readFileSync(path.join(PAGES, src), 'utf8'); const s = lightV ? lighten(s0) : s0;
