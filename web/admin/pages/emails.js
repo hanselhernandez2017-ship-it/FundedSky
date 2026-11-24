@@ -116,7 +116,7 @@ function startEmails(root) {
     edit: null, who: { q: '', f: 'all', row: -1 }, range: 30, toast: '',
     logs: { status: 'all', q: '', em: 'all', row: null },
     rules: Object.assign({ quiet: true, qFrom: '21:00', qTo: '08:00', capDay: '1', capWeek: '3', pauseMk: false, noMkAfterBreach: true, test: false, testTo: (BO.me || {}).email || '', failover: true }, F.st('emails.rules', {})),
-    brand: Object.assign({ address: (((BO.settings || {}).company || {}).address) || '[Company Address]', support: 'support@fundedsky.com', legal: 'All Funded Sky accounts trade in a simulated environment. Nothing in this email is investment advice.', x: 'x.com/fundedsky', ig: '', discord: 'discord.gg/[invite]' }, F.st('emails.brand', {})),
+    brand: Object.assign({ address: (((BO.settings || {}).company || {}).address) || '', support: 'support@fundedsky.com', legal: 'All Funded Sky accounts trade in a simulated environment. Nothing in this email is investment advice.', x: 'x.com/fundedsky', ig: '', discord: 'discord.gg/[invite]' }, F.st('emails.brand', {})),
     supp: F.st('emails.supp', []).map((x) => ({ a: x.a, k: x.k, why: x.why, d: x.at ? F.md(x.at) : x.d || '' })),
     focus: null, dom: null
   };
@@ -148,7 +148,7 @@ function startEmails(root) {
       </div>
       <div class="em-foot">
         <div>${e.mk ? '<u>Unsubscribe</u> · <u>Email Preferences</u>' : "You're getting this because you have a Funded Sky account. It's about your account, so it can't be turned off."}</div>
-        <div>Funded Sky · ${esc(S.brand.address)} · ${esc(S.brand.support)}</div>
+        <div>${['Funded Sky', S.brand.address, S.brand.support].filter((x) => x && !/^\[/.test(x)).map(esc).join(' · ')}</div>
         <div>${esc(S.brand.legal)}</div>
       </div></div>`;
   }

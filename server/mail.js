@@ -6,7 +6,7 @@ const I = require('./integrations');
 const DEFS = require('./emaildefs.json');
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const kv = async (k) => ((await db.one('SELECT v FROM kv WHERE k=$1', [k]).catch(() => null)) || {}).v;
-const BRAND0 = { address: '[Company Address]', support: 'support@fundedsky.com', legal: 'All Funded Sky accounts trade in a simulated environment. Nothing in this email is investment advice.' };
+const BRAND0 = { address: '', support: 'support@fundedsky.com', legal: 'All Funded Sky accounts trade in a simulated environment. Nothing in this email is investment advice.' };
 const RULES0 = { quiet: true, qFrom: '21:00', qTo: '08:00', capDay: '1', capWeek: '3', pauseMk: false, noMkAfterBreach: true, test: false, testTo: '', failover: true };
 
 async function cfg() {
@@ -49,7 +49,7 @@ ${e.n2 ? `<div style="font-size:12.5px;color:${C.fa};line-height:1.5;margin-top:
 </div>
 <div style="border-top:1px solid ${C.ln2};padding:18px 26px 22px;font-size:11.5px;color:${C.fa};line-height:1.6">
 <div style="margin-bottom:6px">${e.mk ? `<a href="${esc(vars.unsub || '')}" style="color:${C.fa}">Unsubscribe</a> · <a href="${esc(vars.prefs || '')}" style="color:${C.fa}">Email Preferences</a>` : "You're getting this because you have a Funded Sky account. It's about your account, so it can't be turned off."}</div>
-<div style="margin-bottom:6px">Funded Sky · ${esc(brand.address)} · ${esc(brand.support)}</div><div>${esc(brand.legal)}</div></div>
+<div style="margin-bottom:6px">${['Funded Sky', brand.address, brand.support].filter((x) => x && !/^\[/.test(x)).map(esc).join(' · ')}</div><div>${esc(brand.legal)}</div></div>
 </div></div></body></html>`;
 }
 function text(e, vars) {
