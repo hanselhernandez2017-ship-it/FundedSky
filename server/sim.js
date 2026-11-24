@@ -33,6 +33,7 @@ function makeTrade(cat, a, when) {
 async function ingestTrade(c, a, t, day) {
   const cat = await core.catalog();
   const { a: na, events } = R.applyTrade(cat, a, t);
+  const swf = ((await c.one("SELECT v FROM kv WHERE k='store.risk.switches'")) || {}).v || {}; if (swf.freeze && na.phase === 'breached' && a.phase !== 'breached') { na.phase = a.phase; na.breached_at = null; na.breach_reason = null; na.halted_today = true; for (let i = events.length - 1; i >= 0; i--) if (events[i].type === 'breach') events.splice(i, 1); }
   await c.q('INSERT INTO trades(account_id,ts,day,instrument,side,qty,pnl,hold_min,tag) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)', [a.id, t.ts, day, t.instrument, t.side, t.qty, t.pnl, t.hold_min, t.tag]);
   await c.q('UPDATE accounts SET balance=$2, today_pnl=$3, halted_today=$4, phase=$5, breached_at=$6, breach_reason=$7 WHERE id=$1', [a.id, na.balance, na.today_pnl, na.halted_today, na.phase, na.breached_at || null, na.breach_reason || null]);
   for (const e of events) {
@@ -77,6 +78,7 @@ async function rollover() {
 async function tick() {
   await rollover();
   if (!marketOpen()) return 0;
+  const sw = ((await db.one("SELECT v FROM kv WHERE k='store.risk.switches'")) || {}).v || {}; if (sw.trading) return 0;
   const { h } = etParts();
   const busy = h >= 9 && h < 16 ? 1 : 0.25; // most trades in the US session
   const cat = await core.catalog();

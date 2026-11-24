@@ -62,14 +62,14 @@ app.post('/api/cart/price', h(async (req) => core.priceCart(req.body.items, { pr
 const T = express.Router(); T.use(auth.needUser);
 T.get('/trader/boot', h(async (req) => { const host = (process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`).replace(/^https?:\/\//, ''); return trader.boot(req.user, req.sess, host); }));
 const maintOn = async () => { const r = await db.one("SELECT v FROM kv WHERE k='settings.maint'"); return r && r.v.on ? r.v.msg : ''; };
-T.post('/orders', h(async (req) => { const m = await maintOn(); if (m) bad(m, 503); if (await auth.blockedReq(req, req.user.email)) bad('This purchase could not be completed. Contact support.', 403); return pay.createOrder(req.user, req.body); }));
+T.post('/orders', h(async (req) => { const m = await maintOn(); if (m) bad(m, 503); if (await auth.blockedReq(req, req.user.email)) bad('This purchase could not be completed. Contact support.', 403); { const sw = ((await db.one("SELECT v FROM kv WHERE k='store.risk.switches'")) || {}).v || {}; if (sw.sales) bad('New purchases are paused for a short time. Try again soon.', 503); } return pay.createOrder(req.user, req.body); }));
 T.post('/orders/reset', h((req) => pay.createResetOrder(req.user, req.body)));
 T.post('/orders/activation', h((req) => pay.createActivationOrder(req.user, req.body)));
 T.get('/orders/:code', h((req) => pay.getOrder(req.user, req.params.code, req.query.session_id)));
 T.post('/orders/:code/pay', h((req) => pay.payOrder(req.user, req.params.code, req.body)));
 T.get('/orders/:code/receipt', async (req, res) => { try { res.type('html').send(await pay.receipt(req.user, req.params.code)); } catch (e) { res.status(404).send('Not found'); } });
 T.post('/accounts/:id/agreement', h(async (req) => { const r = await core.signAgreement(req.user.id, req.params.id); if (r.activation) { const o = await pay.createActivationOrder(req.user, { account: req.params.id }); return { checkout: '/checkout/payment?order=' + o.code }; } return r; }));
-T.post('/payouts', h((req) => core.requestPayout(req.user.id, clean(req.body.account, 40), req.body.amount, parseInt(req.body.method, 10))));
+T.post('/payouts', h(async (req) => { const sw = ((await db.one("SELECT v FROM kv WHERE k='store.risk.switches'")) || {}).v || {}; if (sw.payouts) bad('Payout requests are paused for a short time. Try again later.', 503); return core.requestPayout(req.user.id, clean(req.body.account, 40), req.body.amount, parseInt(req.body.method, 10)); }));
 T.post('/payout-methods', h(async (req) => {
   const rail = ['Rise', 'USDC'].includes(req.body.rail) ? req.body.rail : 'Rise'; const railsOff = ((await db.one("SELECT v FROM kv WHERE k='store.finance.rails'")) || {}).v || {}; if (railsOff[rail.toLowerCase()] === false) bad(rail + ' payouts are not offered right now. Pick another method.'); const raw = clean(req.body.label, 120); if (raw.length < 4) bad('Enter your account or wallet details');
   if (rail === 'USDC' && !/^0x[a-fA-F0-9]{40}$/.test(raw)) bad('Enter a full wallet address that starts with 0x');
@@ -191,6 +191,6 @@ app.use((req, res) => res.status(404).sendFile(path.join(DIST, '404.html'), (e) 
 const PORT = process.env.PORT || 3000;
 migrate().then(() => {
   app.listen(PORT, () => console.log('Funded Sky listening on ' + PORT + (pay.enabled() ? ' (Stripe on)' : ' (test payments)')));
-  sim.start();
+  sim.start(); require('./riskscan').start();
 }).catch((e) => { console.error('Startup failed', e); process.exit(1); });
 module.exports = app;
