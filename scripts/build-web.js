@@ -58,10 +58,13 @@ ${js}
   out('app.html', html);
 }
 
+// ---------- light versions for the checkout flow ----------
+const { lighten } = require('./lighten');
+const THEME_JS = (want) => `<script>(function(){var t='dark';try{t=localStorage.getItem('fs_theme')||(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark')}catch(e){}document.documentElement.dataset.theme='${want}';var c=(document.cookie.match(/(?:^|; )fs_theme=([^;]*)/)||[])[1];if(c!==t){document.cookie='fs_theme='+t+'; Path=/; Max-Age=31536000; SameSite=Lax';if(t!=='${want}'&&!sessionStorage.getItem('fs_th_r')){sessionStorage.setItem('fs_th_r','1');location.reload();}}else{try{sessionStorage.removeItem('fs_th_r')}catch(e){}}})();</script>`;
 // ---------- reset checkout ----------
 {
   const css = rd('rs.css'); const js = rd('tr_data.js') + rd('rs_app.js');
-  out('reset.html', `${HEAD('Funded Sky: reset your account', `<style>html,body{margin:0;background:#08080A}${css}</style>`)}<body><div class="rs" id="rsroot" data-mobile="0"></div><div id="fsload" style="position:fixed;inset:0;display:grid;place-items:center;font:500 14px system-ui;color:#9C9693">Loading…</div>
+  const RESET = (th) => `${HEAD('Funded Sky: reset your account', THEME_JS(th) + `<style>html,body{margin:0;background:#08080A}${css}</style>`)}<body><div class="rs" id="rsroot" data-mobile="0"></div><div id="fsload" style="position:fixed;inset:0;display:grid;place-items:center;font:500 14px system-ui;color:#9C9693">Loading…</div>
 <script src="/static/pay.js"></script>
 <script>
 function startReset(root) {
@@ -73,15 +76,14 @@ ${js}
   window.__FS = await r.json(); var root = document.getElementById('rsroot'); root.dataset.mobile = innerWidth <= 760 ? '1' : '0';
   document.getElementById('fsload').remove(); startReset(root);
 })();
-</script></body></html>`);
+</script></body></html>`;
+  out('reset.html', RESET('dark')); out('reset-light.html', lighten(RESET('light')));
 }
 
 // ---------- design-template pages (checkout and sign-in) ----------
 const DCP = { 'Main.dc.html': 'checkout.html', 'Payment.dc.html': 'payment.html', 'PaymentLoggedIn.dc.html': 'payment-member.html', 'Confirmed.dc.html': 'confirmed.html', 'Login.dc.html': 'login.html', 'SignUp.dc.html': 'signup.html', 'ForgotPassword.dc.html': 'forgot.html', 'ResetPassword.dc.html': 'reset-password.html', 'VerifyEmail.dc.html': 'verify.html' };
 // Checkout pages also get a light version that matches the trader's dashboard theme (chosen by the fs_theme cookie on the server).
 const LIGHTP = { 'Main.dc.html': 1, 'Payment.dc.html': 1, 'PaymentLoggedIn.dc.html': 1, 'Confirmed.dc.html': 1 };
-const { lighten } = require('./lighten');
-const THEME_JS = (want) => `<script>(function(){var t='dark';try{t=localStorage.getItem('fs_theme')||(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark')}catch(e){}document.documentElement.dataset.theme='${want}';var c=(document.cookie.match(/(?:^|; )fs_theme=([^;]*)/)||[])[1];if(c!==t){document.cookie='fs_theme='+t+'; Path=/; Max-Age=31536000; SameSite=Lax';if(t!=='${want}'&&!sessionStorage.getItem('fs_th_r')){sessionStorage.setItem('fs_th_r','1');location.reload();}}else{try{sessionStorage.removeItem('fs_th_r')}catch(e){}}})();</script>`;
 for (const [src0, dst0] of Object.entries(DCP).concat(Object.keys(LIGHTP).map((k) => [k + ':light', DCP[k].replace('.html', '-light.html')]))) {
   const lightV = src0.endsWith(':light'); const src = src0.replace(':light', ''); const dst = dst0;
   const s0 = fs.readFileSync(path.join(PAGES, src), 'utf8'); const s = lightV ? lighten(s0) : s0;

@@ -212,7 +212,7 @@ app.get('/logout', async (req, res) => { await auth.logout(req, res); const n = 
 app.get('/forgot-password', page('forgot.html'));
 app.get('/reset-password', page('reset-password.html'));
 app.get('/verify-email', page('verify.html'));
-app.get('/reset', needPage(false), page('reset.html'));
+app.get('/reset', needPage(false), (req, res, next) => themed('reset.html')(req, res, next));
 app.get(['/app', '/app/*'], needPage(false), page('app.html'));
 app.get(['/admin', '/admin/*'], needPage(true), (req, res) => { const b = ((req.params[0] || 'home').split('/')[0] || 'home').replace(/[^a-z]/g, ''); const f = path.join(DIST, 'admin', b + '.html'); if (fs.existsSync(f)) return res.sendFile(f); res.redirect('/admin/home'); });
 app.use((req, res) => res.status(404).sendFile(path.join(DIST, '404.html'), (e) => e && res.status(404).send('Not found')));
