@@ -113,3 +113,7 @@
 .fsbo .pln .kv>div{gap:12px}
 .fsbo .pln .kv>div span{flex:none}
 @container (max-width:340px){.fsbo .pz[data-n="4"]{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* dropdown arrow: 14px in from the edge */
+.fsbo select{-webkit-appearance:none!important;-moz-appearance:none!important;appearance:none!important;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239C9693' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")!important;background-repeat:no-repeat!important;background-position:right 14px center!important;background-size:16px 16px!important;padding-right:42px!important;text-overflow:ellipsis;cursor:pointer}.fsbo select::-ms-expand{display:none}
+.fsbo.light select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%235E636C' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")!important;background-repeat:no-repeat!important;background-position:right 14px center!important;background-size:16px 16px!important;padding-right:42px!important;text-overflow:ellipsis;cursor:pointer}.fsbo.light select::-ms-expand{display:none}

@@ -60,11 +60,12 @@ ${js}
 
 // ---------- light versions for the checkout flow ----------
 const { lighten } = require('./lighten');
+const { SELECT_CSS } = require('./select-css');
 const THEME_JS = (want) => `<script>(function(){var t='dark';try{t=localStorage.getItem('fs_theme')||(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark')}catch(e){}document.documentElement.dataset.theme='${want}';var c=(document.cookie.match(/(?:^|; )fs_theme=([^;]*)/)||[])[1];if(c!==t){document.cookie='fs_theme='+t+'; Path=/; Max-Age=31536000; SameSite=Lax';if(t!=='${want}'&&!sessionStorage.getItem('fs_th_r')){sessionStorage.setItem('fs_th_r','1');location.reload();}}else{try{sessionStorage.removeItem('fs_th_r')}catch(e){}}})();</script>`;
 // ---------- reset checkout ----------
 {
   const css = rd('rs.css'); const js = rd('tr_data.js') + rd('rs_app.js');
-  const RESET = (th) => `${HEAD('Funded Sky: reset your account', THEME_JS(th) + `<style>html,body{margin:0;background:#08080A}${css}</style>`)}<body><div class="rs" id="rsroot" data-mobile="0"></div><div id="fsload" style="position:fixed;inset:0;display:grid;place-items:center;font:500 14px system-ui;color:#9C9693">Loading…</div>
+  const RESET = (th) => `${HEAD('Funded Sky: reset your account', THEME_JS(th) + `<style>html,body{margin:0;background:#08080A}${css}${SELECT_CSS(th === 'light' ? '5E636C' : '9C9693')}</style>`)}<body><div class="rs" id="rsroot" data-mobile="0"></div><div id="fsload" style="position:fixed;inset:0;display:grid;place-items:center;font:500 14px system-ui;color:#9C9693">Loading…</div>
 <script src="/static/pay.js"></script>
 <script>
 function startReset(root) {
@@ -93,7 +94,7 @@ for (const [src0, dst0] of Object.entries(DCP).concat(Object.keys(LIGHTP).map((k
   const tpl = body.replace(/<helmet>[\s\S]*?<\/helmet>/, '');
   const jsStart = s.indexOf('class Component'); const js = s.slice(jsStart, s.indexOf('</script>', jsStart));
   const helmNoFont = helm.replace(/<link[^>]+fonts\.googleapis[^>]+>/g, '');
-  out(dst, `${HEAD(title.replace(/^Funded Sky( mobile)?( checkout)?:\s*/i, 'Funded Sky: '), (LIGHTP[src] ? THEME_JS(lightV ? 'light' : 'dark') : '') + helmNoFont)}<body><div id="dc-root"></div><template id="dc-tpl">${tpl}</template>
+  out(dst, `${HEAD(title.replace(/^Funded Sky( mobile)?( checkout)?:\s*/i, 'Funded Sky: '), (LIGHTP[src] ? THEME_JS(lightV ? 'light' : 'dark') : '') + helmNoFont + `<style>${SELECT_CSS(lightV ? '5E636C' : '9C9693')}</style>`)}<body><div id="dc-root"></div><template id="dc-tpl">${tpl}</template>
 <script src="/static/morphdom.js"></script><script src="/static/dc.js"></script><script src="/static/site.js"></script><script src="/static/pay.js"></script>
 <script>
 ${js}

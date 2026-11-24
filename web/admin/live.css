@@ -1,3 +1,7 @@
 .fsbo .dots i.off{background:var(--fa)!important}
 .fsbo .upb i:not([class]),.fsbo .upb i[class=""]{background:var(--ln)}
 .fsbo .upb i.none{background:var(--ln)!important;opacity:.5}
+
+/* dropdown arrow: 14px in from the edge */
+select{-webkit-appearance:none!important;-moz-appearance:none!important;appearance:none!important;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239C9693' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")!important;background-repeat:no-repeat!important;background-position:right 14px center!important;background-size:16px 16px!important;padding-right:42px!important;text-overflow:ellipsis;cursor:pointer}select::-ms-expand{display:none}
+.light select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%235E636C' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")!important;background-repeat:no-repeat!important;background-position:right 14px center!important;background-size:16px 16px!important;padding-right:42px!important;text-overflow:ellipsis;cursor:pointer}.light select::-ms-expand{display:none}

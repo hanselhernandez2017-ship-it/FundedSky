@@ -1,0 +1,4 @@
+// One dropdown arrow for every <select>: a chevron 14px in from the right edge, with room for it in the padding.
+const chev = (hex) => `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23${hex}' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`;
+const SELECT_CSS = (hex = '9C9693', scope = '') => `${scope}select{-webkit-appearance:none!important;-moz-appearance:none!important;appearance:none!important;background-image:${chev(hex)}!important;background-repeat:no-repeat!important;background-position:right 14px center!important;background-size:16px 16px!important;padding-right:42px!important;text-overflow:ellipsis;cursor:pointer}${scope}select::-ms-expand{display:none}`;
+module.exports = { SELECT_CSS, chev };
