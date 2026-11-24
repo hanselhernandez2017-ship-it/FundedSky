@@ -66,7 +66,14 @@ function startRisk(root) {
   })();
   /*LIVE*/ const F = window.FSG; const BO = F.BO;
   const ME = F.me();
-  const RV2 = 'a second reviewer';
+  const RV2 = 'a second reviewer'; const SOLO_R = (BO.users || []).filter((u) => u.role && u.role !== 'trader').length < 2;
+  const caseCarry = (c) => { const d = c.decision || ''; const ts = (c.traders || []).map((n) => traders().find((x) => x.name === n)).filter(Boolean); const jobs = [];
+    ts.forEach((t) => { const uid = (t.accts[0] || {}).uid; const accts = t.accts.map((a) => a.id); if (!uid) return;
+      if (/^Warn/.test(d)) jobs.push(F.api('/users/' + uid + '/notify', { title: 'A note from the risk team', body: 'Some of your recent trading was reviewed. Please read the trading rules again. Repeating it can lead to closed accounts.' }));
+      if (/payouts/.test(d)) (BO.payouts || []).filter((p) => p.user === uid && ['requested', 'approved'].includes(p.status)).forEach((p) => jobs.push(F.api('/payouts/' + p.code + '/deny', { note: 'Denied after risk review ' + c.id })));
+      if (/^Close|^Ban/.test(d)) accts.forEach((a) => { const A = (BO.accounts || []).find((x) => x.id === a); if (A && !['breached', 'closed'].includes(A.phase)) jobs.push(F.api('/accounts/' + a + '/breach', { reason: 'Closed after risk review ' + c.id })); });
+      if (/^Ban/.test(d)) jobs.push(F.api('/users/' + uid, { status: 'banned' })); });
+    return Promise.all(jobs); };;
   const rng = (seed) => { let h = 2166136261; for (const ch of String(seed)) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return () => { h ^= h << 13; h ^= h >>> 17; h ^= h << 5; return ((h >>> 0) % 10000) / 10000; }; };
   const RULES = {}; Object.entries(BO.catalog.evalRules).forEach(([z, r]) => { RULES[z] = { target: r.target, daily: r.dll, dd: r.maxLoss, max: r.contracts }; });
   const PLANS = BO.catalog.plans.map((p) => [p.id, p.short, p.sizes.map((z) => z.size)]);
@@ -281,8 +288,8 @@ function startRisk(root) {
         return false; }
       case 'newCase': { const cid = 'CS-' + (89 + CASES.length - 3); CASES.unshift({ id: cid, title: '[New Case]', st: 'open', owner: ME, opened: F.md(new Date()), due: F.md(Date.now() + 3 * 864e5), traders: [], alerts: [], log: [['Just now', ME, 'Case opened.']], decision: '' }); S.drawer = { kind: 'case', id: cid }; return true; }
       case 'caseNote': { const t = v('#cnote'); if (!t) { toast('Write something first'); return 'noRender'; } CASES.find((c) => c.id === id).log.push(['Just now', ME, t]); return true; }
-      case 'caseDecide': { const c = CASES.find((x) => x.id === id); const d = v('#cdec'); c.decision = d; c.log.push(['Just now', ME, 'Decision: ' + d]); if (/Close|Ban/.test(d)) { c.st = 'second'; toast(`Sent to ${RV2} to confirm`); } else { c.st = 'decided'; toast('Decision recorded'); } audit(ME, 'Case decision', `${c.id} · ${d}`); return true; }
-      case 'caseConfirm': { const c = CASES.find((x) => x.id === id); c.st = 'decided'; c.log.push(['Just now', RV2, 'Confirmed the decision.']); audit(`${ME} and ${RV2}`, 'Case decided', `${c.id} · ${c.decision}`); toast('Confirmed and carried out'); return true; }
+      case 'caseDecide': { const c = CASES.find((x) => x.id === id); const d = v('#cdec'); c.decision = d; c.decidedBy = ME; c.log.push([F.md(new Date()), ME, 'Decision: ' + d]); if (/Close|Ban/.test(d)) { c.st = 'second'; toast(`Sent to ${RV2} to confirm`); } else { c.st = 'decided'; LV(caseCarry(c), /^No action/.test(d) ? 'Decision recorded' : 'Decision recorded and carried out'); } audit(ME, 'Case decision', `${c.id} · ${d}`); return true; }
+      case 'caseConfirm': { const c = CASES.find((x) => x.id === id); if (c.decidedBy === ME && !SOLO_R) { toast('Someone other than ' + ME + ' must confirm this'); return 'noRender'; } c.st = 'decided'; c.log.push([F.md(new Date()), ME, 'Confirmed the decision.']); audit(`${c.decidedBy || ME} and ${ME}`, 'Case decided', `${c.id} · ${c.decision}`); LV(new Promise((ok) => setTimeout(ok, 1200)).then(() => caseCarry(c)), 'Confirmed and carried out'); return true; }
       case 'tMatch': S.tf.sel = S.tf.sel === i ? null : i; return true;
       case 'tAlert': { const sel = TRADES[S.tf.sel]; const ms = TRADES.filter((t) => t !== sel && t.s === sel.s && t.trader !== sel.trader && Math.abs(t.sec - sel.sec) <= S.tf.win); const n = RA.reduce((m, x) => Math.max(m, +String(x.id).replace(/\D/g, '') || 0), 1000) + 1; const all = [sel, ...ms]; const uids = [...new Set(all.map((t) => (acct(t.acct) || {}).uid).filter(Boolean))];
         const na = { key: 'manual:' + n, id: 'RK-' + n, type: 'copy', sev: 'high', st: 'investigating', ag: ME, first: new Date().toISOString(), last: new Date().toISOString(), accts: [...new Set(all.map((t) => t.acct))], uids, traders: [...new Set(all.map((t) => t.trader))], sum: `Raised by hand from Trade Search: ${all.length} ${sel.s} trades within ${S.tf.win}s at ${hms(sel.sec)}.`, ev: { h: ['Time ET', 'Trader', 'Trade'], rows: all.map((t) => [hms(t.sec), t.trader, `${t.side} ${t.q} ${t.s}`]) }, rec: 'Check whether these traders match on other days too.' };
@@ -341,6 +348,10 @@ function startRisk(root) {
   setInterval(() => { const cur = JSON.stringify(COST); if (cur !== COST._last) { if (COST._last) F.put('risk.costs', JSON.parse(cur)).catch(() => {}); Object.defineProperty(COST, '_last', { value: cur, writable: true, enumerable: false }); } }, 1000);
   const COST_LABELS = { proc: ['Card Processing (%)', 'Of every payment'], procFix: ['Card Processing per Payment ($)', 'Fixed part of each charge'], platEval: ['Platform Fee per Evaluation ($)', 'Simulator seat for the evaluation'], platFunded: ['Platform Fee per Funded Account ($)', 'Per funded account, for its lifetime'], data: ['Market Data per Account ($)', 'Exchange data passed through'], kyc: ['Identity Check per Trader ($)', 'Charged per check'], affShare: ['Sales Through Affiliates (%)', 'Share of evaluation revenue'], affRate: ['Affiliate Commission (%)', 'Paid on the amount after discounts'], cbFee: ['Chargeback Fee ($)', 'Charged by the processor per dispute'] };
 
+  // Price Lab: put a draft price into the Checkout Catalog's draft, where it needs approval before it goes live
+  function labToCatalog(p, z, L) { const d = F.st('catalog.draft', null); const base = BO.catalog.version || 1; const price = +L.price || z.price;
+    if (d && d.base === base && d.s && d.s.plans) { const dp = d.s.plans.find((x) => x.id === p.id); const dz = dp && dp.sizes.find((y) => y.size === z.size); if (dz) dz.price = price; d.s.changes = [{ id: 'c' + Date.now().toString(36), area: 'Prices', text: `${p.name} ${K(z.size)} price from the Price Lab`, who: ME, when: F.md(new Date()), before: '$' + z.price, after: '$' + price, approve: true, approved: false }].concat(d.s.changes || []); F.put('catalog.draft', d).then(() => toast(`Draft price $${price} for ${p.name} ${K(z.size)} is in the Checkout Catalog. It needs approval there.`)).catch((x) => toast(x.message)); }
+    else F.put('catalog.labPrice', { plan: p.id, size: z.size, price, by: ME, at: new Date().toISOString() }).then(() => toast(`Saved $${price} for ${p.name} ${K(z.size)}. Open the Checkout Catalog to add it to the draft.`)).catch((x) => toast(x.message)); }
   // ---------- economics ----------
   function econ(p, z, over) {
     const c = Object.assign({}, z, over || {}); const k = IS.range / 90;
@@ -479,7 +490,7 @@ function startRisk(root) {
       case 'piToLab': IS.plan = id; IS.size = +k; S.view = 'pi_lab'; return true;
       case 'piSize': IS.size = +k; return true;
       case 'piLabReset': IS.lab = null; return true;
-      case 'piLabSend': { const p = curPlan(), z = curSize(); toast(`Draft price for ${p.name} ${K(z.size)} sent to the Checkout Catalog. It needs approval there.`); return 'noRender'; }
+      case 'piLabSend': { const p = curPlan(), z = curSize(); const L = IS.lab || {}; labToCatalog(p, z, L); return 'noRender'; }
       case 'piCostReset': Object.assign(COST, { proc: 4.2, procFix: 0.3, platEval: 7, platFunded: 85, data: 3.5, kyc: 1.9, affShare: 34, affRate: 15, cbFee: 25 }); toast('Costs reset'); return 'noRender';
       default: return false;
     }

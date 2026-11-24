@@ -25,6 +25,10 @@ function startInsights(root) {
   setInterval(() => { const cur = JSON.stringify(COST); if (cur !== COST._last) { if (COST._last) F.put('risk.costs', JSON.parse(cur)).catch(() => {}); Object.defineProperty(COST, '_last', { value: cur, writable: true, enumerable: false }); } }, 1000);
   const COST_LABELS = { proc: ['Card Processing (%)', 'Of every payment'], procFix: ['Card Processing per Payment ($)', 'Fixed part of each charge'], platEval: ['Platform Fee per Evaluation ($)', 'Simulator seat for the evaluation'], platFunded: ['Platform Fee per Funded Account ($)', 'Per funded account, for its lifetime'], data: ['Market Data per Account ($)', 'Exchange data passed through'], kyc: ['Identity Check per Trader ($)', 'Charged per check'], affShare: ['Sales Through Affiliates (%)', 'Share of evaluation revenue'], affRate: ['Affiliate Commission (%)', 'Paid on the amount after discounts'], cbFee: ['Chargeback Fee ($)', 'Charged by the processor per dispute'] };
 
+  // Price Lab: put a draft price into the Checkout Catalog's draft, where it needs approval before it goes live
+  function labToCatalog(p, z, L) { const d = F.st('catalog.draft', null); const base = BO.catalog.version || 1; const price = +L.price || z.price;
+    if (d && d.base === base && d.s && d.s.plans) { const dp = d.s.plans.find((x) => x.id === p.id); const dz = dp && dp.sizes.find((y) => y.size === z.size); if (dz) dz.price = price; d.s.changes = [{ id: 'c' + Date.now().toString(36), area: 'Prices', text: `${p.name} ${K(z.size)} price from the Price Lab`, who: ME, when: F.md(new Date()), before: '$' + z.price, after: '$' + price, approve: true, approved: false }].concat(d.s.changes || []); F.put('catalog.draft', d).then(() => toast(`Draft price $${price} for ${p.name} ${K(z.size)} is in the Checkout Catalog. It needs approval there.`)).catch((x) => toast(x.message)); }
+    else F.put('catalog.labPrice', { plan: p.id, size: z.size, price, by: ME, at: new Date().toISOString() }).then(() => toast(`Saved $${price} for ${p.name} ${K(z.size)}. Open the Checkout Catalog to add it to the draft.`)).catch((x) => toast(x.message)); }
   // ---------- economics ----------
   function econ(p, z, over) {
     const c = Object.assign({}, z, over || {}); const k = S.range / 90;
@@ -179,9 +183,9 @@ function startInsights(root) {
       case 'toLab': S.plan = id; S.size = +k; S.view = 'lab'; break;
       case 'size': S.size = +k; break;
       case 'labReset': S.lab = null; break;
-      case 'labSend': { const p = curPlan(), z = curSize(); toast(`Draft price for ${p.name} ${K(z.size)} sent to the Checkout Catalog. It needs approval there.`); return; }
+      case 'labSend': { const p = curPlan(), z = curSize(); labToCatalog(p, z, S.lab || {}); return; }
       case 'costReset': Object.assign(COST, { proc: 4.2, procFix: 0.3, platEval: 0, platFunded: 0, data: 0, kyc: 1.9, affShare: 0, affRate: 10, cbFee: 15 }); toast('Costs reset'); return;
-      case 'export': toast('Exported plan and size numbers as CSV'); return;
+      case 'export': { const rows = [['Plan', 'Size', 'Sold', 'Revenue', 'Payouts', 'Costs', 'Profit', 'Margin %', 'Profit per Sale']].concat(cells().map((c) => [c.p.name, c.z.size, c.z.sold, Math.round(c.e.revenue), Math.round(c.e.payouts), Math.round(c.e.costs != null ? c.e.costs : c.e.revenue - c.e.payouts - c.e.profit), Math.round(c.e.profit), Math.round(c.e.margin * 1000) / 10, Math.round(c.e.perSold)])); const q = (v) => (/[",\n]/.test(String(v)) ? '"' + String(v).replace(/"/g, '""') + '"' : String(v)); const a2 = document.createElement('a'); a2.href = URL.createObjectURL(new Blob([rows.map((r2) => r2.map(q).join(',')).join('\n')], { type: 'text/csv' })); a2.download = 'plan-insights.csv'; document.body.appendChild(a2); a2.click(); setTimeout(() => a2.remove(), 500); toast('Downloaded as CSV'); return; }
       default: return;
     }
     render();
