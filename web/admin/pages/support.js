@@ -64,131 +64,46 @@ function startSupport(root) {
       return `<div class="vzbub" style="height:${H}px"><div class="ar">${y0 < 0 ? `<div class="zero" style="top:${(y1 / (y1 - y0) * 100).toFixed(1)}%"></div>` : ''}${items.map((i) => { const s = 18 + Math.sqrt(i.v / mv) * 54; return `<div class="bb ${i.c || ''}" style="left:${((i.x - x0) / (x1 - x0) * 100).toFixed(1)}%;top:${((y1 - i.y) / (y1 - y0) * 100).toFixed(1)}%;width:${s.toFixed(0)}px;height:${s.toFixed(0)}px" title="${E(i.n)}: ${fx(i.x)} · ${fy(i.y)}"><span>${E(i.n)}</span></div>`; }).join('')}${[y1, 0, y0].filter((t, i) => i !== 2 || y0 < 0).map((t) => `<span class="yt" style="top:${((y1 - t) / (y1 - y0) * 100).toFixed(1)}%">${fy(t)}</span>`).join('')}${[0, 0.5, 1].map((f) => `<span class="xt" style="left:${(f * 100).toFixed(0)}%">${fx(x0 + (x1 - x0) * f)}</span>`).join('')}</div><div class="xl">${E(xl)}</div><div class="yl">${E(yl)}</div></div>`; }
     return { map, spark, heat, gauge, ring, flow, funnel, graph, bubbles, CC };
   })();
-  const ME = '[Your Name]';
-  const AGENTS = [
-    { id: 'me', name: ME, role: 'Lead', st: 'online', limit: 500, open: 0, solved: 64, frt: 14, csat: 96 },
-    { id: 'a2', name: '[Agent 2]', role: 'Agent', st: 'online', limit: 150, open: 0, solved: 81, frt: 11, csat: 94 },
-    { id: 'a3', name: '[Agent 3]', role: 'Agent', st: 'away', limit: 150, open: 0, solved: 58, frt: 19, csat: 92 },
-    { id: 'a4', name: '[Risk Reviewer]', role: 'Risk', st: 'online', limit: 0, open: 0, solved: 22, frt: 42, csat: 88 },
-    { id: 'a5', name: '[Agent 5]', role: 'Agent', st: 'offline', limit: 150, open: 0, solved: 47, frt: 16, csat: 95 }
-  ];
-  const CATS = { payouts: 'Payouts', breach: 'Breach Dispute', billing: 'Billing and Refunds', kyc: 'Identity Check', platform: 'Platform and Login', rules: 'Rules Question', account: 'Account Changes', affiliates: 'Affiliates', risk: 'Risk Flag' };
-  const CH = { email: 'Email', chat: 'Live Chat', discord: 'Discord' };
+  /*LIVE*/ const F = window.FSG; const BO = F.BO;
+  const ME = F.me();
+  const $m = (v) => '$' + Math.round(Number(v) || 0).toLocaleString('en-US');
+  const staff = BO.users.filter((u) => u.role !== 'trader');
+  const aid = (uid) => (uid == null ? null : +uid === BO.me.id ? 'me' : 'u' + uid);
+  const online = (uid) => (BO.staffSessions || []).some((s) => s.user_id === uid && F.within(s.seen_at, 15 / 1440)) ? 'online' : (BO.staffSessions || []).some((s) => s.user_id === uid && F.within(s.seen_at, 1 / 24)) ? 'away' : 'offline';
+  const frtOf = (uid) => { const v = BO.tickets.map((t) => { const m = t.msgs.find((x) => x.staff && !x.internal && x.by && staff.find((s) => s.id === uid && x.by.startsWith(s.first))); return m && F.within(t.created, 30) ? (new Date(m.at) - new Date(t.created)) / 6e4 : null; }).filter((x) => x != null).sort((a, b) => a - b); return v.length ? Math.round(v[Math.floor(v.length / 2)]) : 0; };
+  const SPS = F.st('support.agents', {});
+  const AGENTS = [BO.users.find((u) => u.id === BO.me.id) || { id: BO.me.id, first: BO.me.first, last: BO.me.last, role: BO.me.role }].concat(staff.filter((u) => u.id !== BO.me.id && ['admin', 'support', 'risk'].includes(u.role))).map((u) => ({ id: aid(u.id), uid: u.id, name: F.full(u), role: u.role === 'admin' ? 'Lead' : u.role === 'risk' ? 'Risk' : 'Agent', st: online(u.id), limit: (SPS[u.id] || {}).limit != null ? SPS[u.id].limit : (u.role === 'admin' ? 500 : u.role === 'risk' ? 0 : 150), open: 0, solved: BO.tickets.filter((t) => t.assignee === u.id && t.status === 'solved' && F.within(t.updated, 30)).length, frt: frtOf(u.id), csat: null }));
+  const CATS = { payouts: 'Payouts', breach: 'Breach Dispute', billing: 'Billing and Refunds', kyc: 'Identity Check', platform: 'Platform and Login', rules: 'Rules Question', account: 'Account Changes', affiliates: 'Affiliates', risk: 'Risk Flag', general: 'General' };
+  const catKey = (c) => { const e = Object.entries(CATS).find(([, v]) => v.toLowerCase() === String(c || '').toLowerCase()); return e ? e[0] : /breach/i.test(c) ? 'breach' : /payout/i.test(c) ? 'payouts' : /bill|refund/i.test(c) ? 'billing' : /ident|kyc/i.test(c) ? 'kyc' : /platform|login/i.test(c) ? 'platform' : /rule/i.test(c) ? 'rules' : /affil/i.test(c) ? 'affiliates' : /account/i.test(c) ? 'account' : 'general'; };
+  const CH = { email: 'Email', chat: 'Live Chat', discord: 'Discord', web: 'Dashboard' };
+  const chKey = (c) => (/chat/i.test(c) ? 'chat' : /discord/i.test(c) ? 'discord' : /email/i.test(c) ? 'email' : 'web');
   const PRI = { urgent: ['Urgent', 'var(--no)'], high: ['High', 'var(--wa)'], normal: ['Normal', 'var(--mu)'], low: ['Low', 'var(--fa)'] };
   const STS = { open: 'Open', pending: 'Waiting on Trader', hold: 'On Hold', solved: 'Solved' };
-
-  const TRADERS = {
-    t1043: { id: '1043', name: 'Jane D.', email: 'j***@gmail.com', country: 'United States', tz: 'ET', joined: 'Mar 2026', spend: 1248, orders: 6, kyc: 'Verified', payouts: [2, 3120], csat: 5, accts: [['FS-F-50K-2207', 'Funded · $50K', 'Active', '$51,840', '+$1,840'], ['FS-50K-10432', '[Plan B Name] $50K', 'Active', '$51,240', '+$1,240'], ['FS-25K-09811', '[Plan A Name] $25K', 'Closed', '$23,410', 'Drawdown']], flags: [] },
-    t1031: { id: '1031', name: 'Marcus T.', email: 'm***@outlook.com', country: 'United Kingdom', tz: 'GMT', joined: 'Aug 2026', spend: 612, orders: 3, kyc: 'Not Started', payouts: [0, 0], accts: [['FS-100K-10388', '[Plan B Name] $100K', 'Closed', '$96,912', 'Drawdown'], ['FS-50K-10201', '[Plan B Name] $50K', 'Active', '$50,420', '+$420']], flags: [] },
-    t1027: { id: '1027', name: 'Priya S.', email: 'p***@proton.me', country: 'India', tz: 'IST', joined: 'Oct 2026', spend: 169, orders: 1, kyc: 'Not Started', payouts: [0, 0], accts: [['FS-50K-10399', '[Plan B Name] $50K', 'Active', '$50,000', '$0']], flags: [] },
-    t1019: { id: '1019', name: 'Diego R.', email: 'd***@yahoo.com', country: 'Mexico', tz: 'CT', joined: 'Sep 2026', spend: 508, orders: 4, kyc: 'Verified', payouts: [0, 0], accts: [['FS-25K-10310', '[Plan A Name] $25K', 'Active', '$25,610', '+$610']], flags: [] },
-    t1012: { id: '1012', name: 'Amara O.', email: 'a***@gmail.com', country: 'Nigeria', tz: 'WAT', joined: 'Jun 2026', spend: 438, orders: 3, kyc: 'Rejected', payouts: [0, 0], accts: [['FS-50K-09870', '[Plan B Name] $50K', 'Passed', '$53,100', '+$3,100']], flags: [] },
-    t1008: { id: '1008', name: 'Kenji M.', email: 'k***@icloud.com', country: 'Japan', tz: 'JST', joined: 'Nov 2026', spend: 79, orders: 1, kyc: 'Not Started', payouts: [0, 0], accts: [['FS-25K-10421', '[Plan C Name] $25K', 'Active', '$25,000', '$0']], flags: [] },
-    t0996: { id: '0996', name: 'Sofia L.', email: 's***@gmail.com', country: 'Spain', tz: 'CET', joined: 'Feb 2026', spend: 2310, orders: 11, kyc: 'Verified', payouts: [4, 7480], accts: [['FS-F-100K-1984', 'Funded · $100K', 'Active', '$104,200', '+$4,200'], ['FS-100K-10011', '[Plan B Name] $100K', 'Passed', '$106,050', '+$6,050']], flags: [] },
-    t0988: { id: '0988', name: 'Liam K.', email: 'l***@hotmail.com', country: 'Canada', tz: 'ET', joined: 'Jul 2026', spend: 1184, orders: 7, kyc: 'Verified', payouts: [1, 960], accts: [['FS-50K-10290', '[Plan B Name] $50K', 'Active', '$50,880', '+$880'], ['FS-50K-10291', '[Plan B Name] $50K', 'Active', '$49,120', '−$880']], flags: ['Opposite trades on two accounts'] },
-    t0975: { id: '0975', name: 'Noah B.', email: 'n***@gmail.com', country: 'Australia', tz: 'AEST', joined: 'May 2026', spend: 357, orders: 2, kyc: 'Verified', payouts: [0, 0], accts: [['FS-50K-10414', '[Plan B Name] $50K', 'Active', '$50,000', 'Reset today']], flags: [] },
-    t0960: { id: '0960', name: '[Affiliate Name 2]', email: 'c***@gmail.com', country: 'United States', tz: 'PT', joined: 'Jan 2026', spend: 0, orders: 0, kyc: 'Verified', payouts: [0, 0], accts: [], flags: [], affiliate: 'TRADEWITHX' },
-    t0951: { id: '0951', name: 'Elena V.', email: 'e***@outlook.com', country: 'Germany', tz: 'CET', joined: 'Apr 2026', spend: 248, orders: 2, kyc: 'Not Started', payouts: [0, 0], accts: [['FS-25K-10102', '[Plan C Name] $25K', 'Cancelled', '$25,300', '+$300']], flags: [] },
-    t0942: { id: '0942', name: 'Omar H.', email: 'o***@yahoo.com', country: 'United Arab Emirates', tz: 'GST', joined: 'Sep 2026', spend: 259, orders: 1, kyc: 'Not Started', payouts: [0, 0], accts: [['FS-100K-10405', '[Plan B Name] $100K', 'Active', '$100,640', '+$640']], flags: [] }
-  };
-
-  // f: t trader · a agent · n internal note · s system
-  const TICKETS = [
-    { id: 4815, subj: "My account was closed but I never hit the drawdown", cat: 'breach', pri: 'urgent', st: 'open', ch: 'email', tr: 't1031', ag: 'me', sla: -12, age: '2h', review: 'BR-212', msgs: [
-      { f: 't', t: 'Today, 10:41 AM', b: "Hi, my $100K account FS-100K-10388 was closed this morning for max drawdown. My balance never went below $97,000 on my side. I think there's a mistake. Can someone check?" },
-      { f: 's', t: 'Today, 10:42 AM', b: 'Linked to breach review BR-212 automatically.' },
-      { f: 'n', who: ME, t: 'Today, 11:05 AM', b: 'Open position on NQ at 10:02 dipped to $96,912 before he closed it. Floor counts open P&L. Sending to the risk reviewer to confirm before we reply.' }
-    ] },
-    { id: 4830, subj: 'Reset paid but my balance is still the old one', cat: 'billing', pri: 'urgent', st: 'open', ch: 'chat', tr: 't0975', ag: null, sla: 6, age: '24m', msgs: [
-      { f: 't', t: 'Today, 12:18 PM', b: 'I paid $46.50 for the reset 20 minutes ago and Tradovate still shows the closed account. Market is open, I need to trade.' },
-      { f: 's', t: 'Today, 12:18 PM', b: 'Order FS-ORD-2302 paid. Reset job finished on our side at 12:01 PM. Platform sync shows Pending.' }
-    ] },
-    { id: 4816, subj: "Can't log in to Tradovate with the details you sent", cat: 'platform', pri: 'high', st: 'open', ch: 'email', tr: 't1027', ag: 'a2', sla: 18, age: '41m', msgs: [
-      { f: 't', t: 'Today, 12:01 PM', b: 'It says invalid credentials. I copied the username FS10399 exactly. Do I need a different server?' }
-    ] },
-    { id: 4817, subj: 'I was charged twice for one evaluation', cat: 'billing', pri: 'high', st: 'open', ch: 'email', tr: 't1019', ag: null, sla: 44, age: '1h', msgs: [
-      { f: 't', t: 'Today, 11:30 AM', b: 'My bank shows two charges of $99 on Nov 21 but I only have one account. Please refund one.' },
-      { f: 's', t: 'Today, 11:30 AM', b: 'Two payments found: FS-ORD-2287 (paid, account created) and FS-ORD-2288 (paid, no account: checkout was submitted twice).' }
-    ] },
-    { id: 4827, subj: "Rise payout hasn't arrived after 3 days", cat: 'payouts', pri: 'high', st: 'open', ch: 'email', tr: 't0996', ag: 'me', sla: 70, age: '3h', msgs: [
-      { f: 't', t: 'Today, 9:52 AM', b: 'My $2,140 payout was marked Sent on Nov 19 but nothing in Rise yet. Reference RISE-88102.' },
-      { f: 'a', who: ME, t: 'Today, 10:20 AM', b: "Hi Sofia, thanks for the reference. I've asked Rise to trace it and will update you today." },
-      { f: 'n', who: ME, t: 'Today, 10:21 AM', b: 'Opened a trace with Rise, case #R-5521.' }
-    ] },
-    { id: 4818, subj: 'Identity check rejected, my passport is valid', cat: 'kyc', pri: 'normal', st: 'open', ch: 'email', tr: 't1012', ag: null, sla: 132, age: '2h', msgs: [
-      { f: 't', t: 'Today, 10:40 AM', b: "I passed the evaluation and the identity check said my document didn't match. My passport is valid until 2031. My account name is my nickname, maybe that's why?" }
-    ] },
-    { id: 4819, subj: 'Is trading allowed during CPI tomorrow?', cat: 'rules', pri: 'normal', st: 'open', ch: 'chat', tr: 't1008', ag: null, sla: 9, age: '6m', msgs: [
-      { f: 't', t: 'Today, 12:36 PM', b: 'Can I hold a position through the CPI release tomorrow, or do I have to close it?' }
-    ] },
-    { id: 4821, subj: 'Consistency rule: why is my payout blocked?', cat: 'rules', pri: 'normal', st: 'pending', ch: 'email', tr: 't1043', ag: 'me', sla: null, age: '1d', msgs: [
-      { f: 't', t: 'Yesterday, 4:12 PM', b: 'I requested a payout and it says consistency rule not met. What does that mean?' },
-      { f: 'a', who: ME, t: 'Yesterday, 4:40 PM', b: 'Hi Jane, on funded accounts no single day can be more than 40% of total profit when you request a payout. Your best day is 52% right now. A couple more profitable days will bring it under 40%. Want me to show you the numbers?' }
-    ] },
-    { id: 4822, subj: 'Please move my account to NinjaTrader', cat: 'account', pri: 'normal', st: 'open', ch: 'discord', tr: 't0942', ag: null, sla: 210, age: '3h', msgs: [
-      { f: 't', t: 'Today, 9:40 AM', b: "Hey, I picked Tradovate by mistake. Can you switch FS-100K-10405 to NinjaTrader? I haven't traded much." }
-    ] },
-    { id: 4823, subj: 'Missing commission for 3 referrals', cat: 'affiliates', pri: 'low', st: 'open', ch: 'email', tr: 't0960', ag: null, sla: 600, age: '5h', msgs: [
-      { f: 't', t: 'Today, 7:50 AM', b: "Three of my followers bought with TRADEWITHX on Nov 18 but my dashboard only shows 18 uses, not 21." }
-    ] },
-    { id: 4825, subj: 'BLACKFRIDAY code says expired', cat: 'billing', pri: 'normal', st: 'open', ch: 'chat', tr: 't0951', ag: 'a2', sla: 22, age: '12m', msgs: [
-      { f: 't', t: 'Today, 12:30 PM', b: 'I tried BLACKFRIDAY at checkout and it says the code is not active.' }
-    ] },
-    { id: 4829, subj: 'Why are my two accounts flagged?', cat: 'risk', pri: 'high', st: 'hold', ch: 'email', tr: 't0988', ag: 'a4', sla: null, age: '1d', msgs: [
-      { f: 't', t: 'Yesterday, 2:05 PM', b: 'I got a warning email about my trades. I trade two accounts with different strategies, is that not allowed?' },
-      { f: 'n', who: '[Risk Reviewer]', t: 'Yesterday, 3:30 PM', b: 'Opposite positions on 10290 and 10291 within 2 seconds, 6 times on Nov 20. Matches hedging across accounts. Holding until the review is done.' }
-    ] },
-    { id: 4820, subj: "Refund please, I haven't placed any trade", cat: 'billing', pri: 'normal', st: 'open', ch: 'email', tr: 't0951', ag: null, sla: 300, age: '4h', msgs: [
-      { f: 't', t: 'Today, 8:55 AM', b: "I bought a $25K account yesterday but changed my mind. I haven't traded at all. Can I get a refund?" }
-    ] },
-    { id: 4824, subj: 'What time does the daily loss reset?', cat: 'rules', pri: 'low', st: 'solved', ch: 'discord', tr: 't1027', ag: 'a3', sla: null, age: '1d', csat: 5, msgs: [
-      { f: 't', t: 'Yesterday, 9:10 AM', b: 'When does the daily loss limit reset?' },
-      { f: 'a', who: '[Agent 3]', t: 'Yesterday, 9:14 AM', b: 'It resets at 5:00 PM ET every trading day.' }
-    ] },
-    { id: 4812, subj: 'When will my payout be approved?', cat: 'payouts', pri: 'normal', st: 'solved', ch: 'email', tr: 't1043', ag: 'me', sla: null, age: '2d', csat: 5, msgs: [
-      { f: 't', t: 'Nov 20, 9:02 AM', b: 'I requested my first payout yesterday. How long does approval take?' },
-      { f: 'a', who: ME, t: 'Nov 20, 9:30 AM', b: 'Hi Jane, your payout was approved this morning and goes out through Rise today.' }
-    ] },
-    { id: 4808, subj: 'How do I get my funded certificate?', cat: 'account', pri: 'low', st: 'solved', ch: 'chat', tr: 't0996', ag: 'a2', sla: null, age: '3d', csat: 4, msgs: [
-      { f: 't', t: 'Nov 19, 6:10 PM', b: 'Where can I download my certificate?' },
-      { f: 'a', who: '[Agent 2]', t: 'Nov 19, 6:12 PM', b: 'It is on your dashboard under Achievements, and we also emailed it to you.' }
-    ] }
-  ];
-
-  const MACROS = [
-    { id: 'm1', name: 'Breach Explained: Drawdown Counts Open Trades', cat: 'breach', uses: 41, body: "Hi {first_name}, thanks for reaching out. The max drawdown counts open positions too, not only closed trades. On {account}, an open position took the balance below the floor at the time shown in your dashboard, which ended the evaluation. I've attached the trade timeline. If you'd like to try again, you can reset this account from your dashboard." },
-    { id: 'm2', name: 'Payout Timeline', cat: 'payouts', uses: 63, body: "Hi {first_name}, payouts are reviewed within 1 to 2 business days. Once approved, Rise usually shows the money within a few hours. We'll email you at each step." },
-    { id: 'm3', name: 'Platform Login Steps', cat: 'platform', uses: 88, body: "Hi {first_name}, please log in at the platform's own login page with the username from your Your Evaluation Is Ready email, and choose the password on first login. If you still can't get in, reply with a screenshot of the error and we'll fix it right away." },
-    { id: 'm4', name: 'Duplicate Charge Refunded', cat: 'billing', uses: 17, body: "Hi {first_name}, you're right, checkout was submitted twice. I've refunded the second charge. Banks usually show it within 5 to 10 business days." },
-    { id: 'm5', name: 'Refund Policy: No Trades Placed', cat: 'billing', uses: 22, body: "Hi {first_name}, since no trades were placed on {account} and it's within 14 days, we can refund it. The account will be closed. I've started the refund now." },
-    { id: 'm6', name: 'Identity Check: Name Mismatch', cat: 'kyc', uses: 12, body: "Hi {first_name}, the identity check needs the name on your account to match your ID. I've updated your account name to match your passport. Please start the check again from your dashboard." },
-    { id: 'm7', name: 'News Rule', cat: 'rules', uses: 54, body: "Hi {first_name}, you can hold positions through high-impact news. The rule is that no new trades can be opened or closed in the 2 minutes before and after the release. The economic calendar on your dashboard shows each one." },
-    { id: 'm8', name: 'Consistency Rule', cat: 'rules', uses: 39, body: "Hi {first_name}, on funded accounts no single day can be more than 40% of total profit when you request a payout. Spreading profit across more days fixes it, and your dashboard shows your current share." },
-    { id: 'm9', name: 'Platform Switch Done', cat: 'account', uses: 15, body: "Hi {first_name}, {account} now runs on the new platform. Your new login is in the email we just sent. Your balance and trading days carried over." },
-    { id: 'm10', name: 'Promo Code Not Active Yet', cat: 'billing', uses: 9, body: "Hi {first_name}, that code starts on Nov 24 at midnight ET. If you buy before then, reply with your order number and we'll apply the difference once the sale starts." }
-  ];
-
-  const REVIEWS = [
-    { id: 'BR-212', tk: 4815, tr: 't1031', acct: 'FS-100K-10388', rule: 'Max Drawdown', limit: 'Floor $97,000', when: 'Nov 22, 10:02 AM ET', claim: 'Says the balance never went below $97,000.', st: 'open', first: null, trades: [['10:00:12', 'NQ', 'Buy', 2, '21,104.25', '—', '$97,840', '$97,000'], ['10:02:41', 'NQ', 'Open P&L', 2, '21,072.00', '−$928', '$96,912', '$97,000'], ['10:03:05', 'NQ', 'Sell', 2, '21,079.50', '−$990', '$96,850', 'Closed']] },
-    { id: 'BR-209', tk: 4801, tr: 't1043', acct: 'FS-25K-09811', rule: 'Max Drawdown', limit: 'Floor $23,500', when: 'Nov 18, 2:44 PM ET', claim: 'Asked for a second look at slippage on a stop order.', st: 'upheld', first: '[Risk Reviewer]', second: ME, trades: [['14:44:02', 'ES', 'Sell Stop', 1, '5,980.25', '−$412', '$23,410', '$23,500']] },
-    { id: 'BR-205', tk: 4790, tr: 't0996', acct: 'FS-100K-10011', rule: 'Daily Loss Limit', limit: '$2,200', when: 'Nov 15, 9:31 AM ET', claim: 'Platform froze during the open and the stop never filled.', st: 'reinstated', first: '[Risk Reviewer]', second: ME, trades: [['09:30:58', 'NQ', 'Buy', 3, '20,880.00', '—', '$104,100', '—'], ['09:31:40', 'NQ', 'Open P&L', 3, '20,842.50', '−$2,250', '$101,850', 'Limit hit']] }
-  ];
-
-  const ARTICLES = [
-    { id: 'h1', cat: 'Rules', t: 'How the Max Drawdown Works', views: 4820, help: 91, st: 'Published', up: 'Nov 12', body: 'The max drawdown is the lowest your balance can go, counting open trades. It follows your highest end-of-day balance and never moves down.' },
-    { id: 'h2', cat: 'Rules', t: 'The Daily Loss Limit', views: 3911, help: 88, st: 'Published', up: 'Nov 12', body: 'The daily loss limit is the most you can lose in one trading day, open and closed trades together. It resets at 5:00 PM ET.' },
-    { id: 'h3', cat: 'Rules', t: 'Trading Around High-Impact News', views: 2240, help: 84, st: 'Published', up: 'Nov 3', body: 'No new trades in the 2 minutes before and after high-impact releases. You can hold positions through them.' },
-    { id: 'h4', cat: 'Rules', t: 'The Consistency Rule for Payouts', views: 1890, help: 72, st: 'Published', up: 'Oct 28', body: 'When you request a payout, no single day can be more than 40% of total profit.' },
-    { id: 'h5', cat: 'Payouts', t: 'How and When You Get Paid', views: 3102, help: 93, st: 'Published', up: 'Nov 10', body: 'Payouts are reviewed in 1 to 2 business days and sent through Rise.' },
-    { id: 'h6', cat: 'Payouts', t: 'Setting Up Rise', views: 1450, help: 89, st: 'Published', up: 'Oct 30', body: 'Create your Rise account with the same email you use for Funded Sky.' },
-    { id: 'h7', cat: 'Platforms', t: 'Logging In to Tradovate', views: 2780, help: 81, st: 'Published', up: 'Nov 8', body: 'Use the username from your Your Evaluation Is Ready email and choose a password on first login.' },
-    { id: 'h8', cat: 'Platforms', t: 'Switching Platforms', views: 610, help: 86, st: 'Published', up: 'Oct 20', body: 'You can switch platform once per account before your first trade.' },
-    { id: 'h9', cat: 'Billing', t: 'Refund Policy', views: 1980, help: 77, st: 'Published', up: 'Nov 1', body: 'Accounts with no trades can be refunded within 14 days of purchase.' },
-    { id: 'h10', cat: 'Billing', t: 'Resets: What Happens to Your Account', views: 1320, help: 90, st: 'Published', up: 'Nov 5', body: 'A reset brings the account back to its starting balance with the same rules. Trading days start from zero.' },
-    { id: 'h11', cat: 'Getting Funded', t: 'Identity Check: What You Need', views: 990, help: 83, st: 'Published', up: 'Nov 2', body: 'A passport, ID card or driver’s license with the same name as your account, and a phone camera.' },
-    { id: 'h12', cat: 'Getting Funded', t: 'Activation Fee Explained', views: 540, help: 79, st: 'Draft', up: 'Nov 21', body: 'Some plans have a one-time activation fee when your funded account opens.' }
-  ];
-
+  const SET0 = F.st('support.settings', {});
+  const slaT = (p) => ((SET0.sla || {})[p] || { urgent: [15, 240], high: [60, 480], normal: [240, 1440], low: [480, 2880] }[p] || [240, 1440]);
+  const TRADERS = {}; const trOf = (uid) => { const k = 't' + uid; if (TRADERS[k]) return k; const u = F.user(uid) || { id: uid, first: 'Unknown', last: '' }; const ac = BO.accounts.filter((a) => a.user === uid); const pos = BO.payouts.filter((p) => p.user === uid && p.status === 'paid'); const aff = ((BO.lists && BO.lists.affiliates) || []).find((x) => x.user === uid && x.status === 'active');
+    TRADERS[k] = { id: u.tid || String(uid), uid, name: F.short(u), email: (u.email || '').replace(/^(.).*(@.*)$/, '$1***$2'), country: u.country || '—', tz: '—', joined: u.created_at ? new Date(u.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—', spend: F.sum(F.paid().filter((o) => o.user === uid).map((o) => o.total)), orders: BO.orders.filter((o) => o.user === uid && o.status !== 'pending').length, kyc: { verified: 'Verified', submitted: 'In Review', rejected: 'Rejected' }[u.kyc_status] || 'Not Started', payouts: [pos.length, F.sum(pos.map((p) => p.amount))], csat: null,
+      accts: ac.map((a) => [a.id, a.kind === 'funded' ? `Funded · ${F.K(a.size)}` : `${F.plan(a.plan).short} ${F.K(a.size)}`, ['active', 'review'].includes(a.phase) ? 'Active' : a.phase === 'passed' ? 'Passed' : 'Closed', $m(a.bal), a.phase === 'breached' ? (/daily/i.test(a.breach || '') ? 'Daily Loss' : 'Drawdown') : (a.bal - a.start >= 0 ? '+' : '−') + $m(Math.abs(a.bal - a.start))]),
+      flags: ((F.st('risk.alerts', [])).filter((x) => ['new', 'investigating'].includes(x.st) && (x.uids || []).includes(uid)).map((x) => x.sum)), affiliate: aff ? (aff.code || '').toUpperCase() : '' }; return k; };
+  const REVST = F.st('support.reviews', {});
+  const TICKETS = BO.tickets.map((t) => { const age = F.hoursSince(t.created) * 60; const pri = t.priority || 'normal'; const firstStaff = t.msgs.find((m) => m.staff && !m.internal); const lastTrader = [...t.msgs].reverse().find((m) => !m.staff);
+    const waitingSince = t.status === 'open' ? (lastTrader ? lastTrader.at : t.created) : null; const sla = waitingSince ? Math.round((firstStaff ? slaT(pri)[1] : slaT(pri)[0]) - F.hoursSince(waitingSince) * 60) : null;
+    const k = catKey(t.category); const br = k === 'breach' ? BO.accounts.filter((a) => a.user === t.user && a.phase === 'breached').sort((a, b) => new Date(b.breached) - new Date(a.breached))[0] : null;
+    return { id: t.id, subj: t.subject, cat: k, pri, st: t.status, ch: chKey(t.channel), tr: trOf(t.user), ag: aid(t.assignee), sla, age: age < 60 ? Math.max(1, Math.round(age)) + 'm' : age < 1440 ? Math.round(age / 60) + 'h' : Math.round(age / 1440) + 'd', review: br ? 'BR-' + t.id : null, msgs: t.msgs.map((m) => ({ f: m.internal ? 'n' : m.staff ? 'a' : 't', who: m.by || (m.staff ? 'Support' : ''), t: F.when(m.at), b: m.body })), raw: t }; });
+  AGENTS.forEach((a) => { a.open = TICKETS.filter((t) => t.ag === a.id && t.st !== 'solved').length; });
+  const MACROS = F.st('support.macros', null) || [
+    { id: 'm1', name: 'Breach Explained: Drawdown Follows End-of-Day Balance', cat: 'breach', uses: 0, body: "Hi {first_name}, thanks for reaching out. Your max loss floor follows your highest end-of-day balance. On {account}, the balance went below the floor at the time shown in your account history, so the account closed automatically. You can reset it from the account page." },
+    { id: 'm2', name: 'Payout Timeline', cat: 'payouts', uses: 0, body: "Hi {first_name}, payouts are reviewed within 1 to 2 business days. Once approved, Rise usually shows the money within a few hours. We'll email you at each step." },
+    { id: 'm3', name: 'Refund Policy: No Trades Placed', cat: 'billing', uses: 0, body: "Hi {first_name}, since no trades were placed on {account} and it's within 14 days, we can refund it. The account will be closed. I've started the refund now." },
+    { id: 'm4', name: 'Identity Check: Name Mismatch', cat: 'kyc', uses: 0, body: "Hi {first_name}, the identity check needs the name on your account to match your ID. Please update your name in Settings, then start the check again." },
+    { id: 'm5', name: 'News Rule', cat: 'rules', uses: 0, body: "Hi {first_name}, the economic calendar on your dashboard shows each high-impact release. Check your plan's rules for what is allowed around them." },
+    { id: 'm6', name: 'Consistency Rule', cat: 'rules', uses: 0, body: "Hi {first_name}, on funded accounts no single day can be more than the allowed share of total profit when you request a payout. Spreading profit across more days fixes it, and your dashboard shows your current share." },
+    { id: 'm7', name: 'Promo Code Not Active Yet', cat: 'billing', uses: 0, body: "Hi {first_name}, that code is not active yet. If you buy before it starts, reply with your order number and we'll help." }];
+  const REVIEWS = TICKETS.filter((t) => t.review).map((t) => { const a = BO.accounts.filter((x) => x.user === t.raw.user && x.phase === 'breached').sort((x, y) => new Date(y.breached) - new Date(x.breached))[0]; const rs = REVST[t.review] || {};
+    return { id: t.review, tk: t.id, tr: t.tr, acct: a.id, rule: /daily/i.test(a.breach || '') ? 'Daily Loss Limit' : 'Max Drawdown', limit: /daily/i.test(a.breach || '') ? $m(a.dll) : 'Floor ' + $m(a.floor), when: F.when(a.breached) + ' ET', claim: (t.msgs.find((m) => m.f === 't') || { b: t.subj }).b.slice(0, 200), st: rs.st || 'open', first: rs.first || null, second: rs.second || null, decision: rs.decision, note: rs.note || '', trades: [], uid: t.raw.user, raw: a }; });
+  REVIEWS.forEach((r) => F.api('/trades?account=' + encodeURIComponent(r.acct)).then((rows) => { r.trades = rows.slice(0, 14).reverse().map((t) => [F.time(t.ts), t.instrument, t.side, t.qty, '—', (t.pnl >= 0 ? '+' : '−') + $m(Math.abs(t.pnl)), '—', $m(r.raw.floor)]); if (typeof render === 'function' && S.view === 'reviews') render(); }).catch(() => {}));
+  const AV = F.st('support.articlestats', {});
+  const ARTICLES = (((BO.content || {}).articles) || BO.contentDefault.articles).map((a, i) => ({ id: 'h' + (i + 1), i, cat: a[0], t: a[1], views: (AV[a[1]] || {}).views || 0, help: (AV[a[1]] || {}).help == null ? 0 : AV[a[1]].help, st: a[3] === 'Draft' ? 'Draft' : 'Published', up: a[4] ? F.md(a[4]) : '—', body: a[2] || '' }));
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const XL = (board, hash, label, cls) => `<a class="${cls || 'lnk'}" href="Admin${board}.dc.html${hash ? '#' + hash : ''}">${label}</a>`;
   const money = (v) => '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: v % 1 ? 2 : 0, maximumFractionDigits: 2 });
@@ -200,11 +115,13 @@ function startSupport(root) {
   let seq = 4831; let tick = 0;
 
   const S = {
-    view: 'inbox', q: 'open', sel: 4815, search: '', sort: 'sla', mconv: false, ctx: false, toast: '', drawer: null,
-    compose: { mode: 'reply', text: '' }, review: 'BR-212', range: 30, helpCat: 'all', focus: null,
+    view: 'inbox', q: 'open', sel: (TICKETS.find((t) => t.st !== 'solved') || TICKETS[0] || {}).id, search: '', sort: 'sla', mconv: false, ctx: false, toast: '', drawer: null,
+    compose: { mode: 'reply', text: '' }, review: (REVIEWS[0] || {}).id, range: 30, helpCat: 'all', focus: null,
     set: { email: true, chatDash: true, chatCheckout: true, discord: true, h247: false, wk: ['08:00', '22:00'], we: ['10:00', '18:00'], sla: { urgent: [15, 240], high: [60, 480], normal: [240, 1440], low: [480, 2880] }, assign: 'round', maxOpen: '25', autoClose: '3', csat: true, afterHours: true, ahText: "Thanks for reaching out. We're offline right now and reply first thing at 8:00 AM ET. Risk alerts and payouts keep running.", linkReview: true, escalate: 'chargeback, lawyer, fraud, scam', route: { breach: 'Risk', risk: 'Risk', billing: 'Agents', payouts: 'Leads', kyc: 'Agents', platform: 'Agents', rules: 'Agents', account: 'Agents', affiliates: 'Leads' } }
   };
 
+  Object.assign(S.set, SET0); F.watch(() => S.set, 'support.settings'); F.watch(() => MACROS, 'support.macros');
+  const LV = (pr, ok) => pr.then(() => { toast(ok); setTimeout(() => location.reload(), 700); }).catch((e) => toast(e.message));
   // ---------- queues ----------
   const isOpen = (t) => t.st !== 'solved';
   const late = (t) => isOpen(t) && t.sla != null && t.sla < 15;
@@ -216,7 +133,7 @@ function startSupport(root) {
     return l.sort((a, b) => S.sort === 'new' ? b.id - a.id : S.sort === 'old' ? a.id - b.id : ((a.sla == null ? 1e6 : a.sla) - (b.sla == null ? 1e6 : b.sla)) || pr[a.pri] - pr[b.pri]); };
   const cur = () => TICKETS.find((t) => t.id === S.sel);
   const slaChip = (t) => t.sla == null || !isOpen(t) ? '' : t.sla < 0 ? `<span class="b err plain">Late ${mins(-t.sla)}</span>` : t.sla <= 30 ? `<span class="b draft plain">Due in ${mins(t.sla)}</span>` : `<span class="sla">Due in ${mins(t.sla)}</span>`;
-  const stats = () => { const o = TICKETS.filter(isOpen); return { open: o.length, un: o.filter((t) => !t.ag).length, late: o.filter((t) => t.sla != null && t.sla < 0).length, frt: '14m', solved: 38 + TICKETS.filter((t) => t.solvedNow).length, csat: 94 }; };
+  const stats = () => { const o = TICKETS.filter(isOpen); return { open: o.length, un: o.filter((t) => !t.ag).length, late: o.filter((t) => t.sla != null && t.sla < 0).length, frt: (() => { const v = TICKETS.map((t) => { const m = t.raw.msgs.find((x) => x.staff && !x.internal); return m && F.within(t.raw.created, 30) ? (new Date(m.at) - new Date(t.raw.created)) / 6e4 : null; }).filter((x) => x != null).sort((a, b) => a - b); return v.length ? mins(Math.round(v[Math.floor(v.length / 2)])) : '—'; })(), solved: TICKETS.filter((t) => t.st === 'solved' && F.today(t.raw.updated)).length, csat: '—' }; };
 
   // ---------- nav ----------
   const TOOLS = [['reviews', 'Breach Reviews'], ['macros', 'Saved Replies'], ['help', 'Help Center'], ['reports', 'Reports'], ['team', 'Team'], ['settings', 'Settings']];
@@ -298,32 +215,41 @@ function startSupport(root) {
   function vHelp() {
     const cats = ['all', ...new Set(ARTICLES.map((a) => a.cat))]; const l = ARTICLES.filter((a) => S.helpCat === 'all' || a.cat === S.helpCat);
     const views = ARTICLES.reduce((s, a) => s + a.views, 0); const help = Math.round(ARTICLES.reduce((s, a) => s + a.help, 0) / ARTICLES.length);
-    const asked = [['Reset paid, platform still shows old account', 14, 'billing'], ['Two charges for one evaluation', 9, 'billing'], ['Changing the name on my account', 7, 'kyc']];
+    const asked = (() => { const g = {}; TICKETS.filter((t) => F.within(t.raw.created, 7)).forEach((t) => { const k2 = t.subj.trim().toLowerCase().replace(/[?.!]+$/, ''); if (ARTICLES.some((a) => a.t.toLowerCase().includes(k2) || k2.includes(a.t.toLowerCase()))) return; (g[k2] = g[k2] || [t.subj.replace(/[?.!]+$/, ''), 0, t.cat])[1]++; }); return Object.values(g).sort((x, y) => y[1] - x[1]).slice(0, 5); })();
     return `<div class="ph"><div><h1>Help Center</h1><p>Articles traders read before they write to you. Shown at help.fundedsky.com and inside the chat widget.</p></div><div class="act"><button class="pill" data-act="editArticle" data-id="">+ New Article</button></div></div>
-      <div class="tiles"><div class="tile"><span>Articles</span><b>${ARTICLES.filter((a) => a.st === 'Published').length}</b><small>${ARTICLES.filter((a) => a.st === 'Draft').length} in draft</small></div><div class="tile"><span>Views</span><b>${views.toLocaleString('en-US')}</b><small>Last 30 days</small></div><div class="tile"><span>Found It Helpful</span><b>${help}%</b><small>Average across articles</small></div><div class="tile"><span>Questions Answered</span><b>1,240</b><small>Read an article, then didn't write in</small></div></div>
-      <div class="card"><div class="ch"><h3>Asked Often, No Article Yet</h3><span class="lab">From Tickets This Week</span></div><div class="tsc"><table class="t askt"><tbody>${asked.map(([q, n, c]) => `<tr><td><b>${esc(q)}</b></td><td class="nw hint">${n} Tickets</td><td class="num"><button class="lnk" data-act="draftFrom" data-k="${esc(q)}">Write Article</button></td></tr>`).join('')}</tbody></table></div></div>
+      <div class="tiles"><div class="tile"><span>Articles</span><b>${ARTICLES.filter((a) => a.st === 'Published').length}</b><small>${ARTICLES.filter((a) => a.st === 'Draft').length} in draft</small></div><div class="tile"><span>Views</span><b>${views.toLocaleString('en-US')}</b><small>Last 30 days</small></div><div class="tile"><span>Found It Helpful</span><b>${help}%</b><small>Average across articles</small></div><div class="tile"><span>Questions Answered</span><b>${ARTICLES.reduce((x, a) => x + (a.help || 0), 0).toLocaleString('en-US')}</b><small>Readers who marked an article helpful</small></div></div>
+      <div class="card"><div class="ch"><h3>Asked Often, No Article Yet</h3><span class="lab">From Tickets This Week</span></div><div class="tsc"><table class="t askt"><tbody>${asked.length ? '' : '<tr><td class="hint">Nothing repeated this week.</td></tr>'}${asked.map(([q, n, c]) => `<tr><td><b>${esc(q)}</b></td><td class="nw hint">${n} Ticket${n === 1 ? '' : 's'}</td><td class="num"><button class="lnk" data-act="draftFrom" data-k="${esc(q)}">Write Article</button></td></tr>`).join('')}</tbody></table></div></div>
       <div class="card"><div class="ch"><h3>Articles</h3><div class="r"><div class="seg">${cats.map((c) => `<button class="${S.helpCat === c ? 'on' : ''}" data-act="helpCat" data-k="${esc(c)}">${c === 'all' ? 'All' : esc(c)}</button>`).join('')}</div></div></div><div class="tsc"><table class="t"><thead><tr><th>Title</th><th>Section</th><th>Status</th><th class="num">Views</th><th class="num">Helpful</th><th>Updated</th></tr></thead><tbody>${l.map((a) => `<tr class="lk" data-act="editArticle" data-id="${a.id}"><td class="nw"><b>${esc(a.t)}</b></td><td class="nw">${esc(a.cat)}</td><td><span class="b ${a.st === 'Published' ? 'live' : 'draft'}">${a.st}</span></td><td class="num">${a.views.toLocaleString('en-US')}</td><td class="num ${a.help < 80 ? 'warnt' : ''}">${a.help}%</td><td class="nw">${a.up}</td></tr>`).join('')}</tbody></table></div></div>
       <p class="hint">Articles under 80% helpful are marked in amber. Rule amounts must match the live rule sets in the Checkout Catalog.</p>`;
   }
   // ---------- reports ----------
   function vReports() {
-    const k = S.range / 30; const r = rng('rep' + S.range); const n = S.range === 7 ? 7 : S.range === 30 ? 30 : 45; const vals = Array.from({ length: n }, () => 0.35 + r() * 0.65); const mx = Math.max(...vals);
-    const byCat = [['payouts', 312, '11m', '6h', 95], ['rules', 288, '9m', '2h', 96], ['platform', 241, '8m', '1h', 93], ['billing', 198, '13m', '9h', 91], ['breach', 96, '16m', '1d 4h', 71], ['kyc', 74, '18m', '14h', 88], ['account', 66, '12m', '5h', 95], ['risk', 21, '31m', '2d', 64], ['affiliates', 18, '42m', '1d', 90]];
-    return `<div class="ph"><div><h1>Reports</h1><p>How fast the team answers, what traders write about, and how happy they are with the answer.</p></div><div class="act"><div class="seg">${[7, 30, 90].map((d) => `<button class="${S.range === d ? 'on' : ''}" data-act="range" data-k="${d}">${d} Days</button>`).join('')}</div></div></div>
-      <div class="tiles t6"><div class="tile"><span>New Tickets</span><b>${Math.round(1314 * k).toLocaleString('en-US')}</b><small>${Math.round(43.8 * k * 30 / S.range)} a day</small></div><div class="tile"><span>Solved</span><b>${Math.round(1281 * k).toLocaleString('en-US')}</b><small>97% of new</small></div><div class="tile"><span>First Reply</span><b>14m</b><small>Median · target 1h</small></div><div class="tile"><span>Time to Solve</span><b>4h 20m</b><small>Median</small></div><div class="tile"><span>Satisfaction</span><b>94%</b><small>${Math.round(412 * k)} ratings</small></div><div class="tile"><span>Missed Targets</span><b class="bad">3.1%</b><small>Replies after the deadline</small></div></div>
-      <div class="two wl"><div class="card m0"><div class="ch"><h3>Tickets per Day</h3><span class="lab">Last ${S.range} Days</span></div><div class="cb"><div class="bars">${vals.map((v) => `<i style="height:${Math.round(v / mx * 100)}%"></i>`).join('')}</div></div></div>
-      <div class="card m0"><div class="ch"><h3>Channels</h3></div><div class="cb fg">${[['Email', 58], ['Live Chat', 34], ['Discord', 8]].map(([c, p]) => `<div><div class="rowl"><span>${c}</span><b>${p}%</b></div><div class="split"><i style="width:${p}%"></i></div></div>`).join('')}</div></div></div>
-      <div class="two" style="margin-top:14px"><div class="card m0"><div class="ch"><h3>Reply Targets</h3><span class="lab">Last ${S.range} days</span></div><div class="cb"><div class="gauges">${[[94, 'Replied within 1 hour'], [88, 'Solved within 24 hours'], [92, 'Happy with the answer']].map(([p, l]) => `<div class="cdn1">${VZ.ring(p, p + '%', '', { s: 96, c: p >= 90 ? 'var(--ok)' : 'var(--wa)' })}<span class="hint">${l}</span></div>`).join('')}</div></div></div>
-      <div class="card m0"><div class="ch"><h3>How Traders Feel</h3><span class="lab">From ratings and ticket wording, by week</span></div><div class="cb">${(() => { const v = [71, 74, 72, 76, 73, 69, 75, 78, 77, 80, 79, 82]; return `<div class="vzrow" style="margin-bottom:10px"><div class="mstat"><span>This Week</span><b>82 of 100</b></div><div class="mstat"><span>12 Weeks Ago</span><b>71 of 100</b></div></div>${VZ.spark(v, { h: 80, c: 'var(--ok)' })}<p class="hint" style="margin:8px 0 0">Dip in week 6 was the payout delay from ${XL('Health', 'incidents', 'incident INC-21')}.</p>`; })()}</div></div></div>
-      <div class="card" style="margin-top:14px"><div class="ch"><h3>When Tickets Come In</h3><span class="lab">Eastern Time · use this to plan shifts in ${XL('Team', 'members', 'Team')}</span></div><div class="cb">${(() => { const g = rng('spheat'); const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']; const hrs = Array.from({ length: 24 }, (_, h) => `${h % 12 || 12}${h < 12 ? 'a' : 'p'}`); const m = days.map((d, i) => hrs.map((_, h) => Math.round((h >= 9 && h <= 12 ? 8 : h >= 13 && h <= 17 ? 6 : h >= 18 && h <= 22 ? 4 : 1) * (i >= 5 ? 0.6 : i === 0 ? 1.3 : 1) * (0.7 + g() * 0.6)))); return VZ.heat(days, hrs, m, (v) => v + ' tickets', { skip: 3, cls: 'tall' }); })()}</div></div>
-      <div class="card" style="margin-top:14px"><div class="ch"><h3>By Topic</h3></div><div class="tsc"><table class="t"><thead><tr><th>Topic</th><th class="num">Tickets</th><th class="num">First Reply</th><th class="num">Time to Solve</th><th class="num">Satisfaction</th></tr></thead><tbody>${byCat.map(([c, v, f, s, cs]) => `<tr><td class="nw"><b>${CATS[c]}</b></td><td class="num">${Math.round(v * k)}</td><td class="num">${f}</td><td class="num">${s}</td><td class="num ${cs < 80 ? 'warnt' : ''}">${cs}%</td></tr>`).join('')}</tbody></table></div></div>
-      <div class="card"><div class="ch"><h3>By Person</h3></div><div class="tsc"><table class="t"><thead><tr><th>Name</th><th class="num">Solved</th><th class="num">First Reply</th><th class="num">Satisfaction</th></tr></thead><tbody>${AGENTS.map((a) => `<tr><td class="nw"><b>${esc(a.name)}</b></td><td class="num">${Math.round(a.solved * k * 4)}</td><td class="num">${a.frt}m</td><td class="num">${a.csat}%</td></tr>`).join('')}</tbody></table></div></div>
-      <p class="hint">Breach disputes and risk flags score lowest on satisfaction, as expected: most end with the closure upheld. Sample numbers.</p>`;
+    const W = S.range; const inW = (d) => F.within(d, W); const TT = TICKETS.filter((t) => inW(t.raw.created));
+    const fr = (t) => { const m = t.raw.msgs.find((x) => x.staff && !x.internal); return m ? (new Date(m.at) - new Date(t.raw.created)) / 6e4 : null; };
+    const sv = (t) => (t.st === 'solved' ? (new Date(t.raw.updated) - new Date(t.raw.created)) / 6e4 : null);
+    const med = (a) => { const v = a.filter((x) => x != null).sort((x, y) => x - y); return v.length ? v[Math.floor(v.length / 2)] : null; };
+    const fmt = (m) => (m == null ? '—' : m >= 1440 ? `${Math.floor(m / 1440)}d ${Math.round(m % 1440 / 60)}h` : mins(Math.round(m)));
+    const solved = TT.filter((t) => t.st === 'solved'); const frs = TT.map(fr); const late = TT.filter((t) => { const f = fr(t); return f != null && f > slaT(t.pri)[0]; }).length;
+    const n = Math.min(W, 45); const per = F.series(TT.map((t) => t.raw), 'created', null, n); const mx = Math.max(1, ...per);
+    const chs = {}; TT.forEach((t) => { chs[CH[t.ch]] = (chs[CH[t.ch]] || 0) + 1; }); const chT = Math.max(1, TT.length);
+    const in1h = TT.length ? TT.filter((t) => { const f = fr(t); return f != null && f <= 60; }).length / TT.length * 100 : 0; const s24 = TT.length ? TT.filter((t) => { const v = sv(t); return v != null && v <= 1440; }).length / TT.length * 100 : 0;
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']; const hrs = Array.from({ length: 24 }, (_, h) => `${h % 12 || 12}${h < 12 ? 'a' : 'p'}`); const hm = days.map(() => hrs.map(() => 0)); TT.forEach((t) => { const e = F.et(t.raw.created); hm[(e.getDay() + 6) % 7][e.getHours()]++; });
+    const byCat = Object.keys(CATS).map((c) => { const l = TT.filter((t) => t.cat === c); return [c, l.length, fmt(med(l.map(fr))), fmt(med(l.map(sv)))]; }).filter((x) => x[1]);
+    return `<div class="ph"><div><h1>Reports</h1><p>How fast the team answers and what traders write about.</p></div><div class="act"><div class="seg">${[7, 30, 90].map((d) => `<button class="${S.range === d ? 'on' : ''}" data-act="range" data-k="${d}">${d} Days</button>`).join('')}</div></div></div>
+      <div class="tiles t6"><div class="tile"><span>New Tickets</span><b>${TT.length.toLocaleString('en-US')}</b><small>${(TT.length / W).toFixed(1)} a day</small></div><div class="tile"><span>Solved</span><b>${solved.length.toLocaleString('en-US')}</b><small>${TT.length ? Math.round(solved.length / TT.length * 100) : 0}% of new</small></div><div class="tile"><span>First Reply</span><b>${fmt(med(frs))}</b><small>Median</small></div><div class="tile"><span>Time to Solve</span><b>${fmt(med(TT.map(sv)))}</b><small>Median</small></div><div class="tile"><span>Satisfaction</span><b>—</b><small>Ratings start when traders rate answers</small></div><div class="tile"><span>Missed Targets</span><b class="${late ? 'bad' : ''}">${TT.length ? (late / TT.length * 100).toFixed(1) : '0.0'}%</b><small>Replies after the deadline</small></div></div>
+      <div class="two wl"><div class="card m0"><div class="ch"><h3>Tickets per Day</h3><span class="lab">Last ${n} Days</span></div><div class="cb"><div class="bars">${per.map((v) => `<i style="height:${Math.max(2, Math.round(v / mx * 100))}%" title="${v} tickets"></i>`).join('')}</div></div></div>
+      <div class="card m0"><div class="ch"><h3>Channels</h3></div><div class="cb fg">${Object.entries(chs).sort((x, y) => y[1] - x[1]).map(([c, v]) => { const pc = Math.round(v / chT * 100); return `<div><div class="rowl"><span>${c}</span><b>${pc}%</b></div><div class="split"><i style="width:${pc}%"></i></div></div>`; }).join('') || '<div class="empty">No tickets yet.</div>'}</div></div></div>
+      <div class="two" style="margin-top:14px"><div class="card m0"><div class="ch"><h3>Reply Targets</h3><span class="lab">Last ${W} days</span></div><div class="cb"><div class="gauges">${[[Math.round(in1h), 'Replied within 1 hour'], [Math.round(s24), 'Solved within 24 hours']].map(([p2, l]) => `<div class="cdn1">${VZ.ring(p2, p2 + '%', '', { s: 96, c: p2 >= 90 ? 'var(--ok)' : 'var(--wa)' })}<span class="hint">${l}</span></div>`).join('')}</div></div></div>
+      <div class="card m0"><div class="ch"><h3>Open Tickets by Age</h3><span class="lab">Right now</span></div><div class="cb fg">${[['Under 1 hour', 0, 60], ['1 to 4 hours', 60, 240], ['4 to 24 hours', 240, 1440], ['Over a day', 1440, 1e9]].map(([l, lo, hi]) => { const v = TICKETS.filter((t) => t.st !== 'solved' && F.hoursSince(t.raw.created) * 60 >= lo && F.hoursSince(t.raw.created) * 60 < hi).length; return `<div><div class="rowl"><span>${l}</span><b>${v}</b></div><div class="split"><i style="width:${Math.min(100, v / Math.max(1, TICKETS.filter((t) => t.st !== 'solved').length) * 100)}%"></i></div></div>`; }).join('')}</div></div></div>
+      <div class="card" style="margin-top:14px"><div class="ch"><h3>When Tickets Come In</h3><span class="lab">Eastern Time · use this to plan shifts in ${XL('Team', 'members', 'Team')}</span></div><div class="cb">${VZ.heat(days, hrs, hm, (v) => v + ' tickets', { skip: 3, cls: 'tall' })}</div></div>
+      <div class="card" style="margin-top:14px"><div class="ch"><h3>By Topic</h3></div><div class="tsc"><table class="t"><thead><tr><th>Topic</th><th class="num">Tickets</th><th class="num">First Reply</th><th class="num">Time to Solve</th></tr></thead><tbody>${byCat.map(([c, v, f, s2]) => `<tr><td class="nw"><b>${CATS[c]}</b></td><td class="num">${v}</td><td class="num">${f}</td><td class="num">${s2}</td></tr>`).join('') || '<tr><td colspan="4" class="hint">No tickets in this period.</td></tr>'}</tbody></table></div></div>
+      <div class="card"><div class="ch"><h3>By Person</h3></div><div class="tsc"><table class="t"><thead><tr><th>Name</th><th class="num">Solved</th><th class="num">First Reply</th><th class="num">Open Now</th></tr></thead><tbody>${AGENTS.map((a2) => `<tr><td class="nw"><b>${esc(a2.name)}</b></td><td class="num">${TICKETS.filter((t) => t.ag === a2.id && t.st === 'solved' && inW(t.raw.updated)).length}</td><td class="num">${a2.frt ? mins(a2.frt) : '—'}</td><td class="num">${a2.open}</td></tr>`).join('')}</tbody></table></div></div>`;
   }
+
   // ---------- team ----------
   function vTeam() {
     return `<div class="ph"><div><h1>Team</h1><p>Who answers tickets, what they can do, and how much they can refund without a second person. Staff accounts and roles are managed in ${XL('Team', 'members', 'Team and Approvals')}.</p></div><div class="act"><button class="pill" data-act="invite">+ Invite Someone</button></div></div>
-      <div class="card"><div class="tsc"><table class="t"><thead><tr><th>Name</th><th>Role</th><th>Status</th><th class="num">Open Now</th><th class="num">Solved, 30 Days</th><th class="num">First Reply</th><th class="num">Satisfaction</th><th>Refund Limit ($)</th></tr></thead><tbody>${AGENTS.map((a, i) => `<tr><td class="nw"><b>${esc(a.name)}</b></td><td class="nw">${a.role}</td><td><select data-bind="ag.st" data-i="${i}" aria-label="Status" class="stsel">${[['online', 'Online'], ['away', 'Away'], ['offline', 'Offline']].map(([v, l]) => `<option value="${v}" ${a.st === v ? 'selected' : ''}>${l}</option>`).join('')}</select></td><td class="num">${TICKETS.filter((t) => isOpen(t) && t.ag === a.id).length}</td><td class="num">${a.solved * 4}</td><td class="num">${a.frt}m</td><td class="num">${a.csat}%</td><td><input type="number" min="0" value="${a.limit}" data-bind="ag.limit" data-i="${i}" aria-label="Refund limit"></td></tr>`).join('')}</tbody></table></div></div>
+      <div class="card"><div class="tsc"><table class="t"><thead><tr><th>Name</th><th>Role</th><th>Status</th><th class="num">Open Now</th><th class="num">Solved, 30 Days</th><th class="num">First Reply</th><th class="num">Satisfaction</th><th>Refund Limit ($)</th></tr></thead><tbody>${AGENTS.map((a, i) => `<tr><td class="nw"><b>${esc(a.name)}</b></td><td class="nw">${a.role}</td><td><select data-bind="ag.st" data-i="${i}" aria-label="Status" class="stsel">${[['online', 'Online'], ['away', 'Away'], ['offline', 'Offline']].map(([v, l]) => `<option value="${v}" ${a.st === v ? 'selected' : ''}>${l}</option>`).join('')}</select></td><td class="num">${TICKETS.filter((t) => isOpen(t) && t.ag === a.id).length}</td><td class="num">${a.solved * 4}</td><td class="num">${a.frt}m</td><td class="num">${a.csat == null ? '—' : a.csat + '%'}</td><td><input type="number" min="0" value="${a.limit}" data-bind="ag.limit" data-i="${i}" aria-label="Refund limit"></td></tr>`).join('')}</tbody></table></div></div>
       <div class="tiles t3">${[['Agent', 'Replies, free resets, platform switches, refunds up to their limit.'], ['Lead', 'Everything agents do, plus approving refunds over an agent\'s limit and editing saved replies.'], ['Risk', 'Breach reviews, account holds and risk flags. Can confirm another reviewer\'s decision.']].map(([r, d]) => `<div class="tile"><span>${r}</span><b style="font-size:16px;margin:6px 0 4px">${AGENTS.filter((a) => a.role === r).length} ${AGENTS.filter((a) => a.role === r).length === 1 ? 'Person' : 'People'}</b><small>${d}</small></div>`).join('')}</div>`;
   }
   // ---------- settings ----------
@@ -370,7 +296,7 @@ function startSupport(root) {
     const views = { reviews: vReviews, macros: vMacros, help: vHelp, reports: vReports, team: vTeam, settings: vSettings };
     const inbox = S.view === 'inbox'; const online = AGENTS.filter((a) => a.st === 'online').length;
     root.innerHTML = `<div class="tb"><a class="pill bk" href="AdminHome.dc.html" aria-label="Back to Admin">←<span class="lg"> Back to Admin</span></a><span class="tb-t">Support</span>
-      <div class="tb-mid hm"><div class="tb-stats"><div><span>Open</span><b>${st.open}</b></div><div><span>Unassigned</span><b>${st.un}</b></div><div><span>Late</span><b class="${st.late ? 'bad' : ''}">${st.late}</b></div><div><span>First Reply</span><b>${st.frt}</b></div><div><span>Solved Today</span><b>${st.solved}</b></div><div><span>Satisfaction</span><b>${st.csat}%</b></div></div></div>
+      <div class="tb-mid hm"><div class="tb-stats"><div><span>Open</span><b>${st.open}</b></div><div><span>Unassigned</span><b>${st.un}</b></div><div><span>Late</span><b class="${st.late ? 'bad' : ''}">${st.late}</b></div><div><span>First Reply</span><b>${st.frt}</b></div><div><span>Solved Today</span><b>${st.solved}</b></div><div><span>Satisfaction</span><b>${st.csat === '—' ? '—' : st.csat + '%'}</b></div></div></div>
       <div class="igs hm">${[['EM', 'Email', S.set.email], ['LC', 'Live Chat', S.set.chatDash || S.set.chatCheckout], ['DC', 'Discord', S.set.discord]].map(([m, l, on]) => `<button class="ig" data-act="go" data-v="settings" title="${l}: ${on ? 'on' : 'off'}" aria-label="${l}"><span>${m}</span><i style="background:${on ? 'var(--ok)' : 'var(--fa)'}"></i></button>`).join('')}<span class="onl"><i></i>${online} Online</span></div>
       <button class="pill" data-act="newTicket">+ New Ticket</button></div>
     <div class="body ${inbox ? 'inbox' : 'wide'} ${S.mconv ? 'mconv' : ''}"><div class="mnav"><select id="mnavsel" aria-label="Go to section">${mnavHtml()}</select></div><nav class="nav" aria-label="Support">${navHtml()}</nav>
@@ -398,18 +324,17 @@ function startSupport(root) {
       case 'sort': S.sort = k; break;
       case 'cmode': S.compose.mode = k; break;
       case 'send': { const txt = S.compose.text.trim(); if (!txt) { toast(k === 'note' ? 'Write a note first' : 'Write a reply first'); return; }
-        if (k === 'note') { t.msgs.push({ f: 'n', who: ME, t: 'Just now', b: txt }); S.compose.text = ''; S.scrollThread = true; toast('Note added'); return; }
-        t.msgs.push({ f: 'a', who: ME, t: 'Just now', b: txt }); if (!t.ag) t.ag = 'me'; t.sla = null;
-        if (k === 'solve') { t.st = 'solved'; t.solvedNow = true; if (S.set.csat) sysMsg(t, 'Solved by ' + ME + '. Rating request sent.'); } else t.st = 'pending';
-        S.compose = { mode: 'reply', text: '' }; S.scrollThread = true; toast(k === 'solve' ? `Sent to ${tr(t).name} and solved` : `Sent to ${tr(t).name}. Waiting on their reply.`); return; }
+        if (k === 'note') { LV(F.api('/tickets/' + t.id + '/note', { body: txt }), 'Note added'); return; }
+        LV(F.api('/tickets/' + t.id + '/reply', { body: txt, solve: k === 'solve' }), k === 'solve' ? `Sent to ${tr(t).name} and solved` : `Sent to ${tr(t).name}. Waiting on their reply.`); return; }
       case 'action': {
-        const T = tr(t); const acct = (T.accts[0] || [''])[0];
-        if (k === 'login') { if (!acct) { toast('No trading account'); return; } sysMsg(t, `${ME} resent the platform login for ${acct}.`); toast('Platform login sent'); return; }
-        if (k === 'pw') { sysMsg(t, `${ME} sent a password reset link.`); toast('Password reset link sent'); return; }
-        if (k === 'review') { if (t.review) { S.view = 'reviews'; S.review = t.review; break; } if (!acct) { toast('No trading account'); return; } const rid = 'BR-' + (213 + REVIEWS.length); REVIEWS.unshift({ id: rid, tk: t.id, tr: t.tr, acct, rule: 'Max Drawdown', limit: '—', when: 'Today', claim: t.subj, st: 'open', first: null, trades: [['—', '—', 'Waiting for the platform feed', '—', '—', '—', '—', '—']] }); t.review = rid; sysMsg(t, `Breach review ${rid} opened by ${ME}.`); toast(`Breach review ${rid} opened`); return; }
+        const T = tr(t); const acct = (T.accts.find((a) => a[2] === 'Active') || T.accts[0] || [''])[0];
+        if (k === 'login') { toast('Accounts trade on the simulated feed. There is no platform login to send yet.'); return; }
+        if (k === 'pw') { LV(F.api('/users/' + T.uid + '/reset-password', {}).then(() => F.api('/tickets/' + t.id + '/note', { body: `${ME} sent a password reset link.` })), 'Password reset link sent'); return; }
+        if (k === 'review') { if (t.review) { S.view = 'reviews'; S.review = t.review; break; } LV(F.api('/tickets/' + t.id + '/category', { category: 'Breach Dispute' }), 'Marked as a breach dispute'); return; }
+        const ords = BO.orders.filter((o) => o.user === T.uid && o.status === 'paid').map((o) => [o.code, (o.lines || []).map((l) => l.label).join(', ') || o.kind, o.total]);
+        if (k === 'refund' && !ords.length) { toast('This trader has no paid orders'); return; }
         if (!acct && k !== 'refund') { toast('No trading account'); return; }
-        const orders = t.cat === 'billing' && t.id === 4817 ? [['FS-ORD-2288', 'Duplicate, no account', 99], ['FS-ORD-2287', T.accts[0][1], 99]] : [['FS-ORD-' + (2200 + +T.id % 97), (T.accts[0] || ['', 'Order'])[1], T.id === '0975' ? 46.5 : 169]];
-        const f = { refund: { orders, order: orders[0][0], amount: orders[0][2], reason: t.id === 4817 ? 'dup' : 'notrade', close: t.id !== 4817 }, reset: { acct, reason: 'error' }, extend: { acct, days: '7' }, switch: { acct, plat: 'NinjaTrader' } }[k];
+        const f = { refund: { orders: ords, order: (ords[0] || [])[0], amount: (ords[0] || [])[2], reason: 'notrade', close: true }, reset: { acct, reason: 'error' }, extend: { acct, days: '7' }, switch: { acct, plat: 'NinjaTrader' } }[k];
         S.drawer = { kind: k, f }; break; }
       case 'closeDrw': S.drawer = null; break;
       case 'artSt': D.st = k; break;
@@ -417,17 +342,17 @@ function startSupport(root) {
       case 'delMacro': { const i = MACROS.findIndex((m) => m.id === D.id); MACROS.splice(i, 1); S.drawer = null; toast('Saved reply deleted'); return; }
       case 'goReview': S.view = 'reviews'; S.review = id; break;
       case 'pickReview': S.review = id; break;
-      case 'decide': { const r = REVIEWS.find((x) => x.id === S.review); r.decision = k; r.first = ME; r.note = S.rvnote || ''; r.st = 'second'; S.rvnote = ''; const tk = TICKETS.find((x) => x.id === r.tk); if (tk) { tk.msgs.push({ f: 'n', who: ME, t: 'Just now', b: `Proposed: ${k === 'reinstated' ? 'reinstate the account' : 'uphold the closure'}. Waiting for a second reviewer.` }); } toast('Sent to a second reviewer'); return; }
-      case 'confirmReview': { const r = REVIEWS.find((x) => x.id === S.review); r.st = r.decision; r.second = '[Risk Reviewer]'; const tk = TICKETS.find((x) => x.id === r.tk); if (tk) { tk.msgs.push({ f: 's', t: 'Just now', b: `${r.id} decided: ${r.st === 'reinstated' ? 'account reinstated' : 'closure upheld'}. Confirmed by [Risk Reviewer].` }); } toast(r.st === 'reinstated' ? 'Account reinstated. Reply to the trader from the ticket.' : 'Closure upheld. Reply to the trader from the ticket.'); return; }
-      case 'rejectReview': { const r = REVIEWS.find((x) => x.id === S.review); r.st = 'open'; r.first = null; toast('Sent back for another look'); return; }
+      case 'decide': { const r = REVIEWS.find((x) => x.id === S.review); LV(F.put('support.reviews', Object.assign({}, REVST, { [r.id]: { st: 'second', decision: k, first: ME, note: S.rvnote || '' } })).then(() => F.api('/tickets/' + r.tk + '/note', { body: `${ME} proposed: ${k === 'reinstated' ? 'reinstate' : 'uphold the closure'}. ${S.rvnote || ''}` })), 'Sent for a second reviewer'); S.rvnote = ''; return; }
+      case 'confirmReview': { const r = REVIEWS.find((x) => x.id === S.review); if (r.first === ME) { toast('A second reviewer must confirm'); return; } LV((r.decision === 'reinstated' ? F.api('/accounts/' + r.acct + '/reinstate', {}) : Promise.resolve()).then(() => F.put('support.reviews', Object.assign({}, REVST, { [r.id]: { st: r.decision, decision: r.decision, first: r.first, second: ME, note: r.note } }))).then(() => F.api('/tickets/' + r.tk + '/note', { body: `${r.id} decided: ${r.decision === 'reinstated' ? 'account reinstated' : 'closure upheld'} by ${r.first} and ${ME}.` })), r.decision === 'reinstated' ? 'Account reinstated' : 'Closure upheld'); return; }
+      case 'rejectReview': { const r = REVIEWS.find((x) => x.id === S.review); const v = Object.assign({}, REVST); delete v[r.id]; LV(F.put('support.reviews', v), 'Sent back for another look'); return; }
       case 'openTicket': S.view = 'inbox'; S.q = 'open'; S.sel = +id; S.mconv = true; S.scrollThread = true; if (!TICKETS.find((x) => x.id === +id)) { toast('That ticket is solved and archived'); S.sel = TICKETS[0].id; } break;
       case 'editMacro': { const m = MACROS.find((x) => x.id === id) || { id: '', name: '[New Saved Reply]', cat: 'rules', body: 'Hi {first_name}, ', uses: 0 }; S.drawer = { kind: 'macro', f: { ...m } }; break; }
-      case 'editArticle': { const x = ARTICLES.find((z) => z.id === id) || { id: '', t: '[New Article]', cat: 'Rules', body: '', st: 'Draft', views: 0, help: 0, up: 'Nov 22' }; S.drawer = { kind: 'article', f: { ...x } }; break; }
-      case 'draftFrom': S.drawer = { kind: 'article', f: { id: '', t: k, cat: 'Billing', body: '', st: 'Draft', views: 0, help: 0, up: 'Nov 22' } }; break;
+      case 'editArticle': { const x = ARTICLES.find((z) => z.id === id) || { id: '', t: '[New Article]', cat: 'Rules', body: '', st: 'Draft', views: 0, help: 0, up: F.md(new Date()) }; S.drawer = { kind: 'article', f: { ...x } }; break; }
+      case 'draftFrom': S.drawer = { kind: 'article', f: { id: '', t: k, cat: 'Billing', body: '', st: 'Draft', views: 0, help: 0, up: F.md(new Date()) } }; break;
       case 'helpCat': S.helpCat = k; break;
       case 'range': S.range = +k; break;
       case 'invite': S.drawer = { kind: 'invite', f: { email: '', role: 'Agent' } }; break;
-      case 'newTicket': S.drawer = { kind: 'new', f: { tr: 't1043', subj: '', cat: 'account', pri: 'normal', body: '' } }; break;
+      case 'newTicket': S.drawer = { kind: 'new', f: { tr: Object.keys(TRADERS)[0] || '', subj: '', cat: 'account', pri: 'normal', body: '' } }; break;
       case 'setT': S.set[k] = !S.set[k]; break;
       case 'setAssign': S.set.assign = k; break;
       default: return;
@@ -435,17 +360,18 @@ function startSupport(root) {
     render();
   });
   function saveDrawer() {
-    const { kind, f } = S.drawer; const t = cur();
-    if (kind === 'refund') { const amt = +f.amount || 0; if (!amt) { toast('Enter an amount'); return; } if (amt > agent('me').limit) { sysMsg(t, `Refund of ${money(amt)} on ${f.order} sent to a Lead for approval.`); toast('Sent for approval'); } else { sysMsg(t, `${ME} refunded ${money(amt)} on ${f.order}${f.close ? ' and closed the account' : ''}.`); toast(`Refunded ${money(amt)}`); } }
-    else if (kind === 'reset') { sysMsg(t, `${ME} gave a free reset on ${f.acct}.`); toast('Account reset'); }
-    else if (kind === 'extend') { sysMsg(t, `${ME} added ${f.days} days to ${f.acct}.`); toast(`${f.days} days added`); }
-    else if (kind === 'switch') { sysMsg(t, `${ME} moved ${f.acct} to ${f.plat}. Platform Switched email sent.`); toast(`Moved to ${f.plat}`); }
-    else if (kind === 'macro') { if (f.id) Object.assign(MACROS.find((m) => m.id === f.id), f); else MACROS.push({ ...f, id: 'm' + (++seq) }); toast('Saved reply saved'); }
-    else if (kind === 'article') { if (f.id) Object.assign(ARTICLES.find((x) => x.id === f.id), f, { up: 'Nov 22' }); else ARTICLES.push({ ...f, id: 'h' + (++seq) }); toast(f.st === 'Published' ? 'Article published' : 'Saved as a draft'); }
-    else if (kind === 'new') { if (!f.subj.trim()) { toast('Add a subject'); return; } const nid = ++seq; TICKETS.unshift({ id: nid, subj: f.subj, cat: f.cat, pri: f.pri, st: f.body ? 'pending' : 'open', ch: 'email', tr: f.tr, ag: 'me', sla: f.body ? null : S.set.sla[f.pri][0], age: 'Now', msgs: f.body ? [{ f: 'a', who: ME, t: 'Just now', b: f.body }] : [{ f: 's', t: 'Just now', b: `Ticket opened by ${ME}.` }] }); S.view = 'inbox'; S.q = 'open'; S.sel = nid; S.mconv = true; toast(`Ticket #${nid} created`); }
-    else if (kind === 'invite') { if (!/^\S+@\S+\.\S+$/.test(f.email)) { toast('Enter a full email address'); return; } toast(`Invite sent to ${f.email}`); }
+    const { kind, f } = S.drawer; const t = cur(); const note = (b) => F.api('/tickets/' + t.id + '/note', { body: b });
+    if (kind === 'refund') { const o = BO.orders.find((x) => x.code === f.order); if (!o) { toast('Pick an order'); return; } if (o.total > agent('me').limit) { LV(note(`Refund of ${money(o.total)} on ${f.order} needs a Lead. Asked by ${ME}.`).then(() => F.put('finance.refunds', F.st('finance.refunds', []).concat([{ order: o.code, reason: f.reason, ticket: t.id, by: ME, at: new Date().toISOString() }]))), 'Sent to Finance for approval'); S.drawer = null; return; } LV(F.api('/orders/' + o.code + '/refund', { note: 'Refunded from ticket #' + t.id }).then(() => note(`${ME} refunded ${money(o.total)} on ${o.code}.`)), `Refunded ${money(o.total)}`); S.drawer = null; return; }
+    if (kind === 'reset') { LV(F.api('/accounts/' + f.acct + '/reset', {}).then(() => note(`${ME} gave a free reset on ${f.acct}.`)), 'Account reset'); S.drawer = null; return; }
+    if (kind === 'extend') { toast('Evaluations have no time limit, so there is nothing to extend.'); S.drawer = null; render(); return; }
+    if (kind === 'switch') { toast('Platforms are not connected yet. Every account trades on the simulated feed.'); S.drawer = null; render(); return; }
+    if (kind === 'macro') { if (f.id) Object.assign(MACROS.find((m) => m.id === f.id), f); else MACROS.push({ ...f, id: 'm' + Date.now().toString(36) }); toast('Saved reply saved'); }
+    else if (kind === 'article') { const A = (((BO.content || {}).articles) || BO.contentDefault.articles).map((x) => x.slice()); const row = [f.cat, f.t, f.body, f.st, new Date().toISOString()]; const ex = ARTICLES.find((x) => x.id === f.id); if (ex) A[ex.i] = row; else A.push(row); S.drawer = null; LV(F.api('/content/articles', { value: A }, 'PUT'), f.st === 'Published' ? 'Article published' : 'Saved as a draft'); return; }
+    else if (kind === 'new') { if (!f.subj.trim()) { toast('Add a subject'); return; } const T = TRADERS[f.tr]; if (!T) { toast('Pick a trader'); return; } S.drawer = null; F.api('/tickets', { user: T.uid, subject: f.subj, category: CATS[f.cat], priority: f.pri, body: f.body }).then((r2) => { toast(`Ticket #${r2.id} opened`); setTimeout(() => { location.hash = 'inbox'; location.reload(); }, 700); }).catch((e) => toast(e.message)); return; }
+    else if (kind === 'invite') { S.drawer = null; location.href = '/admin/team#members'; return; }
     S.drawer = null; render();
   }
+
   root.addEventListener('input', (ev) => {
     const el = ev.target; const lv = el.dataset && el.dataset.live; if (!lv) return;
     if (lv === 'compose') { S.compose.text = el.value; return; }
@@ -460,8 +386,8 @@ function startSupport(root) {
     if (b === 'macro') { const m = MACROS.find((x) => x.id === el.value); if (m) { S.compose.text = (S.compose.text ? S.compose.text + '\n\n' : '') + fillMacro(m, t); m.uses += 1; S.compose.mode = 'reply'; S.focus = { k: 'cmp', s: S.compose.text.length }; } render(); return; }
     if (b === 'rvnote') { S.rvnote = el.value; return; }
     const p = b.split('.');
-    if (p[0] === 't') { const old = t[p[1]]; t[p[1]] = el.value || null; const lab = { st: 'Status', pri: 'Priority', ag: 'Assignee', cat: 'Topic' }[p[1]]; const val = p[1] === 'st' ? STS[el.value] : p[1] === 'pri' ? PRI[el.value][0] : p[1] === 'ag' ? (agent(el.value) || { name: 'Unassigned' }).name : CATS[el.value]; sysMsg(t, `${ME} changed ${lab.toLowerCase()} to ${val}.`); if (p[1] === 'st' && el.value === 'solved') t.solvedNow = true; void old; }
-    else if (p[0] === 'ag') { const a = AGENTS[+el.dataset.i]; a[p[1]] = p[1] === 'limit' ? +el.value : el.value; }
+    if (p[0] === 't') { const v = el.value || null; const pr = p[1] === 'st' ? F.api('/tickets/' + t.id + '/status', { status: v }) : p[1] === 'pri' ? F.api('/tickets/' + t.id + '/priority', { priority: v }) : p[1] === 'ag' ? F.api('/tickets/' + t.id + '/assign', { to: v ? (v === 'me' ? 'me' : +String(v).slice(1)) : null }) : F.api('/tickets/' + t.id + '/category', { category: CATS[v] }); LV(pr, 'Saved'); return; }
+    else if (p[0] === 'ag') { const a = AGENTS[+el.dataset.i]; a[p[1]] = p[1] === 'limit' ? +el.value : el.value; F.put('support.agents', Object.assign({}, SPS, { [a.uid]: { limit: a.limit } })).catch(() => {}); }
     else if (p[0] === 'set') { let o = S.set; for (let i = 1; i < p.length - 1; i++) o = o[p[i]]; const last = p[p.length - 1]; o[last] = /^\d+$/.test(el.value) && p[1] === 'sla' ? +el.value : el.value; }
     render();
   });

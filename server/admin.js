@@ -132,6 +132,10 @@ function router(h) {
   r.post('/webhooks/test', h(async (req) => { need(req.user); await I.outHooks(clean(req.body.kind, 30) || 'order', 'Test event from the Funded Sky back office', { test: true }); }));
   r.post('/risk/scan', h(async (req) => { need(req.user, 'risk'); return require('./riskscan').scan(); }));
   r.get('/risk/trades', h(async (req) => { const since = req.query.days ? +req.query.days : 1; return db.all(`SELECT t.account_id, t.ts, t.instrument, t.side, t.qty, t.pnl::float pnl, t.hold_min, a.user_id FROM trades t JOIN accounts a ON a.id=t.account_id WHERE t.ts > now() - ($1 || ' days')::interval ORDER BY t.ts DESC LIMIT 3000`, [String(Math.min(30, since))]); }));
+  r.post('/tickets', h(async (req) => { need(req.user, 'support', 'risk', 'finance'); const b = req.body; const u = await db.one('SELECT id, email, first FROM users WHERE id=$1', [+b.user]); if (!u) bad('Pick a trader');
+    const subj = clean(b.subject, 200); if (!subj) bad('Add a subject'); const t = await db.one("INSERT INTO tickets(user_id,subject,category,channel,status,priority,assignee) VALUES($1,$2,$3,'Email',$4,$5,$6) RETURNING id", [u.id, subj, clean(b.category, 60) || 'General', b.body ? 'pending' : 'open', ['low', 'normal', 'high', 'urgent'].includes(b.priority) ? b.priority : 'normal', req.user.id]);
+    if (b.body) { await db.q('INSERT INTO ticket_msgs(ticket_id,author_id,staff,body) VALUES($1,$2,true,$3)', [t.id, req.user.id, clean(b.body, 5000)]); await core.notify(null, u.id, 'Support: ' + subj, clean(b.body, 140), 'support?tkt=' + t.id); await require('./mail').send(u.email, `${subj} [#${t.id}]`, `Hi ${u.first},\n\n${clean(b.body, 5000)}\n\nReply from your dashboard: ${require('./auth').BASE()}/app/support?tkt=${t.id}`, 'ticket'); }
+    await core.audit(req.user.id, 'ticket.create', String(t.id), {}); return { id: t.id }; }));
   // ---- Store: board settings and lists kept for each board ----
   r.put('/store/:key', h(async (req) => { const k = clean(req.params.key, 60); if (!/^[a-z0-9_.-]+$/i.test(k)) bad('Bad key'); need(req.user, 'finance', 'risk', 'support'); await putStore(k, req.body.value); await core.audit(req.user.id, 'store.' + k, k, {}); }));
   // Integrations (admin only)
@@ -156,7 +160,7 @@ function router(h) {
     const u = await db.one('SELECT email, first FROM users WHERE id=$1', [t.user_id]);
     await require('./mail').send(u.email, `Re: ${t.subject} [#${t.id}]`, `Hi ${u.first},\n\n${body}\n\nReply from your dashboard: ${require('./auth').BASE()}/app/support?tkt=${t.id}`, 'ticket');
   }));
-  r.post('/tickets/:id/status', h(async (req) => { const st = ['open', 'pending', 'solved'].includes(req.body.status) ? req.body.status : 'open'; await db.q('UPDATE tickets SET status=$2, updated_at=now() WHERE id=$1', [+req.params.id, st]); }));
+  r.post('/tickets/:id/status', h(async (req) => { const st = ['open', 'pending', 'solved', 'hold'].includes(req.body.status) ? req.body.status : 'open'; await db.q('UPDATE tickets SET status=$2, updated_at=now() WHERE id=$1', [+req.params.id, st]); }));
 
   r.put('/catalog', h(async (req) => {
     need(req.user);
@@ -209,6 +213,7 @@ function router(h) {
     return db.all(`SELECT t.*, a.user_id, a.plan, a.size FROM trades t JOIN accounts a ON a.id=t.account_id ${q.length ? 'WHERE ' + q.join(' AND ') : ''} ORDER BY t.ts DESC LIMIT 500`, v); }));
   // ---- Support ----
   r.post('/tickets/:id/assign', h(async (req) => { const to = req.body.to === 'me' ? req.user.id : req.body.to ? +req.body.to : null; await db.q('UPDATE tickets SET assignee=$2, updated_at=now() WHERE id=$1', [+req.params.id, to]); }));
+  r.post('/tickets/:id/category', h(async (req) => { await db.q('UPDATE tickets SET category=$2, updated_at=now() WHERE id=$1', [+req.params.id, clean(req.body.category, 60) || 'General']); }));
   r.post('/tickets/:id/note', h(async (req) => { const body = clean(req.body.body, 5000); if (!body) bad('Write a note first'); await db.q('INSERT INTO ticket_msgs(ticket_id,author_id,staff,internal,body) VALUES($1,$2,true,true,$3)', [+req.params.id, req.user.id, body]); }));
   r.post('/tickets/:id/priority', h(async (req) => { await db.q('UPDATE tickets SET priority=$2 WHERE id=$1', [+req.params.id, ['low', 'normal', 'high', 'urgent'].includes(req.body.priority) ? req.body.priority : 'normal']); }));
   // ---- Generic lists stored in kv: announcements, macros, blocklist, countries, incidents ----
