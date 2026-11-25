@@ -88,7 +88,7 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 <div class="fs-g3" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px 12px; padding-top: 8px;">
 <sc-for list="{{ plans }}" as="p" hint-placeholder-count="3">
 <button type="button" class="fs-opt" aria-pressed="{{ p.on }}" onClick="{{ p.pick }}" style="position: relative; min-height: 76px; text-align: left; background: {{ p.bg }}; border: 1px solid {{ p.bd }}; border-radius: 8px; padding: 16px; box-sizing: border-box; color: #F4F2F1; font: inherit; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; cursor: pointer;">
-<sc-if value="{{ p.badge }}" hint-placeholder-val="{{ false }}"><span style="position: absolute; top: -9px; left: 14px; background: #7CC4FF; color: #08080A; font-size: 10px; line-height: 1; font-weight: 600; font-stretch: 112%; padding: 4px 7px 5px; border-radius: 4px;">Most Popular</span></sc-if>
+<sc-if value="{{ p.badge }}" hint-placeholder-val="{{ false }}"><span style="position: absolute; top: -9px; left: 14px; background: #7CC4FF; color: #08080A; font-size: 10px; line-height: 1; font-weight: 600; font-stretch: 112%; padding: 4px 7px 5px; border-radius: 4px;">{{ p.badge }}</span></sc-if>
 <span style="display: flex; flex-direction: column; gap: 4px; min-width: 0;"><span style="font-size: 16px; line-height: 20px; font-weight: 600;">{{ p.name }}</span><span style="font-size: 13px; line-height: 18px; color: {{ p.sub }};">{{ p.desc }}</span></span>
 <span style="flex: none; width: 20px; height: 20px; border-radius: 10px; box-sizing: border-box; border: {{ p.ring }};"></span>
 </button>
@@ -100,7 +100,7 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 <h2 style="margin: 0; font-size: 18px; line-height: 24px; font-weight: 600; letter-spacing: -0.01em;">Account Size</h2>
 <div class="fs-g4" style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px;">
 <sc-for list="{{ sizes }}" as="s" hint-placeholder-count="4">
-<button type="button" class="fs-opt" aria-pressed="{{ s.on }}" onClick="{{ s.pick }}" style="height: 68px; background: {{ s.bg }}; border: 1px solid {{ s.bd }}; border-radius: 8px; color: #F4F2F1; font: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer;"><span style="font-family: 'Geist Mono', monospace; font-size: 20px; line-height: 24px; font-weight: 500;">{{ s.label }}</span><span style="font-size: 12px; line-height: 16px; color: {{ s.sub }};">{{ s.price }}</span></button>
+<button type="button" class="fs-opt" aria-pressed="{{ s.on }}" onClick="{{ s.pick }}" style="height: 68px; background: {{ s.bg }}; border: 1px solid {{ s.bd }}; border-radius: 8px; color: #F4F2F1; font: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer;"><span style="font-family: 'Geist Mono', monospace; font-size: 20px; line-height: 24px; font-weight: 500;">{{ s.label }}</span><span style="font-size: 12px; line-height: 16px; color: {{ s.sub }};"><sc-if value="{{ s.compare }}"><s style="opacity: 0.6; margin-right: 4px;">{{ s.compare }}</s></sc-if>{{ s.price }}</span></button>
 </sc-for>
 </div>
 </div>
@@ -206,7 +206,7 @@ class Component extends DCLogic {
     super(props);
     const saved = FSX.cart.get();
     const qp = DC.qs('plan'); const qpromo = DC.qs('promo');
-    this.state = { cat: null, cart: saved && saved.cart && saved.cart.length ? saved.cart : [{ id: 1, plan: qp || 'prime', size: 50000, platform: 'Tradovate', addons: {}, qty: 1 }], active: 1, nextId: 9, promo: qpromo || (saved && saved.promo) || '', promoInput: qpromo || (saved && saved.promo) || '', priced: null, promoMsg: '', promoOk: false, me: null };
+    this.state = { cat: null, cart: saved && saved.cart && saved.cart.length ? saved.cart : [{ id: 1, plan: qp || 'prime', size: 50000, platform: '', addons: {}, qty: 1 }], active: 1, nextId: 9, promo: qpromo || (saved && saved.promo) || '', promoInput: qpromo || (saved && saved.promo) || '', priced: null, promoMsg: '', promoOk: false, me: null };
     this.state.active = this.state.cart[0].id; this.state.nextId = Math.max(...this.state.cart.map((c) => c.id)) + 1;
   }
   async componentDidMount() {
@@ -215,7 +215,7 @@ class Component extends DCLogic {
     this.setState({ cat, me, cart });
     this.reprice();
   }
-  fix(cat, c) { const p = cat.plans.find((x) => x.id === c.plan) || cat.plans.find((x) => x.badge) || cat.plans[0]; const sz = p.sizes.find((z) => z.size === Number(c.size)) ? Number(c.size) : p.sizes[Math.min(1, p.sizes.length - 1)].size; const addons = {}; Object.keys(c.addons || {}).forEach((k) => { if (c.addons[k] && p.addons.includes(k)) addons[k] = true; }); return Object.assign({}, c, { plan: p.id, size: sz, platform: p.platforms.includes(c.platform) ? c.platform : p.platforms[0], addons }); }
+  fix(cat, c) { const p = cat.plans.find((x) => x.id === c.plan) || cat.plans.find((x) => x.badge) || cat.plans[0]; const sz = p.sizes.find((z) => z.size === Number(c.size)) ? Number(c.size) : p.sizes[Math.min(1, p.sizes.length - 1)].size; const addons = {}; Object.keys(c.addons || {}).forEach((k) => { if (c.addons[k] && p.addons.includes(k)) addons[k] = true; }); return Object.assign({}, c, { plan: p.id, size: sz, platform: p.platforms.includes(c.platform) ? c.platform : (p.defPlatform && p.platforms.includes(p.defPlatform) ? p.defPlatform : p.platforms[0]), addons }); }
   updActive(fn) { const cat = this.state.cat; this.setState({ cart: this.state.cart.map((c) => (c.id === this.state.active ? this.fix(cat, Object.assign({}, c, fn(c))) : c)) }); this.reprice(); }
   setCart(cart, extra) { this.setState(Object.assign({ cart }, extra || {})); this.reprice(); }
   reprice() {
@@ -238,9 +238,9 @@ class Component extends DCLogic {
     const P = (id) => cat.plans.find((p) => p.id === id);
     const pc = P(cur.plan); const sd = pc.sizes.find((z) => z.size === cur.size);
     const K = (z) => '$' + z / 1000 + 'K';
-    const plans = cat.plans.map((p) => Object.assign({ id: p.id, name: p.name, desc: p.desc, badge: !!p.badge }, cur.plan === p.id ? on : off, { on: cur.plan === p.id, pick: () => this.updActive(() => ({ plan: p.id })) }));
+    const plans = cat.plans.map((p) => Object.assign({ id: p.id, name: p.name, desc: p.desc, badge: p.badge || '' }, cur.plan === p.id ? on : off, { on: cur.plan === p.id, pick: () => this.updActive(() => ({ plan: p.id })) }));
     const promo = (cat.promos || []).find((x) => st.promoOk && st.promo && x.code === st.promo.toUpperCase());
-    const sizes = pc.sizes.map((z) => Object.assign({ label: K(z.size), price: M(z.price) + (z.activation ? ' + ' + M(z.activation) + ' later' : '') }, cur.size === z.size ? on : off, { on: cur.size === z.size, pick: () => this.updActive(() => ({ size: z.size })) }));
+    const sizes = pc.sizes.map((z) => Object.assign({ label: K(z.size), compare: z.compare ? M(z.compare) : '', price: M(z.price) + (z.activation ? ' + ' + M(z.activation) + ' later' : '') }, cur.size === z.size ? on : off, { on: cur.size === z.size, pick: () => this.updActive(() => ({ size: z.size })) }));
     const platforms = pc.platforms.map((s) => Object.assign({ label: s }, cur.platform === s ? on : off, { on: cur.platform === s, pick: () => this.updActive(() => ({ platform: s })) }));
     const addons = pc.addons.map((k) => { const a = cat.addons[k]; const sel = !!cur.addons[k]; return Object.assign({ id: k, name: a.name, desc: a.desc, price: '+' + M(Math.round(sd.price * a.pct / 100)) }, sel ? on : off, { on: sel, toggle: () => this.updActive((c) => ({ addons: Object.assign({}, c.addons, { [k]: !sel }) })) }); });
     const count = st.cart.reduce((n, c) => n + c.qty, 0);
@@ -258,9 +258,9 @@ class Component extends DCLogic {
     const pr = st.priced;
     const lines = pr ? pr.lines.map((l) => ({ label: l.label, amount: l.amount < 0 ? '−' + M(-l.amount) : M(l.amount), color: l.amount < 0 ? '#5FD39B' : l.kind === 'addon' ? '#9C9693' : '#D4CFCD' })) : [];
     const isI = pc.kind === 'funded';
-    const r = isI ? cat.instantRules[cur.size] : cat.evalRules[cur.size];
-    const rules = isI ? { targetLabel: 'Profit Goal Before First Payout', target: M(r.goal), maxLossLabel: 'Max Loss (Trailing, End of Day)', maxLoss: M(r.maxLoss), dllLabel: 'Daily Loss Limit', dll: M(r.dll), contracts: r.contracts, split: cat.instantCommon.splitFirst + '%, then ' + cat.instantCommon.splitLater + '%' }
-      : { targetLabel: 'Profit Target', target: M(r.target), maxLossLabel: 'Max Loss (Trailing, End of Day)', maxLoss: M(r.maxLoss), dllLabel: 'Daily Loss Limit', dll: M(r.dll), contracts: r.contracts, split: cat.fundedCommon.split + '%' };
+    const r = ((cat.rules || {})[pc.id] || {})[cur.size] || (isI ? Object.assign({ target: cat.instantRules[cur.size].goal }, cat.instantRules[cur.size]) : cat.evalRules[cur.size]);
+    const rules = { targetLabel: isI ? 'Profit Goal Before First Payout' : 'Profit Target', target: M(r.target), maxLossLabel: 'Max Loss (Trailing, End of Day)', maxLoss: M(r.maxLoss), dllLabel: 'Daily Loss Limit', dll: M(r.dll), contracts: r.contracts,
+      split: r.splitText || (isI ? cat.instantCommon.splitFirst + '%, then ' + cat.instantCommon.splitLater + '%' : cat.fundedCommon.split + '%') };
     const act = st.cart.some((c) => (P(c.plan).sizes.find((z) => z.size === c.size) || {}).activation);
     const next = st.me ? '/checkout/payment' : '/checkout/payment';
     return {

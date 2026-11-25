@@ -55,7 +55,7 @@ ${e.n2 ? `<div style="font-size:12.5px;color:${C.fa};line-height:1.5;margin-top:
 function text(e, vars) {
   const f = (t) => String(t == null ? '' : t).replace(/\{(\w+)\}/g, (m, k) => (vars[k] != null ? vars[k] : ''));
   const rows = (e.r || []).map(([k, v]) => [f(k), f(v)]).filter(([, v]) => v.trim());
-  return [f(e.h) + (e.a ? ' ' + f(e.a) : ''), e.al ? f(e.al[1]) : '', ...[].concat(e.b || []).map(f), e.c ? f(e.c) : '', rows.map(([k, v]) => `${k}: ${v}`).join('\n'), (e.st || []).map(([t, d], i) => `${i + 1}. ${f(t)}: ${f(d)}`).join('\n'), e.cta && vars.url ? `${f(e.cta)}: ${vars.url}` : '', e.n2 ? f(e.n2) : ''].filter(Boolean).join('\n\n');
+  return [f(e.h) + (e.a ? ' ' + f(e.a) : ''), e.p ? f(e.p) : '', e.pg ? `${f(e.pg[0])}: ${f(e.pg[3])}` : '', e.al ? f(e.al[1]) : '', ...[].concat(e.b || []).map(f), e.c ? f(e.c) : '', rows.map(([k, v]) => `${k}: ${v}`).join('\n'), (e.st || []).map(([t, d], i) => `${i + 1}. ${f(t)}: ${f(d)}`).join('\n'), e.cta && vars.url ? `${f(e.cta)}: ${vars.url}` : '', e.n2 ? f(e.n2) : ''].filter(Boolean).join('\n\n');
 }
 async function deliver({ to, subject, body, html, template, from, status, uid }) {
   const c = await I.cfg('resend').catch(() => null);

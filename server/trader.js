@@ -2,6 +2,8 @@
 const db = require('./db');
 const core = require('./core');
 const R = require('./rules');
+// Certificate IDs: the same short hash the back office uses, so revoking there matches here
+const certId = (s) => 'CF-' + (Array.from(String(s)).reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % 90000 + 10000);
 const content = require('./content');
 const I = require('./integrations');
 const flows = require('./flows');
@@ -39,7 +41,7 @@ async function boot(user, sessToken, host) {
   const ordById = Object.fromEntries(orders.map((o) => [o.id, o]));
   const pending = new Set(pays.filter((p) => ['requested', 'approved'].includes(p.status)).map((p) => p.account_id));
 
-  const PLANS = cat.plans.filter((p) => p.active).map((p) => ({ id: p.id, n: p.name, short: p.short, kind: p.kind, desc: p.desc, billing: 'one-time', badge: p.badge, sizes: p.sizes.map((s) => [s.size, s.price]), act: Object.fromEntries(p.sizes.map((s) => [s.size, s.activation])), plats: p.platforms, addons: p.addons, rv: 1 }));
+  const PLANS = cat.plans.filter((p) => p.active).map((p) => ({ id: p.id, n: p.name, short: p.short, kind: p.kind, desc: p.desc, billing: 'one-time', badge: p.badge, sizes: p.sizes.map((s) => [s.size, core.priceOf(s)]), act: Object.fromEntries(p.sizes.map((s) => [s.size, s.activation])), plats: p.platforms, addons: p.addons, rv: 1 }));
   const RULESET = Object.fromEntries(Object.entries(cat.evalRules).map(([z, r]) => [z, { target: r.target, dll: r.dll, dd: r.maxLoss, ct: r.contracts }]));
   const RULE_ALL = { minDays: cat.evalCommon.minDays, evalCons: cat.evalCommon.consistency, cons: cat.fundedCommon.consistency, split: cat.fundedCommon.split, payoutMin: cat.fundedCommon.payoutMin, winDays: cat.fundedCommon.winDays, winDayMin: cat.fundedCommon.winDayMin, ddType: 'Trailing, end of day', news: '2 minutes before and after high-impact news', resetPct: cat.resetPct };
 
@@ -85,7 +87,7 @@ async function boot(user, sessToken, host) {
       cycle: (a.payout_count || 0) + 1, paid: Number(a.paid_total), payouts: a.payout_count || 0, funded: a.funded_at ? shortDate(a.funded_at) : '', steps,
       closed: a.breached_at ? shortDate(a.breached_at) : a.closed_at ? shortDate(a.closed_at) : '', breach: a.breach_reason || '',
       plan: p.name, planShort: p.short, rv: 1, dll: r.dll, ddAmt: r.maxLoss, ct: r.contracts, minDays: r.minDays || 0,
-      cons: a.kind === 'evaluation' ? cat.evalCommon.consistency : r.consistency, split: r.split || cat.fundedCommon.split,
+      cons: r.consistency, split: r.split || cat.fundedCommon.split,
       floor: Number(a.floor), price: s.price, activation: s.activation || 0, freeResets: a.free_resets, resets: a.reset_count,
       halted: a.halted_today, curve, created: a.created_at, parent: a.parent_id,
       dl: dd.map((d) => ({ iso: d.day, pnl: Number(d.pnl) })).concat(a.today_date === today && today_pnl ? [{ iso: today, pnl: round2(today_pnl) }] : []),
@@ -95,7 +97,7 @@ async function boot(user, sessToken, host) {
       x.target = start + r.target; x.goal = r.target;
       const profit = bal - start; x.consNow = profit > 0 ? Math.round((x.best / profit) * 100) : 0;
       x.checks = R.evalChecks(cat, a);
-      x.resetPrice = Math.round(s.price * cat.resetPct / 100);
+      x.resetPrice = s.reset ? Number(s.reset) : Math.round(core.priceOf(s) * cat.resetPct / 100);
     } else {
       x.target = start + (r.instant && !(a.payout_count > 0) ? r.goal : Math.ceil(r.payoutMin / (r.split / 100)) + r.cushion);
       x.goal = r.goal || 0;
@@ -129,28 +131,38 @@ async function boot(user, sessToken, host) {
   const AGREE = [['Terms of Service', 'v1.0', ag.terms], ['Privacy Policy', 'v1.0', ag.privacy], ['Risk Disclosure', 'v1.0', ag.risk], ['Refund Policy', 'v1.0', ag.refund], ['Funded Trader Agreement', 'v1.0', ag.funded]].filter((x) => x[2]).map(([n, v, d]) => [n, v, 'Accepted ' + longDate(d), '']);
   const PTS_LOG = plog.map((p) => [p.label, (p.delta > 0 ? '+' : '−') + Math.abs(p.delta).toLocaleString('en-US'), shortDate(p.created_at)]);
   const CERTS = [];
-  pays.filter((p) => p.status === 'paid').forEach((p) => CERTS.push({ id: 'CF-' + p.code.slice(3), k: 'Payout', v: '$' + Math.round(p.amount).toLocaleString('en-US'), n: 'Paid ' + longDate(p.paid_at), views: 0 }));
-  accts.filter((a) => a.kind === 'funded' && a.funded_at).forEach((a) => CERTS.push({ id: 'CF-F' + a.id.slice(-4), k: 'Funded', v: '$' + K(a.size) + ' Funded Account', n: 'Funded ' + longDate(a.funded_at), views: 0 }));
-  accts.filter((a) => a.passed_at).forEach((a) => CERTS.push({ id: 'CF-P' + a.id.slice(-4), k: 'Passed', v: '$' + K(a.size) + ' Evaluation', n: 'Passed ' + longDate(a.passed_at), views: 0 }));
+  const CV = ((await db.one("SELECT v FROM kv WHERE k='certviews'")) || {}).v || {}; const REVK = ((await db.one("SELECT v FROM kv WHERE k='store.rewards.revoked'")) || {}).v || [];
+  pays.filter((p) => p.status === 'paid').forEach((p) => { const cidv = certId('o' + p.code); if (!REVK.includes(cidv)) CERTS.push({ id: cidv, k: 'Payout', v: '$' + Math.round(p.amount).toLocaleString('en-US'), n: 'Paid ' + longDate(p.paid_at), views: CV[cidv] || 0 }); });
+  accts.filter((a) => a.kind === 'funded' && a.funded_at).forEach((a) => { const cidv = certId('f' + a.id); if (!REVK.includes(cidv)) CERTS.push({ id: cidv, k: 'Funded', v: '$' + K(a.size) + ' Funded Account', n: 'Funded ' + longDate(a.funded_at), views: CV[cidv] || 0 }); });
+  accts.filter((a) => a.passed_at).forEach((a) => { const cidv = certId('p' + a.id); if (!REVK.includes(cidv)) CERTS.push({ id: cidv, k: 'Passed', v: '$' + K(a.size) + ' Evaluation', n: 'Passed ' + longDate(a.passed_at), views: CV[cidv] || 0 }); });
 
   const C = await content.all();
   const prog = (user.settings && user.settings.courses) || {};
   const COURSES = C.courses.filter((c) => c.status !== 'Draft').map((c) => ({ ...c, done: Math.min(c.l, prog[c.id] || 0) }));
   const fmt = (v) => '$' + Number(v).toLocaleString('en-US');
   const sizes = [25000, 50000, 100000, 150000];
-  const PLANRULES = [['Profit Target', ...sizes.map((z) => fmt(cat.evalRules[z].target))], ['Daily Loss Limit', ...sizes.map((z) => fmt(cat.evalRules[z].dll))], ['Max Loss (trailing, end of day)', ...sizes.map((z) => fmt(cat.evalRules[z].maxLoss))], ['Max Position Size', ...sizes.map((z) => cat.evalRules[z].contracts + ' contracts')], ['Minimum Trading Days', ...sizes.map(() => String(cat.evalCommon.minDays))], ['Consistency to Pass', ...sizes.map(() => cat.evalCommon.consistency + '%')], ['Consistency for Payouts', ...sizes.map(() => cat.fundedCommon.consistency + '%')], ['Payout Split', ...sizes.map(() => cat.fundedCommon.split + '%')], ['Payout Cap, payouts 1 to 3', ...sizes.map((z) => fmt(cat.fundedCaps[z].first))], ['Payout Cap, payouts 4 to 6', ...sizes.map((z) => fmt(cat.fundedCaps[z].later))], ['Lifetime Payouts per Account', ...sizes.map((z) => fmt(cat.fundedCaps[z].lifetime))], ['Minimum Payout', ...sizes.map(() => fmt(cat.fundedCommon.payoutMin))]];
+  // Rules tables for Resources, from the same effective rules the engine uses. Plans with identical rules share one table.
+  const evalRows = (pid) => { const pl = cat.plans.find((x) => x.id === pid); const has = (z) => pl.sizes.some((y) => y.size === z); const er = (z) => R.rulesFor(cat, { plan: pid, size: z, kind: 'evaluation' }); const fr = (z) => R.rulesFor(cat, { plan: pid, size: z, kind: 'funded', payout_count: 0 });
+    const row = (label, f) => [label, ...sizes.map((z) => (has(z) && cat.evalRules[z] ? f(z) : '—'))];
+    return [row('Profit Target', (z) => fmt(er(z).target)), row('Daily Loss Limit', (z) => fmt(er(z).dll)), row('Max Loss (Trailing, End of Day)', (z) => fmt(er(z).maxLoss)), row('Max Position Size', (z) => (er(z).fullContracts || er(z).contracts) + ' contracts'), row('Minimum Trading Days', (z) => String(er(z).minDays)), row('Consistency to Pass', (z) => er(z).consistency + '%'), row('Consistency for Payouts', (z) => fr(z).consistency + '%'), row('Payout Split', (z) => fr(z).split + '%'), row('Payout Cap, Payouts 1 to 3', (z) => fmt(cat.fundedCaps[z].first)), row('Payout Cap, Payouts 4 to 6', (z) => fmt(cat.fundedCaps[z].later)), row('Lifetime Payouts per Account', (z) => fmt(cat.fundedCaps[z].lifetime)), row('Minimum Payout', (z) => fmt(fr(z).payoutMin))]; };
+  const RULESETS = []; cat.plans.filter((p) => p.active && p.id !== 'instant' && p.kind !== 'funded').forEach((p) => { const rows = evalRows(p.id); const same = RULESETS.find((x) => JSON.stringify(x.rows) === JSON.stringify(rows)); if (same) same.plans.push(p.short); else RULESETS.push({ plans: [p.short], rows }); });
+  RULESETS.forEach((x) => { x.names = x.plans.length > 1 ? x.plans.slice(0, -1).join(', ') + ' and ' + x.plans[x.plans.length - 1] : x.plans[0]; });
+  const PLANRULES = RULESETS.length ? RULESETS[0].rows : [];
+  const instP = cat.plans.find((p) => p.id === 'instant' && p.active); const iz = [25000, 50000, 100000];
+  const INSTRULES = instP ? (() => { const has = (z) => instP.sizes.some((y) => y.size === z) && cat.instantRules[z]; const ir2 = (z) => R.rulesFor(cat, { plan: 'instant', size: z, kind: 'funded', payout_count: 0 }); const ov = (z) => ((cat.planRules || {}).instant || {})[z] || {}; const row = (label, f) => [label, ...iz.map((z) => (has(z) ? f(z) : '—'))];
+    return [row('Profit Goal Before First Payout', (z) => fmt(ir2(z).goal)), row('Daily Loss Limit', (z) => fmt(ir2(z).dll)), row('Max Loss (Trailing, End of Day)', (z) => fmt(ir2(z).maxLoss)), row('Max Position Size', (z) => ir2(z).contracts + ' contracts'), row('Consistency for Payouts', (z) => ir2(z).consistency + '%'), row('Payout Split', (z) => (ov(z).split != null ? ov(z).split + '%' : `${cat.instantCommon.splitFirst}% for the first ${cat.instantCommon.splitFirstCount}, then ${cat.instantCommon.splitLater}%`)), row('Payout Cap, Payouts 1 to 3', (z) => fmt(cat.instantCaps[z].first)), row('Payout Cap, Payouts 4 to 6', (z) => fmt(cat.instantCaps[z].later)), row('Lifetime Payouts per Account', (z) => fmt(cat.instantCaps[z].lifetime)), row('Minimum Payout', (z) => fmt(ir2(z).payoutMin))]; })() : null;
   const nowIso = new Date().toISOString().slice(0, 10);
-  const PROMOS = (cat.promos || []).filter((p) => p.active && (!p.ends || p.ends >= nowIso)).map((p) => ({ code: p.code, n: p.name, d: p.desc, pct: p.pct, plans: p.plans, when: (p.starts ? shortDate(p.starts + 'T12:00:00Z') : '') + (p.ends ? ' to ' + shortDate(p.ends + 'T12:00:00Z') : ''), ends: p.ends ? shortDate(p.ends + 'T12:00:00Z') : '', live: !p.starts || p.starts <= nowIso, note: p.once ? 'One use per trader. Not combined with bundles.' : '' }));
+  const PROMOS = (cat.promos || []).filter((p) => p.active && !(Number(p.total) === 1) && (!p.ends || p.ends >= nowIso)).map((p) => ({ code: p.code, n: p.name, d: p.desc, pct: p.pct, plans: p.plans, when: (p.starts ? shortDate(p.starts + 'T12:00:00Z') : '') + (p.ends ? ' to ' + shortDate(p.ends + 'T12:00:00Z') : ''), ends: p.ends ? shortDate(p.ends + 'T12:00:00Z') : '', live: !p.starts || p.starts <= nowIso, note: p.once ? 'One use per trader. Not combined with bundles.' : '' }));
 
   return {
     now: new Date().toISOString(), today, payMode: require('./payments').mode(), flags: Object.assign({ competitions: true, rewards: true, affiliates: true, education: true, cryptoPayouts: true }, ((await db.one("SELECT v FROM kv WHERE k='settings.flags'")) || {}).v || {}), integ: { sumsub: await I.on('sumsub'), track1099: await I.on('track1099'), rise: await I.on('rise'), crisp: await I.on('crisp') },
-    ME: { first: user.first, last: (user.last || '').slice(0, 1) + '.', lastFull: user.last, full: `${user.first} ${user.last}`, ini: ((user.first || '')[0] || '') + ((user.last || '')[0] || ''), email: user.email, country: user.country, phone: user.phone || '', since: new Date(user.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }), tid: user.tid, ref: `${host}/?ref=${user.ref_code}`, refCode: user.ref_code, verified: user.verified, kyc: user.kyc_status, tax: await flows.taxSync(user), rise: user.rise_status, role: user.role, pts: user.points, settings: user.settings || {}, refs: { list: refs.map((r) => ({ n: (r.first || '?')[0] + '•••• ' + (r.last || '?')[0] + '.', joined: shortDate(r.created_at), bought: r.bought ? shortDate(r.bought) : '' })), clicks: Array.from({ length: 30 }, (_, i) => { const d = new Date(Date.now() - (29 - i) * 86400000).toISOString().slice(0, 10); return clicksMap[d] || 0; }), pts: refPts.n } },
-    PLANS, RULESET, RULE_ALL, ADDONS: Object.fromEntries(Object.entries(cat.addons).map(([k, a]) => [k, [a.name, '+' + a.pct + '%', a.desc]])), PROMOS, BUNDLES: (cat.bundles || []).map((b) => [b.buy, b.get]),
+    ME: { aff: await require('./affiliates').summary(user.id), first: user.first, last: (user.last || '').slice(0, 1) + '.', lastFull: user.last, full: `${user.first} ${user.last}`, ini: ((user.first || '')[0] || '') + ((user.last || '')[0] || ''), email: user.email, country: user.country, phone: user.phone || '', since: new Date(user.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }), tid: user.tid, ref: `${host}/?ref=${user.ref_code}`, refCode: user.ref_code, verified: user.verified, kyc: user.kyc_status, tax: await flows.taxSync(user), rise: user.rise_status, role: user.role, pts: user.points, settings: user.settings || {}, refs: { list: refs.map((r) => ({ n: (r.first || '?')[0] + '•••• ' + (r.last || '?')[0] + '.', joined: shortDate(r.created_at), bought: r.bought ? shortDate(r.bought) : '' })), clicks: Array.from({ length: 30 }, (_, i) => { const d = new Date(Date.now() - (29 - i) * 86400000).toISOString().slice(0, 10); return clicksMap[d] || 0; }), pts: refPts.n } },
+    PLANS, RULESET, RULE_ALL, ADDONS: Object.fromEntries(Object.entries(cat.addons).map(([k, a]) => [k, [a.name, a.flat != null && Number(a.flat) > 0 ? '+$' + Number(a.flat) : '+' + a.pct + '%', a.desc]])), PROMOS, BUNDLES: (cat.bundles || []).map((b) => [b.buy, b.get]),
     ACC, HIST, DAYS, TRADES, PAYOUTS, ORDERS, NOTES, COURSES, LESSONS: C.lessons, REWARDS: C.rewards, EARN: C.earn, PTS_LOG, CERTS,
-    LB: C.leaderboard, COMPS: C.competitions, CPRIZES: C.cprizes, ARTICLES: C.articles, TOPICS: C.topics, TICKETS, SESS, AGREE, NEWS: C.news, PLANRULES,
+    LB: C.leaderboard, COMPS: await (async () => { const rows = await db.all("SELECT key, count(*)::int n FROM users, jsonb_each(COALESCE(settings->'comps','{}'::jsonb)) WHERE value = 'true'::jsonb GROUP BY key"); const n = Object.fromEntries(rows.map((r) => [r.key, r.n])); return (C.competitions || []).map((c) => Object.assign({}, c, { players: n[c.id] || 0 })); })(), CPRIZES: C.cprizes, ARTICLES: C.articles, TOPICS: C.topics, TICKETS, SESS, AGREE, NEWS: C.news, PLANRULES, RULESETS, INSTRULES, AFFTIERS: (await require('./affiliates').tiers()).map((t) => [t.name, t.how, t.rate + '%', t.disc + '%']), AFFSET: await require('./affiliates').settings(), REFSET: await core.referralSettings(),
     METHODS: methods.map((m) => ({ id: m.id, rail: m.rail, label: m.label, def: m.is_default, locked: new Date(m.unlock_at) > new Date(), unlock: new Date(m.unlock_at).toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }) + ' ET' })),
     COUPONS: coupons.map((c) => ({ code: c.code, label: c.label, used: c.used, kind: c.kind })),
     caps: { funded: cat.fundedCaps, instant: cat.instantCaps, instantRules: cat.instantRules, instantCommon: cat.instantCommon, fundedCommon: cat.fundedCommon }
   };
 }
-module.exports = { boot };
+module.exports = { certId, boot };

@@ -22,7 +22,7 @@ async function scan() {
   const since = new Date(Date.now() - 7 * 864e5);
   const [trades, accts, users, sess, methods, payouts, orders, content] = await Promise.all([
     db.all('SELECT t.account_id, t.ts, t.instrument, t.side, t.qty, t.pnl::float pnl, t.hold_min, a.user_id, a.size, a.plan, a.kind FROM trades t JOIN accounts a ON a.id=t.account_id WHERE t.ts > $1 ORDER BY t.ts', [since]),
-    db.all('SELECT id, user_id, plan, size, kind, phase, start_bal::float start_bal, balance::float balance, funded_at, created_at FROM accounts'),
+    db.all('SELECT id, user_id, plan, size, kind, phase, start_bal::float start_bal, balance::float balance, funded_at, created_at, payout_count, rs FROM accounts'),
     db.all("SELECT id, first, last, email, country, kyc, role FROM users WHERE role='trader'"),
     db.all("SELECT s.user_id, s.ip, s.ua, s.created_at FROM sessions s JOIN users u ON u.id=s.user_id WHERE u.role='trader'"),
     db.all('SELECT user_id, label FROM payout_methods'),
@@ -32,7 +32,7 @@ async function scan() {
   ]);
   const U = Object.fromEntries(users.map((u) => [u.id, u])); const A = Object.fromEntries(accts.map((a) => [a.id, a]));
   const cat = await require('./core').catalog();
-  const rules = (a) => { const R = a.kind === 'funded' && a.plan === 'instant' ? cat.instantRules : cat.evalRules; return (R && R[a.size]) || {}; };
+  const rules = (a) => { try { return require('./rules').rulesFor(cat, a); } catch (e) { return {}; } };
   const out = [];
   const add = (key, type, accIds, uids, sum, ev, rec, when) => { if (!cfg[type] || cfg[type].on === false) return; out.push({ key, type, sev: cfg[type].sev, accts: [...new Set(accIds)], uids: [...new Set(uids)], traders: [...new Set(uids)].map((i) => (U[i] ? short(U[i]) : '?')), sum, ev, rec, when: when || new Date().toISOString() }); };
 

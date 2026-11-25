@@ -40,7 +40,7 @@
   const SESS = FS.SESS;
   const AGREE = FS.AGREE;
   const NEWS = FS.NEWS;
-  const PLANRULES = FS.PLANRULES;
+  const PLANRULES = FS.PLANRULES; const RULESETS = FS.RULESETS || [{ names: 'Essential and Prime', rows: FS.PLANRULES }]; const INSTRULES = FS.INSTRULES || null; const NOINST = FS.INSTRULES === null;
   const METHODS = FS.METHODS;
   const COUPONS = FS.COUPONS;
   const CAPS = FS.caps;

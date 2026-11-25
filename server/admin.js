@@ -182,6 +182,7 @@ function router(h) {
   }));
   r.put('/content/:key', h(async (req) => { need(req.user, 'support'); await content.set(req.params.key, req.body.value); await core.audit(req.user.id, 'content.update', req.params.key, {}); }));
   r.post('/sim/tick', h(async (req) => { need(req.user); return { trades: await sim.tick() }; }));
+  r.post('/automations/run', h(async (req) => { need(req.user); return require('./automations').run(); }));
   r.post('/demo/purge', h(async (req) => {
     need(req.user);
     const ids = (await db.all("SELECT id FROM users WHERE email LIKE '%@demo.fundedsky.test'")).map((x) => x.id);

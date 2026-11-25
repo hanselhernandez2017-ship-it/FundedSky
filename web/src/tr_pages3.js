@@ -146,6 +146,7 @@
       case 'invoice': window.open('/api/orders/' + encodeURIComponent(id) + '/receipt', '_blank'); break;
       case 'addCard': toast('Cards are entered on the secure payment page at checkout'); break;
       case 'saveCard': S.drawer = null; break;
+      case 'shareCert': API('/api/certs/' + el.dataset.id + '/share', {}).then((r) => { try { navigator.clipboard.writeText(r.url); } catch (e) { /* clipboard blocked */ } toast(r.points ? 'Link copied. +50 points for sharing.' : 'Link copied'); if (r.points) { ME.pts = (ME.pts || 0) + r.points; } }).catch((e) => toast(e.message)); return;
       case 'copy': try { navigator.clipboard.writeText(el.dataset.msg || ''); } catch (e) { /* clipboard blocked */ } toast(/^https?:/.test(el.dataset.msg || '') ? 'Link copied' : el.dataset.msg); break;
       case 'msg': toast(el.dataset.msg); break;
       default: return; }

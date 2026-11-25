@@ -34,7 +34,7 @@ app.use((req, res, next) => auth.loadUser(req, res, next).catch(next));
 
 // Basic rate limit for auth endpoints
 const hits = new Map();
-const limit = (n, ms) => (req, res, next) => { const k = req.ip + req.path; const now = Date.now(); const h = (hits.get(k) || []).filter((t) => now - t < ms); h.push(now); hits.set(k, h); if (h.length > n) return res.status(429).json({ error: 'Too many tries. Wait a minute and try again.' }); next(); };
+const limit = (n, ms) => (req, res, next) => { if (process.env.QA_NO_LIMIT === '1' && process.env.NODE_ENV !== 'production') return next(); const k = req.ip + req.path; const now = Date.now(); const h = (hits.get(k) || []).filter((t) => now - t < ms); h.push(now); hits.set(k, h); if (h.length > n) return res.status(429).json({ error: 'Too many tries. Wait a minute and try again.' }); next(); };
 setInterval(() => hits.clear(), 10 * 60 * 1000).unref();
 
 const h = (fn) => async (req, res) => {
@@ -44,7 +44,12 @@ const h = (fn) => async (req, res) => {
 
 // ---------- public ----------
 app.get('/api/health', h(async () => ({ ok: true, db: !!(await db.one('SELECT 1 AS x')), stripe: pay.enabled(), market: sim.marketOpen() })));
-app.get('/api/catalog', h(async () => { const c = await core.catalog(); return { plans: c.plans.filter((p) => p.active), evalRules: c.evalRules, evalCommon: c.evalCommon, fundedCommon: c.fundedCommon, fundedCaps: c.fundedCaps, instantRules: c.instantRules, instantCommon: c.instantCommon, instantCaps: c.instantCaps, addons: c.addons, resetPct: c.resetPct, bundles: c.bundles, promos: (c.promos || []).filter((p) => p.active && (!p.ends || p.ends >= new Date().toISOString().slice(0, 10))).map(({ code, name, pct, plans, starts, ends, desc }) => ({ code, name, pct, plans, starts, ends, desc })), payments: pay.mode() }; }));
+app.get('/api/catalog', h(async () => { const c = await core.catalog(); const RR = require('./rules');
+  // Effective rules per plan and size, the same numbers the rule engine uses for a new account
+  const rules = {}; c.plans.filter((p) => p.active).forEach((p) => { rules[p.id] = {}; p.sizes.forEach((z) => { const inst = p.id === 'instant' || p.kind === 'funded'; const ev = RR.rulesFor(c, { plan: p.id, size: z.size, kind: inst ? 'funded' : 'evaluation', payout_count: 0 }); const fu = inst ? ev : RR.rulesFor(c, { plan: p.id, size: z.size, kind: 'funded', payout_count: 0 }); const ov = ((c.planRules || {})[p.id] || {})[z.size] || {};
+    rules[p.id][z.size] = { target: inst ? ev.goal : ev.target, dll: ev.dll, maxLoss: ev.maxLoss, contracts: ev.fullContracts || ev.contracts, minDays: ev.minDays || 0, consistency: ev.consistency, split: fu.split, splitText: inst && ov.split == null ? `${c.instantCommon.splitFirst}%, then ${c.instantCommon.splitLater}%` : fu.split + '%', payoutMin: fu.payoutMin }; }); });
+  const pubPlans = c.plans.filter((p) => p.active).map((p) => Object.assign({}, p, { sizes: p.sizes.map((z) => ({ size: z.size, price: core.priceOf(z), activation: z.activation, compare: z.compare && z.compare > core.priceOf(z) ? z.compare : undefined })), bundleOff: undefined }));
+  return { rules, plans: pubPlans, evalRules: c.evalRules, evalCommon: c.evalCommon, fundedCommon: c.fundedCommon, fundedCaps: c.fundedCaps, instantRules: c.instantRules, instantCommon: c.instantCommon, instantCaps: c.instantCaps, addons: c.addons, resetPct: c.resetPct, bundles: c.bundles, promos: (c.promos || []).filter((p) => p.active && !(Number(p.total) === 1) && (!p.ends || p.ends >= new Date().toISOString().slice(0, 10))).map(({ code, name, pct, plans, starts, ends, desc }) => ({ code, name, pct, plans, starts, ends, desc })), payments: pay.mode() }; }));
 app.get('/api/public-config', h(async () => { const m = await pay.refreshMode(); const crisp = await I.cfg('crisp'); const ph = await I.cfg('posthog'); const ss = await I.cfg('sumsub');
   const kv2 = await db.all("SELECT k, v FROM kv WHERE k IN ('settings.flags','settings.maint')"); const g = (k) => (kv2.find((r) => r.k === k) || {}).v || {};
   const ann = await db.one("SELECT v FROM kv WHERE k='list.announcements'"); const now = new Date().toISOString().slice(0, 10);
@@ -61,6 +66,8 @@ app.post('/api/cart/price', h(async (req) => core.priceCart(req.body.items, { pr
 
 // ---------- trader ----------
 const T = express.Router(); T.use(auth.needUser);
+// A suspended trader can sign in, read their dashboard and talk to support, but cannot buy, get paid or redeem
+T.use((req, res, next) => { if (req.method !== 'POST' || !req.user || req.user.status !== 'suspended') return next(); if (/^\/(tickets|notifications|settings|password|profile|kyc|tax|sessions|journal|courses)/.test(req.path)) return next(); return res.status(403).json({ error: 'Your account is suspended. Contact support for details.' }); });
 T.get('/trader/boot', h(async (req) => { const host = (process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`).replace(/^https?:\/\//, ''); return trader.boot(req.user, req.sess, host); }));
 const maintOn = async () => { const r = await db.one("SELECT v FROM kv WHERE k='settings.maint'"); return r && r.v.on ? r.v.msg : ''; };
 T.post('/orders', h(async (req) => { const m = await maintOn(); if (m) bad(m, 503); if (await auth.blockedReq(req, req.user.email)) bad('This purchase could not be completed. Contact support.', 403); { const sw = ((await db.one("SELECT v FROM kv WHERE k='store.risk.switches'")) || {}).v || {}; if (sw.sales) bad('New purchases are paused for a short time. Try again soon.', 503); } return pay.createOrder(req.user, req.body); }));
@@ -124,7 +131,25 @@ T.post('/rewards/:id/redeem', h(async (req) => {
     return { code };
   });
 }));
-T.post('/competitions/:id/join', h(async (req) => { await db.q("UPDATE users SET settings = jsonb_set(settings, '{comps}', COALESCE(settings->'comps','{}'::jsonb) || jsonb_build_object($2::text, true)) WHERE id=$1", [req.user.id, clean(req.params.id, 20)]); }));
+T.post('/competitions/:id/join', h(async (req) => { const fl = ((await db.one("SELECT v FROM kv WHERE k='settings.flags'")) || {}).v || {}; if (fl.competitions === false) bad('Competitions are not open right now', 403); const comp = ((await content.all()).competitions || []).find((x) => x.id === req.params.id); if (!comp) bad('Competition not found', 404); if (comp.st === 'ended') bad('This competition has ended'); await db.q("UPDATE users SET settings = jsonb_set(settings, '{comps}', COALESCE(settings->'comps','{}'::jsonb) || jsonb_build_object($2::text, true)) WHERE id=$1", [req.user.id, clean(req.params.id, 20)]); }));
+// Certificates: find one by its public ID
+async function findCert(id) {
+  const tr = require('./trader'); id = clean(id, 20);
+  for (const p of await db.all("SELECT p.code, p.amount, p.paid_at, p.user_id FROM payouts p WHERE p.status='paid'")) if (tr.certId('o' + p.code) === id) return { id, user: p.user_id, k: 'Payout Certificate', v: '$' + Math.round(p.amount).toLocaleString('en-US'), when: p.paid_at };
+  for (const a of await db.all('SELECT id, user_id, size, kind, funded_at, passed_at FROM accounts WHERE funded_at IS NOT NULL OR passed_at IS NOT NULL')) {
+    if (a.kind === 'funded' && a.funded_at && tr.certId('f' + a.id) === id) return { id, user: a.user_id, k: 'Funded Trader', v: '$' + a.size / 1000 + 'K Funded Account', when: a.funded_at };
+    if (a.passed_at && tr.certId('p' + a.id) === id) return { id, user: a.user_id, k: 'Evaluation Passed', v: '$' + a.size / 1000 + 'K Evaluation', when: a.passed_at };
+  }
+  return null;
+}
+// Sharing a certificate earns 50 points, at most once a week
+T.post('/certs/:id/share', h(async (req) => {
+  const c = await findCert(req.params.id); if (!c || c.user !== req.user.id) bad('Certificate not found', 404);
+  const rev = ((await db.one("SELECT v FROM kv WHERE k='store.rewards.revoked'")) || {}).v || []; if (rev.includes(c.id)) bad('This certificate is no longer valid');
+  const recent = await db.one("SELECT 1 FROM points_log WHERE user_id=$1 AND label LIKE 'Shared certificate%' AND created_at > now() - interval '7 days'", [req.user.id]);
+  if (!recent) await core.points(null, req.user.id, 50, 'Shared certificate ' + c.id);
+  return { url: require('./auth').BASE() + '/cert/' + c.id, points: recent ? 0 : 50 };
+}));
 T.post('/kyc/sumsub', h((req) => flows.sumsubToken(req.user)));
 T.post('/tax/form', h((req) => flows.taxForm(req.user)));
 T.post('/kyc', h(async (req) => {
@@ -195,6 +220,18 @@ const editable = (slug, f) => async (req, res) => {
   const body = String(p.txt).split(/\n\n+/).map((para) => (/^#+\s/.test(para) ? `<h2>${e(para.replace(/^#+\s*/, ''))}</h2>` : `<p>${e(para).replace(/\n/g, '<br>')}</p>`)).join('');
   res.send(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Funded Sky: ${e(p.title)}</title><style>body{margin:0;background:#08080A;color:#D4CFCD;font-family:"Mona Sans",system-ui;line-height:1.6}main{max-width:720px;margin:0 auto;padding:56px 24px}h1{color:#F4F2F1;font-size:32px;margin:0 0 6px}h2{color:#F4F2F1;font-size:18px;margin:28px 0 6px}a{color:#7CC4FF}.n{color:#9C9693;font-size:14px}</style></head><body><main><p><a href="/">← Funded Sky</a></p><h1>${e(p.title)}</h1><p class="n">Last updated ${e(new Date(p.at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }))}</p>${body}</main></body></html>`);
 };
+app.get('/cert/:id', async (req, res) => {
+  const e = (x) => String(x || '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const c = await findCert(req.params.id).catch(() => null); const rev = ((await db.one("SELECT v FROM kv WHERE k='store.rewards.revoked'").catch(() => null)) || {}).v || [];
+  let u = null; if (c) { u = await db.one('SELECT first, last FROM users WHERE id=$1', [c.user]); db.q("INSERT INTO kv(k,v) VALUES('certviews', jsonb_build_object($1::text, 1)) ON CONFLICT (k) DO UPDATE SET v = kv.v || jsonb_build_object($1::text, COALESCE((kv.v->>$1)::int,0)+1)", [c.id]).catch(() => {}); }
+  const bad2 = !c || rev.includes(c.id);
+  const when = c ? new Date(c.when).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '';
+  res.status(c ? 200 : 404).send(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Funded Sky Certificate ${e(req.params.id)}</title>
+<meta property="og:title" content="${bad2 ? 'Funded Sky certificate' : e(c.k + ': ' + c.v)}"><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#08080A;color:#F4F2F1;font-family:"Mona Sans",system-ui,sans-serif;padding:24px;box-sizing:border-box}
+.c{width:min(640px,100%);border:1px solid #26262A;border-radius:16px;padding:40px;background:radial-gradient(120% 120% at 100% 0,#13202E,#111113 60%);box-sizing:border-box}.lg{font-weight:700;font-size:20px}.lg i{font-style:normal;background:#7CC4FF;color:#08080A;border-radius:4px;padding:1px 6px;margin-left:6px;font-size:14px}
+.k{margin-top:36px;color:#7CC4FF;font-size:14px;letter-spacing:.12em;text-transform:uppercase}.v{font-size:40px;font-weight:700;margin:8px 0}.n{color:#D4CFCD;font-size:16px}.id{margin-top:32px;font-family:"Geist Mono",monospace;color:#9C9693;font-size:13px}.no{color:#F2777F;font-size:18px;margin-top:28px}</style></head>
+<body><div class="c"><div class="lg">fundedsky<i>futures</i></div>${bad2 ? `<p class="no">${c ? 'This certificate is no longer valid.' : 'Certificate not found.'}</p>` : `<div class="k">${e(c.k)}</div><div class="v">${e(c.v)}</div><div class="n">${e(u.first)} ${e((u.last || '').slice(0, 1))}. · ${e(when)}</div>`}<div class="id">${e(req.params.id)} · Simulated trading. Funded Sky pays performance rewards from simulated accounts.</div></div></body></html>`);
+});
 app.get('/status', async (req, res) => {
   const e = (x) => String(x || '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const inc = (((await db.one("SELECT v FROM kv WHERE k='list.incidents'").catch(() => null)) || {}).v || []).filter((x) => x.pub !== false).slice(0, 10);
@@ -218,8 +255,10 @@ app.get(['/admin', '/admin/*'], needPage(true), (req, res) => { const b = ((req.
 app.use((req, res) => res.status(404).sendFile(path.join(DIST, '404.html'), (e) => e && res.status(404).send('Not found')));
 
 const PORT = process.env.PORT || 3000;
-migrate().then(() => {
+migrate().then(async () => {
+  // Accounts bought before rule snapshots existed keep the rules in force today from now on
+  try { const cat = await core.catalog(true); const RR = require('./rules'); for (const a of await db.all('SELECT id, plan, size FROM accounts WHERE rs IS NULL')) await db.q('UPDATE accounts SET rs=$2 WHERE id=$1', [a.id, RR.snapshot(cat, a.plan, a.size)]); } catch (e) { console.error('rules backfill', e.message); }
   app.listen(PORT, () => console.log('Funded Sky listening on ' + PORT + (pay.enabled() ? ' (Stripe on)' : ' (test payments)')));
-  sim.start(); require('./riskscan').start();
+  sim.start(); require('./riskscan').start(); require('./automations').start();
 }).catch((e) => { console.error('Startup failed', e); process.exit(1); });
 module.exports = app;

@@ -31,6 +31,26 @@ async function insertOrder(user, kind, priced, meta) {
   return o;
 }
 
+// Limits and Restrictions from the catalog (back office): per trader, per plan, monthly caps and blocked countries
+async function checkLimits(user, items) {
+  const cat = await core.catalog(); const L = (cat.x || {}).limits; if (!L) return;
+  const list = (v) => String(v || '').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean);
+  const ctry = String(user.country || '').toLowerCase();
+  if (ctry && list(L.blocked).includes(ctry)) bad(`Funded Sky accounts are not available in ${user.country}.`, 403);
+  const mine = await db.all("SELECT plan, size, kind FROM accounts WHERE user_id=$1 AND phase IN ('active','passed','review')", [user.id]);
+  const isF = (pid) => { const p = core.planDef(cat, pid); return pid === 'instant' || (p && p.kind === 'funded'); };
+  const newEval = items.filter((i) => !isF(i.plan)).reduce((n, i) => n + i.qty, 0); const newF = items.filter((i) => isF(i.plan));
+  const nEval = mine.filter((a) => a.kind === 'evaluation').length; const fund = mine.filter((a) => a.kind === 'funded');
+  if (L.maxActive && newEval && nEval + newEval > +L.maxActive) bad(`You can have up to ${L.maxActive} active evaluations at a time. You have ${nEval}.`);
+  if (L.maxFunded && newF.length && fund.length + newF.reduce((n, i) => n + i.qty, 0) > +L.maxFunded) bad(`You can have up to ${L.maxFunded} funded accounts at a time.`);
+  if (L.maxFundedBalance && newF.length && fund.reduce((n, a) => n + Number(a.size), 0) + newF.reduce((n, i) => n + i.size * i.qty, 0) > +L.maxFundedBalance) bad(`Your funded accounts can total up to $${Number(L.maxFundedBalance).toLocaleString('en-US')}.`);
+  for (const pid of [...new Set(items.map((i) => i.plan))]) {
+    const l = (L.plans || {})[pid]; if (!l) continue; const qty = items.filter((i) => i.plan === pid).reduce((n, i) => n + i.qty, 0); const pn = (core.planDef(cat, pid) || {}).short || pid;
+    if (ctry && list(l.countries).includes(ctry)) bad(`The ${pn} plan is not available in ${user.country}.`, 403);
+    if (+l.perTrader && mine.filter((a) => a.plan === pid).length + qty > +l.perTrader) bad(`You can have up to ${l.perTrader} active ${pn} account${+l.perTrader === 1 ? '' : 's'}.`);
+    if (+l.cap) { const sold = (await db.one("SELECT COALESCE(sum((it->>'qty')::int),0)::int n FROM orders o, jsonb_array_elements(o.items) it WHERE o.status='paid' AND it->>'plan'=$1 AND o.paid_at >= date_trunc('month', now())", [pid])).n; if (sold + qty > +l.cap) bad(`The ${pn} plan is sold out for this month.`); }
+  }
+}
 async function createOrder(user, body) {
   const priced = await core.priceCart(body.items, { promo: body.promo, coupon: body.coupon, userId: user.id });
   // one use per trader for promo codes marked "once"
@@ -38,8 +58,11 @@ async function createOrder(user, body) {
     const cat = await core.catalog(); const p = cat.promos.find((x) => x.code === priced.promo);
     if (p && p.once && (await db.one("SELECT 1 FROM orders WHERE user_id=$1 AND promo=$2 AND status='paid'", [user.id, p.code]))) bad('You have already used this code');
   }
+  await checkLimits(user, priced.items);
   const kind = priced.items.every((i) => i.plan === 'instant') ? 'instant' : priced.items.some((i) => i.plan === 'instant') ? 'mixed' : 'evaluation';
-  const o = await insertOrder(user, kind, priced, { coupon: priced.coupon || undefined });
+  const o = await insertOrder(user, kind, priced, { coupon: priced.coupon || undefined, affiliate: priced.affiliate || undefined });
+  // A buyer who uses an affiliate's code is credited to that affiliate from now on (if nobody referred them yet)
+  if (priced.affiliate && priced.affiliate !== user.id) await db.q('UPDATE users SET referred_by=$2 WHERE id=$1 AND referred_by IS NULL', [user.id, priced.affiliate]);
   if (Number(o.total) === 0) return finishFree(o);
   return { code: o.code, total: Number(o.total), mode: mode() };
 }
@@ -52,13 +75,14 @@ async function createResetOrder(user, body) {
   const cat = await core.catalog(); const s = core.sizeDef(cat, a.plan, a.size);
   const addons = (body.addons || []).filter((x) => ['reset', 'daily'].includes(x));
   const lines = []; let subtotal = 0; let discount = 0;
-  const base = Math.round(s.price * cat.resetPct / 100);
+  const base = s.reset ? Number(s.reset) : Math.round(core.priceOf(s) * cat.resetPct / 100);
   lines.push({ label: `Reset · ${core.kLabel(a.size)} ${core.planDef(cat, a.plan).short}`, amount: base, kind: 'plan' }); subtotal += base;
   if (a.free_resets > 0) { lines.push({ label: 'Free Reset (your add-on)', amount: -base, kind: 'discount' }); discount += base; }
-  for (const ad of addons) { const def = cat.addons[ad]; if ((a.addons || []).includes(ad) && ad === 'daily') continue; const amt = Math.round(s.price * def.pct / 100); lines.push({ label: def.name, amount: amt, kind: 'addon' }); subtotal += amt; }
+  for (const ad of addons) { const def = cat.addons[ad]; if ((a.addons || []).includes(ad) && ad === 'daily') continue; const amt = def.flat != null && Number(def.flat) > 0 ? Number(def.flat) : Math.round(core.priceOf(s) * def.pct / 100); lines.push({ label: def.name, amount: amt, kind: 'addon' }); subtotal += amt; }
   if (body.coupon) {
     const c = await db.one('SELECT * FROM coupons WHERE code=$1 AND user_id=$2 AND used=false', [clean(body.coupon, 40), user.id]);
     if (!c) bad('That reward code is not valid');
+    if (c.expires_at ? new Date(c.expires_at) < new Date() : new Date(c.created_at) < new Date(Date.now() - 90 * 86400000)) bad('That code has expired');
     const d = c.kind === 'free_reset' ? Math.max(0, base - (a.free_resets > 0 ? base : 0)) : c.kind === 'discount' ? round2((subtotal - discount) * Number(c.pct) / 100) : 0;
     if (!d) bad('That code does not apply to resets');
     lines.push({ label: c.label, amount: -d, kind: 'coupon' }); discount += d;
@@ -249,6 +273,12 @@ async function refund(actorId, code, note, opt = {}) {
     note = (note ? note + ' · ' : '') + 'Crypto refund: send it manually from Confirmo';
   }
   await db.q("UPDATE orders SET status='refunded', refunded_at=now(), meta = meta || $2 WHERE id=$1", [o.id, JSON.stringify({ refundNote: note || '' })]);
+  // Take back the points this order earned, and the referrer's bonus if this was a referred trader's first purchase
+  const earned = Math.floor(Number(o.total)); if (earned > 0) await core.points(null, o.user_id, -earned, 'Refund ' + o.code);
+  { const u = await db.one('SELECT referred_by FROM users WHERE id=$1', [o.user_id]);
+    if (u && u.referred_by && o.kind !== 'reset') { const first = await db.one("SELECT id FROM orders WHERE user_id=$1 AND (status='paid' OR id=$2) AND kind<>'reset' ORDER BY paid_at NULLS LAST, id LIMIT 1", [o.user_id, o.id]);
+      const gave = await db.one("SELECT 1 FROM points_log WHERE user_id=$1 AND label='Friend bought an account' LIMIT 1", [u.referred_by]);
+      if (first && first.id === o.id && gave) { await core.points(null, u.referred_by, -1000, 'Friend\'s order refunded'); await core.notify(null, u.referred_by, 'A referred order was refunded', 'The 1,000 points for that referral were taken back.', 'affiliates'); } } }
   // close accounts created by this order that have not traded
   for (const id of (o.meta && o.meta.accounts) || []) await db.q("UPDATE accounts SET phase='closed', closed_at=now(), breach_reason='Order refunded' WHERE id=$1 AND phase IN ('active','passed')", [id]);
   require('./mail').t('refund', o.user_id, { amount: money2(o.total), order: o.code, paid_with: o.pay_method || o.provider || 'Original payment method', url: `${BASE()}/app#billing` });

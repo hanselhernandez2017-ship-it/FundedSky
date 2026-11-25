@@ -30,54 +30,114 @@ function promoFor(cat, code, planId, now = new Date()) {
   return { ...p, applies: true };
 }
 
-// Price a cart. items: [{plan,size,platform,addons:[...],qty}]
-async function priceCart(items, { promo, coupon, userId } = {}) {
-  const cat = await catalog();
+async function referralSettings() { const v = ((await db.one("SELECT v FROM kv WHERE k='store.rewards.settings'")) || {}).v || {}; const pctOf = (x) => { const m = String(x || '').match(/(\d+(?:\.\d+)?)\s*%/); return m ? Number(m[1]) : 10; }; return { on: v.refOn !== false, pct: v.refFriend != null ? pctOf(v.refFriend) : 10, pts: v.refPts != null ? Number(v.refPts) : 1000 }; }
+// Effective price of a size right now: a scheduled price switches on by itself at its date
+function priceOf(s, now = new Date()) { const sc = s && s.sched; if (sc && sc.price && sc.at && new Date(sc.at) <= now) return Number(sc.price); return Number(s.price); }
+// A promotion in one shape (catalog codes may be the simple { code, pct } kind or the full kind from the back office)
+function normPromo(p) {
+  const vtype = p.vtype || 'percent'; const value = p.value != null ? Number(p.value) : Number(p.pct || 0);
+  return { code: p.code ? String(p.code).toUpperCase() : '', name: p.name || p.code || 'Offer', vtype, value, freeAddon: p.freeAddon || '', plans: p.plans || [], sizes: (p.sizes || []).map(Number),
+    lines: Object.assign({ base: true, addon: false, reset: false }, p.lines || {}), withBundles: !!p.withBundles, first: !!p.first, minCart: Number(p.minCart || 0),
+    countries: String(p.countries || '').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean), total: Number(p.total || 0), maxOff: Number(p.maxOff || 0),
+    perTrader: p.perTrader != null ? Number(p.perTrader) : (p.once ? 1 : 0), exclusive: !!p.exclusive, priority: Number(p.priority || 10), active: p.active !== false, starts: p.starts || p.start || '', ends: p.ends || p.end || '' };
+}
+const liveOn = (p, d) => p.active && !(p.starts && d < p.starts) && !(p.ends && d > p.ends);
+// Price a cart. items: [{plan,size,platform,addons:[...],qty}]. Same rules as the back office Live Preview.
+async function priceCart(items, { promo, coupon, userId, country, kind } = {}) {
+  const cat = await catalog(); const today = new Date().toISOString().slice(0, 10);
   if (!Array.isArray(items) || !items.length) bad('Your cart is empty');
   if (items.length > 10) bad('Too many accounts in one order');
-  const lines = []; let subtotal = 0; let promoDisc = 0; const norm = [];
-  const promoRow = promo ? (cat.promos || []).find((x) => x.code.toUpperCase() === String(promo).toUpperCase() && x.active) : null;
-  if (promo && !promoRow) bad('That promo code is not valid');
-  let count = 0;
-  for (const it of items) {
+  const comps = []; const accts = []; const norm = []; let count = 0;
+  items.forEach((it, li) => {
     const p = planDef(cat, it.plan); if (!p || !p.active) bad('Unknown plan');
     const s = sizeDef(cat, it.plan, it.size); if (!s) bad('That size is not offered on the ' + p.name);
     const qty = Math.max(1, Math.min(5, parseInt(it.qty, 10) || 1));
-    const platform = p.platforms.includes(it.platform) ? it.platform : p.platforms[0];
-    const addons = (it.addons || []).filter((x) => p.addons.includes(x));
-    const base = s.price * qty; subtotal += base; count += qty;
-    lines.push({ label: `${p.short} ${kLabel(s.size)}${qty > 1 ? ' × ' + qty : ''}`, amount: base, kind: 'plan' });
-    for (const ad of addons) {
-      const a = cat.addons[ad]; const amt = round2((a.flat != null ? Number(a.flat) : Math.round(s.price * a.pct / 100)) * qty);
-      subtotal += amt; lines.push({ label: `${a.name}${qty > 1 ? ' × ' + qty : ''}`, amount: amt, kind: 'addon' });
-    }
-    const pr = promoRow && promoFor(cat, promoRow.code, p.id);
-    if (pr && pr.applies) promoDisc += round2(base * Math.min(pr.pct, cat.maxPromoPct || 100) / 100);
-    norm.push({ plan: p.id, size: s.size, platform, addons, qty, unit: s.price });
+    if (it.platform && !p.platforms.includes(it.platform)) bad(`${it.platform} is not offered on the ${p.name}`);
+    const platform = it.platform || p.defPlatform || p.platforms[0];
+    const addons = (it.addons || []).filter((x) => p.addons.includes(x) && cat.addons[x]);
+    const unit = priceOf(s); count += qty;
+    comps.push({ li, type: 'base', plan: p.id, size: s.size, label: `${p.short} ${kLabel(s.size)}${qty > 1 ? ' × ' + qty : ''}`, amt: unit * qty, rem: unit * qty, floor: Number(s.floor || 0) * qty });
+    for (let i = 0; i < qty; i++) accts.push({ li, plan: p.id, size: s.size, price: unit });
+    for (const ad of addons) { const a = cat.addons[ad]; const amt = round2((a.flat != null && Number(a.flat) > 0 ? Number(a.flat) : Math.round(unit * a.pct / 100)) * qty);
+      comps.push({ li, type: 'addon', aid: ad, plan: p.id, size: s.size, label: `${a.name}${qty > 1 ? ' × ' + qty : ''}`, amt, rem: amt, floor: 0, discountable: a.discountable !== false }); }
+    norm.push({ plan: p.id, size: s.size, platform, addons, qty, unit });
+  });
+  const sub = round2(comps.reduce((n, c) => n + c.amt, 0));
+  const u = userId ? await db.one("SELECT referred_by, country, (SELECT count(*)::int FROM orders WHERE user_id=$1 AND status='paid') n FROM users WHERE id=$1", [userId]) : null;
+  const firstBuy = !u || u.n === 0; const ctry = String(country || (u && u.country) || '').toLowerCase();
+  // ---- bundles: the single best one wins
+  const elig = (pid, bid) => { const pl = planDef(cat, pid); return !(pl && pl.bundleOff && pl.bundleOff[bid]); };
+  const bundleDefs = (cat.bundles || []).length ? [{ id: 'tier', type: 'tier', name: (cat.bundleName || 'Multi-Account Savings'), samePlan: !!cat.bundleSamePlan, tiers: cat.bundles.map((b) => ({ min: b.min, pct: b.pct, buy: b.buy })) }] : [];
+  (cat.bundleRules || []).forEach((b) => bundleDefs.push(b));
+  const bestBundle = () => { let best = null;
+    bundleDefs.forEach((b) => { let off = 0; let hit = [];
+      if (b.type === 'tier') { const by = {}; accts.forEach((a) => { if (elig(a.plan, b.id)) (by[b.samePlan ? a.plan : 'all'] = by[b.samePlan ? a.plan : 'all'] || []).push(a); });
+        Object.values(by).forEach((arr) => { const t = b.tiers.filter((x) => arr.length >= x.min).sort((x, y) => y.min - x.min)[0]; if (t) { off += arr.reduce((n, a) => n + a.price, 0) * t.pct / 100; hit.push(...new Set(arr.map((a) => a.li))); b._label = t.buy ? `${t.buy}: ${t.pct}% off` : `${b.name}: ${t.pct}% off`; } }); }
+      else if (b.type === 'mix') { const arr = accts.filter((a) => (b.mixPlans || []).includes(a.plan) && elig(a.plan, b.id)); if (arr.length >= b.min) { off = arr.reduce((n, a) => n + a.price, 0) * b.pct / 100; hit = [...new Set(arr.map((a) => a.li))]; b._label = `${b.name}: ${b.pct}% off`; } }
+      else if (b.type === 'fixed') { let ok = true; let val = 0; const used = []; (b.items || []).forEach((it) => { const arr = accts.filter((a) => a.plan === it.plan && a.size === Number(it.size) && elig(a.plan, b.id)); if (arr.length < it.qty) ok = false; else { val += it.qty * arr[0].price; used.push(...arr.slice(0, it.qty).map((a) => a.li)); } }); if (ok && (b.items || []).length) { off = Math.max(0, val - Number(b.price)); hit = [...new Set(used)]; b._label = `${b.name}: ${money(b.price)}`; } }
+      off = round2(off); if (off > 0 && (!best || off > best.off)) best = { b, off, hit }; });
+    return best; };
+  // ---- promotions
+  const applyPromo = (C, pr) => { let tot = 0;
+    C.forEach((c) => { if (pr.plans.length && !pr.plans.includes(c.plan)) return; if (pr.sizes.length && !pr.sizes.includes(c.size)) return; if (c.bundled && !pr.withBundles) return;
+      let take = 0;
+      if (pr.vtype === 'free') { if (c.type === 'addon' && c.aid === pr.freeAddon) take = c.rem; }
+      else { if (c.type === 'base' && !pr.lines.base) return; if (c.type === 'addon' && (!pr.lines.addon || !c.discountable)) return;
+        const pctV = pr.vtype === 'percent' ? Math.min(pr.value, pr.code && !pr.auto ? (cat.maxPromoPct || 100) : 100) : 0;
+        take = pr.vtype === 'percent' ? c.rem * pctV / 100 : pr.vtype === 'fixed' ? Math.min(c.rem, pr.value) : 0; }
+      take = Math.min(take, Math.max(0, c.rem - c.floor)); if (pr.maxOff) take = Math.min(take, pr.maxOff - tot);
+      take = Math.max(0, round2(take)); c.rem = round2(c.rem - take); tot += take; });
+    return round2(tot); };
+  const autos = (cat.autos || []).map((p) => Object.assign(normPromo(p), { auto: true })).filter((p) => liveOn(p, today) && (!p.first || firstBuy) && (!p.minCart || sub >= p.minCart) && (!p.countries.length || p.countries.includes(ctry))).sort((a, b) => a.priority - b.priority);
+  // the code a trader typed: a catalog promotion, or an affiliate's code
+  const AFF = require('./affiliates'); let codeP = null; let affRow = null; let promoRow = null;
+  if (promo) {
+    promoRow = (cat.promos || []).find((x) => String(x.code).toUpperCase() === String(promo).toUpperCase());
+    if (promoRow) { const pr = normPromo(promoRow);
+      if (!pr.active) bad('That promo code is not valid');
+      if (pr.starts && today < pr.starts) bad('That code is not active yet');
+      if (pr.ends && today > pr.ends) bad('That code has expired');
+      if (pr.first && !firstBuy) bad('That code is for your first purchase only');
+      if (pr.minCart && sub < pr.minCart) bad(`That code needs a cart of at least ${money(pr.minCart)}`);
+      if (pr.countries.length && ctry && !pr.countries.includes(ctry)) bad('That code is not available in your country');
+      if (pr.total) { const used = (await db.one("SELECT count(*)::int n FROM orders WHERE upper(promo)=$1 AND status='paid'", [pr.code])).n; if (used >= pr.total) bad('That code has been fully used'); }
+      if (pr.perTrader && userId) { const mine = (await db.one("SELECT count(*)::int n FROM orders WHERE user_id=$1 AND upper(promo)=$2 AND status='paid'", [userId, pr.code])).n; if (mine >= pr.perTrader) bad(pr.perTrader === 1 ? 'You have already used this code' : 'You have used this code the maximum number of times'); }
+      codeP = pr;
+    } else { affRow = await AFF.byCode(promo); if (!affRow) bad('That promo code is not valid'); if (userId && affRow.user === userId) bad('You cannot use your own affiliate code');
+      const t = await AFF.tierOf(affRow); if (!t.disc) bad('That code has no discount right now'); codeP = Object.assign(normPromo({ code: affRow.code, pct: t.disc, name: 'Code ' + affRow.code }), { aff: affRow.user }); }
   }
-  if (promoRow && promoDisc === 0) bad('That code does not apply to the plans in your cart');
-  // Bundle discount (not combined with a promo code: the larger one wins)
-  let bundle = null; let bundleDisc = 0;
-  for (const b of (cat.bundles || [])) if (count >= b.min && (!bundle || b.pct > bundle.pct)) bundle = b;
-  if (bundle) bundleDisc = round2(lines.filter((l) => l.kind === 'plan').reduce((s, l) => s + l.amount, 0) * bundle.pct / 100);
-  // Referral: 10% off a referred trader's first order
-  let refDisc = 0;
-  if (userId) { const u = await db.one("SELECT referred_by, (SELECT count(*)::int FROM orders WHERE user_id=$1 AND status='paid') n FROM users WHERE id=$1", [userId]); if (u && u.referred_by && u.n === 0) refDisc = round2(lines.filter((l) => l.kind === 'plan').reduce((s, l) => s + l.amount, 0) * 0.10); }
-  let discount = 0; let applied = null;
-  if (refDisc > promoDisc && refDisc > bundleDisc) { discount = refDisc; applied = { type: 'referral', label: 'Friend referral: 10% off your first order' }; }
-  else if (promoDisc >= bundleDisc && promoDisc > 0) { discount = promoDisc; applied = { type: 'promo', code: promoRow.code, label: `${promoRow.name}: ${promoRow.pct}% off` }; }
-  else if (bundleDisc > 0) { discount = bundleDisc; applied = { type: 'bundle', label: `${bundle.buy}: ${bundle.pct}% off` }; }
-  if (applied) lines.push({ label: applied.label, amount: -discount, kind: 'discount' });
-  // Reward coupon
+  // no code: a referred trader's first order gets the referral discount
+  let refP = null; const RS = await referralSettings();
+  if (!codeP && u && u.referred_by && u.n === 0) { const af = await AFF.byUser(u.referred_by);
+    if (af) { const t = await AFF.tierOf(af); if (t.disc) refP = Object.assign(normPromo({ code: af.code, pct: t.disc }), { label: `Code ${af.code}: ${t.disc}% off`, ref: true }); }
+    else if (RS.on && RS.pct) refP = Object.assign(normPromo({ code: '', pct: RS.pct }), { label: `Friend referral: ${RS.pct}% off your first order`, ref: true }); }
+  const one = codeP || refP;
+  // run the cart with or without the bundle and keep the cheaper result for the trader
+  const run = (useBundle) => { const C = comps.map((c) => Object.assign({}, c)); const sav = []; let bun = null;
+    if (useBundle) { bun = bestBundle(); if (bun) { let left = bun.off; C.filter((c) => c.type === 'base' && bun.hit.includes(c.li)).forEach((c) => { const take = Math.min(left, Math.max(0, c.rem - c.floor)); c.rem = round2(c.rem - take); left = round2(left - take); c.bundled = true; }); sav.push({ label: bun.b._label, amount: round2(bun.off - left), type: 'bundle' }); } }
+    let excl = false; autos.forEach((pr) => { const got = applyPromo(C, pr); if (got) { sav.push({ label: `${pr.name}`, amount: got, type: 'auto' }); if (pr.exclusive) excl = true; } });
+    let codeGot = 0; let why = '';
+    if (one) { if (excl && codeP) why = 'That code can\'t be combined with the current sale'; else { codeGot = applyPromo(C, one); if (codeGot) sav.push({ label: one.label || (one.aff ? `Code ${one.code}: ${one.value}% off` : `${one.name}${one.vtype === 'percent' ? `: ${Math.min(one.value, cat.maxPromoPct || 100)}% off` : one.vtype === 'fixed' ? `: ${money(one.value)} off` : ''}`), amount: codeGot, type: one.ref ? 'referral' : one.aff ? 'affiliate' : 'promo' }); } }
+    return { C, sav, bun, codeGot, why, total: round2(C.reduce((n, c) => n + c.rem, 0)) }; };
+  let R = run(true);
+  if (one && !R.codeGot) { const R2 = run(false); if (R2.codeGot && R2.total < R.total) R = R2; }
+  if (codeP && !R.codeGot) bad(R.why || 'That code does not apply to the plans in your cart');
+  const lines = comps.map((c) => ({ label: c.label, amount: c.amt, kind: c.type === 'base' ? 'plan' : 'addon' })).concat(R.sav.map((x) => ({ label: x.label, amount: -x.amount, kind: 'discount' })));
+  let discount = round2(R.sav.reduce((n, x) => n + x.amount, 0)); let applied = R.sav.length ? { type: R.sav[R.sav.length - 1].type, label: R.sav.map((x) => x.label).join(' + ') } : null;
+  if (codeP && codeP.aff) applied = Object.assign(applied || {}, { type: 'affiliate', code: affRow.code, affiliate: affRow.user });
+  // reward coupon from points
   if (coupon) {
-    const c = await db.one('SELECT * FROM coupons WHERE code=$1 AND user_id=$2 AND used=false', [coupon, userId || 0]);
+    const c = await db.one("SELECT * FROM coupons WHERE code=$1 AND user_id=$2 AND used=false", [coupon, userId || 0]);
     if (!c) bad('That reward code is not valid');
-    if (c.kind === 'discount') { const d = round2((subtotal - discount) * Number(c.pct) / 100); discount += d; lines.push({ label: c.label, amount: -d, kind: 'coupon' }); }
-    if (c.kind === 'free_eval') { const first = norm[0]; if (first.size !== 25000) bad('This reward is for a $25K account'); discount += first.unit; lines.push({ label: c.label, amount: -first.unit, kind: 'coupon' }); }
+    if (c.expires_at ? new Date(c.expires_at) < new Date() : new Date(c.created_at) < new Date(Date.now() - 90 * 86400000)) bad(c.expires_at ? 'That code has expired' : 'That reward code has expired (codes last 90 days)');
+    const left = round2(sub - discount);
+    if (c.kind === 'discount') { const d = round2(left * Number(c.pct) / 100); discount += d; lines.push({ label: c.label, amount: -d, kind: 'coupon' }); }
+    else if (c.kind === 'free_eval') { const first = norm[0]; if (first.size !== 25000) bad('This reward is for a $25K account'); const d = Math.min(left, first.unit); discount += d; lines.push({ label: c.label, amount: -d, kind: 'coupon' }); }
+    else bad('This reward can\'t be used at checkout');
     applied = { ...(applied || {}), coupon: c.code };
   }
-  const total = Math.max(0, round2(subtotal - discount));
-  return { items: norm, lines, subtotal: round2(subtotal), discount: round2(discount), total, applied, promo: promoRow ? promoRow.code : null, coupon: coupon || null };
+  const total = Math.max(0, round2(sub - discount));
+  return { items: norm, lines, subtotal: sub, discount: round2(discount), total, applied, promo: codeP && !codeP.aff ? codeP.code : affRow ? String(affRow.code).toUpperCase() : null, affiliate: affRow ? affRow.user : null, coupon: coupon || null };
 }
 
 const ordCode = async (c) => 'FS-ORD-' + (await (c || db).one("SELECT nextval('seq_order') AS n")).n;
@@ -91,15 +151,16 @@ function simTraits(kind) {
   const sk = kind === 'funded' ? -0.06 + g() * 0.2 : -0.14 + g() * 0.18;
   return { skill: round2(sk), vol: round2(0.75 + Math.random() * 0.5), activity: round2(0.6 + Math.random() * 0.35), seed: Math.floor(Math.random() * 1e9) };
 }
-async function createAccount(c, { userId, orderId, plan, size, platform, addons, kind, parentId }) {
+async function createAccount(c, { userId, orderId, plan, size, platform, addons, kind, parentId, rs }) {
   const cat = await catalog();
+  const snap = rs || R.snapshot(cat, plan, size);
   const k = kind || (plan === 'instant' ? 'funded' : 'evaluation');
   const id = await newAccountId(c, size);
-  const st = R.initialState(cat, { plan, size, kind: k });
+  const st = R.initialState(cat, { plan, size, kind: k, rs: snap });
   const freeResets = (addons || []).includes('reset') ? 1 : 0;
-  await c.q(`INSERT INTO accounts(id,user_id,order_id,parent_id,plan,size,platform,kind,phase,start_bal,balance,peak_eod,floor,cycle_profit_start,addons,free_resets,today_date,sim,funded_at)
-    VALUES($1,$2,$3,$4,$5,$6,$7,$8,'active',$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
-  [id, userId, orderId || null, parentId || null, plan, size, platform || 'Tradovate', k, st.start_bal, st.balance, st.peak_eod, st.floor, st.cycle_profit_start, JSON.stringify(addons || []), freeResets, tradeDate(), simTraits(k), k === 'funded' ? new Date() : null]);
+  await c.q(`INSERT INTO accounts(id,user_id,order_id,parent_id,plan,size,platform,kind,phase,start_bal,balance,peak_eod,floor,cycle_profit_start,addons,free_resets,today_date,sim,funded_at,rs)
+    VALUES($1,$2,$3,$4,$5,$6,$7,$8,'active',$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`,
+  [id, userId, orderId || null, parentId || null, plan, size, platform || 'Tradovate', k, st.start_bal, st.balance, st.peak_eod, st.floor, st.cycle_profit_start, JSON.stringify(addons || []), freeResets, tradeDate(), simTraits(k), k === 'funded' ? new Date() : null, snap]);
   return id;
 }
 
@@ -138,9 +199,16 @@ async function fulfilOrder(orderId) {
     await points(c, o.user_id, pts, o.kind === 'reset' ? 'Reset ' + o.meta.account : o.kind === 'activation' ? 'Activation fee' : 'Bought ' + o.items.map((x) => kLabel(x.size)).join(', ') + ' account' + (made.length > 1 ? 's' : ''));
     // referral reward on first purchase
     const u = await c.one('SELECT referred_by FROM users WHERE id=$1', [o.user_id]);
-    if (u.referred_by && o.kind !== 'reset') {
-      const prev = await c.one("SELECT count(*)::int n FROM orders WHERE user_id=$1 AND status='paid' AND id<>$2", [o.user_id, o.id]);
-      if (prev.n === 0) { await points(c, u.referred_by, 1000, 'Friend bought an account'); await notify(c, u.referred_by, 'A friend you referred bought an account', 'You earned 1,000 points.', 'affiliates'); }
+    if (u.referred_by) {
+      const af = await require('./affiliates').byUser(u.referred_by);
+      if (af) { // affiliates earn cash commission on every paid order from people they referred
+        const t = await require('./affiliates').tierOf(af); const amt = round2(Number(o.total) * t.rate / 100);
+        if (amt > 0) { await notify(c, u.referred_by, `You earned ${money(amt)} commission`, `${t.rate}% of order ${o.code}. It's paid after the 30-day refund window.`, 'affiliates'); M('commission', u.referred_by, { amount: money(amt), order: o.code, order_total: money(o.total), code: af.code, rate: t.rate + '%', url: require('./auth').BASE() + '/app#affiliates' }); }
+      } else if (o.kind !== 'reset') {
+        const RS = await referralSettings();
+        const prev = await c.one("SELECT count(*)::int n FROM orders WHERE user_id=$1 AND status='paid' AND id<>$2", [o.user_id, o.id]);
+        if (prev.n === 0 && RS.on && RS.pts > 0) { await points(c, u.referred_by, RS.pts, 'Friend bought an account'); await notify(c, u.referred_by, 'A friend you referred bought an account', `You earned ${RS.pts.toLocaleString('en-US')} points.`, 'affiliates'); }
+      }
     }
     await c.q("UPDATE orders SET meta = meta || $2 WHERE id=$1", [o.id, JSON.stringify({ fulfilled: true, accounts: made })]);
     return { ...o, accounts: made };
@@ -168,7 +236,7 @@ async function activateFunded(c, accountId, userId, orderId) {
   if (a.phase !== 'passed') bad('This account has not passed yet');
   const existing = await c.one('SELECT id FROM accounts WHERE parent_id=$1', [a.id]);
   if (existing) return existing.id;
-  const id = await createAccount(c, { userId, orderId, plan: a.plan, size: a.size, platform: a.platform, addons: (a.addons || []).filter((x) => x === 'daily'), kind: 'funded', parentId: a.id });
+  const id = await createAccount(c, { userId, orderId, plan: a.plan, size: a.size, platform: a.platform, addons: (a.addons || []).filter((x) => x === 'daily'), kind: 'funded', parentId: a.id, rs: a.rs || undefined });
   const steps = { ...(a.steps || {}), funded: new Date().toISOString(), ...(orderId ? { activation: new Date().toISOString() } : {}) };
   await c.q("UPDATE accounts SET phase='closed', closed_at=now(), steps=$2 WHERE id=$1", [a.id, steps]);
   await c.q('UPDATE accounts SET steps=$2 WHERE id=$1', [id, steps]);
@@ -260,4 +328,4 @@ async function reviewPayout(actorId, code, action, note, batchId) {
   });
 }
 
-module.exports = { catalog, saveCatalog, planDef, sizeDef, kLabel, priceCart, promoFor, ordCode, createAccount, fulfilOrder, resetAccount, activateFunded, signAgreement, requestPayout, reviewPayout, notify, points, audit };
+module.exports = { referralSettings, priceOf, normPromo, catalog, saveCatalog, planDef, sizeDef, kLabel, priceCart, promoFor, ordCode, createAccount, fulfilOrder, resetAccount, activateFunded, signAgreement, requestPayout, reviewPayout, notify, points, audit };

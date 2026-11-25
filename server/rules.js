@@ -1,10 +1,30 @@
 // Rule engine: account rules, trade application, end-of-day close, pass/breach, payout eligibility.
 const { round2 } = require('./util');
 
-function rulesFor(cat, a) {
+// Rules as they were when the account was bought (accounts.rs), so later catalog edits only apply to new purchases.
+function snapshot(cat, plan, size) {
+  return { o: ((cat.planRules || {})[plan] || {})[size] || null, e: (cat.evalRules || {})[size] || null, ec: cat.evalCommon, fc: cat.fundedCommon,
+    fcap: (cat.fundedCaps || {})[size] || null, ir: (cat.instantRules || {})[size] || null, ic: cat.instantCommon, icap: (cat.instantCaps || {})[size] || null, at: new Date().toISOString() };
+}
+function catFor(cat, a) {
+  const s = a && a.rs; if (!s || typeof s !== 'object') return cat;
+  const z = a.size; const pick = (v, base) => (v == null ? base : v);
+  return Object.assign({}, cat, {
+    planRules: Object.assign({}, cat.planRules, { [a.plan]: Object.assign({}, (cat.planRules || {})[a.plan], { [z]: s.o }) }),
+    evalRules: Object.assign({}, cat.evalRules, { [z]: pick(s.e, (cat.evalRules || {})[z]) }), evalCommon: pick(s.ec, cat.evalCommon), fundedCommon: pick(s.fc, cat.fundedCommon),
+    fundedCaps: Object.assign({}, cat.fundedCaps, { [z]: pick(s.fcap, (cat.fundedCaps || {})[z]) }),
+    instantRules: Object.assign({}, cat.instantRules, { [z]: pick(s.ir, (cat.instantRules || {})[z]) }), instantCommon: pick(s.ic, cat.instantCommon),
+    instantCaps: Object.assign({}, cat.instantCaps, { [z]: pick(s.icap, (cat.instantCaps || {})[z]) })
+  });
+}
+function rulesFor(cat0, a) {
+  const cat = catFor(cat0, a);
   const R0 = rulesBase(cat, a); const o = (((cat.planRules || {})[a.plan]) || {})[a.size];
   if (!o) return R0;
-  const R = Object.assign({}, R0); ['target', 'goal', 'dll', 'maxLoss', 'minDays', 'consistency', 'split', 'payoutMin'].forEach((k) => { if (o[k] != null && R0[k] != null) R[k] = Number(o[k]); });
+  const R = Object.assign({}, R0);
+  // Which overrides apply: an evaluation plan's rule set sets the pass rules on the evaluation, and the loss limits, split and minimum on its funded account
+  const keys = R0.instant ? ['goal', 'dll', 'maxLoss', 'consistency', 'split', 'payoutMin'] : R0.kind === 'evaluation' ? ['target', 'dll', 'maxLoss', 'minDays', 'consistency'] : ['dll', 'maxLoss', 'split', 'payoutMin'];
+  keys.forEach((k) => { if (o[k] != null && R0[k] != null) R[k] = Number(o[k]); });
   if (o.contracts != null) { R.fullContracts = Number(o.contracts); R.contracts = R0.fullContracts && R0.contracts < R0.fullContracts ? Math.max(1, Math.floor(o.contracts / 2)) : Number(o.contracts); }
   return R;
 }
@@ -34,8 +54,8 @@ function rulesBase(cat, a) {
 }
 
 // Fresh account values for a new evaluation / funded / instant account
-function initialState(cat, { plan, size, kind }) {
-  const r = rulesFor(cat, { plan, size, kind, payout_count: 0 });
+function initialState(cat, { plan, size, kind, rs }) {
+  const r = rulesFor(cat, { plan, size, kind, payout_count: 0, rs });
   return { start_bal: size, balance: size, peak_eod: size, floor: size - r.maxLoss, cycle_profit_start: size };
 }
 
@@ -141,4 +161,4 @@ function payoutQuote(cat, a, opts = {}) {
   };
 }
 
-module.exports = { rulesFor, initialState, trailFloor, applyTrade, closeDay, evalChecks, payoutQuote };
+module.exports = { snapshot, catFor, rulesFor, initialState, trailFloor, applyTrade, closeDay, evalChecks, payoutQuote };
