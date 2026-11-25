@@ -138,7 +138,7 @@ T.post('/privacy-request', h(async (req) => {
 T.post('/articles/stat', h(async (req) => { await require('./support').articleStat(req.body.t, req.body.kind); }));
 const SETTING_KEYS = ['nEmail', 'nSms', 'nPush', 'nNews', 'nMkt', 'nComp', 'mfaPay'];
 T.post('/settings', h(async (req) => { const o = {}; for (const k of SETTING_KEYS) if (k in req.body) o[k] = !!req.body[k]; await db.q('UPDATE users SET settings = settings || $2 WHERE id=$1', [req.user.id, JSON.stringify(o)]); }));
-T.post('/profile', h(async (req) => { await db.q('UPDATE users SET phone=$2 WHERE id=$1', [req.user.id, clean(req.body.phone, 40)]); }));
+T.post('/profile', h(async (req) => { const ph = require('./phone').parse(req.body.phoneIso, req.body.phone); if (ph.err) bad(ph.err); await db.q("UPDATE users SET phone=$2, settings=COALESCE(settings,'{}'::jsonb)||jsonb_build_object('phoneIso',$3::text) WHERE id=$1", [req.user.id, ph.phone, ph.iso]); return { ok: true, phone: ph.phone }; }));
 T.post('/password', h((req) => auth.changePassword(req)));
 T.post('/sessions/:prefix/revoke', h(async (req) => { await db.q("DELETE FROM sessions WHERE user_id=$1 AND token LIKE $2 || '%' AND token<>$3", [req.user.id, clean(req.params.prefix, 20), req.sess]); }));
 T.post('/journal/note', h(async (req) => {

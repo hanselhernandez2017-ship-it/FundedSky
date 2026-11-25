@@ -70,6 +70,7 @@ async function signup(req, res) {
   if (!emailOk(email)) bad('Enter a valid email address');
   pwRule(pass);
   if (!first || !last) bad('Enter your first and last name');
+  const ph = require('./phone').parse(req.body.phoneIso, req.body.phone); if (ph.err) bad(ph.err);
   const rc = await db.one("SELECT v FROM kv WHERE k='list.countries'"); if (rc && (rc.v || []).some((c) => c.blocked && c.name === country)) bad('Funded Sky is not available in ' + country + ' yet.');
   if (await blockedReq(req, email)) bad('We could not create an account. Contact support if you think this is a mistake.');
   if (await db.one('SELECT 1 FROM users WHERE email=$1', [email])) bad('An account with this email already exists. Log in instead.');
@@ -80,10 +81,10 @@ async function signup(req, res) {
   const role = adminEmails.includes(email) ? 'admin' : inv && ['admin', 'support', 'risk', 'finance'].includes(inv.role) ? inv.role : 'trader';
   require('./integrations').alert('user', `New sign-up: ${first} ${last} from ${country || 'unknown country'}`);
   if (inv) await db.q("UPDATE kv SET v=$1 WHERE k='store.team.invites'", [JSON.stringify(invs.filter((x) => x !== inv))]);
-  const u = await db.one(`INSERT INTO users(tid,email,pass_hash,first,last,country,role,ref_code,referred_by,settings,agreements) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+  const u = await db.one(`INSERT INTO users(tid,email,pass_hash,first,last,country,role,ref_code,referred_by,settings,agreements,phone) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
     ['T-' + n, email, await bcrypt.hash(pass, 10), first, last, country, role, 't' + n, ref,
-      Object.assign({ nEmail: true, nSms: false, nPush: true, nNews: true, nMkt: req.body.offers === true, nComp: true, mfaPay: true }, (() => { try { const c = parseCookies(req.headers.cookie); const f = c.fs_src ? JSON.parse(c.fs_src) : null; const l = c.fs_lsrc ? JSON.parse(c.fs_lsrc) : null; return f || l ? { src: f || l, lsrc: l || f } : {}; } catch (e) { return {}; } })()),
-      { terms: new Date().toISOString(), privacy: new Date().toISOString(), risk: new Date().toISOString(), refund: new Date().toISOString() }]);
+      Object.assign({ nEmail: true, nSms: false, nPush: true, nNews: true, nMkt: req.body.offers === true, nComp: true, mfaPay: true, phoneIso: ph.iso }, (() => { try { const c = parseCookies(req.headers.cookie); const f = c.fs_src ? JSON.parse(c.fs_src) : null; const l = c.fs_lsrc ? JSON.parse(c.fs_lsrc) : null; return f || l ? { src: f || l, lsrc: l || f } : {}; } catch (e) { return {}; } })()),
+      { terms: new Date().toISOString(), privacy: new Date().toISOString(), risk: new Date().toISOString(), refund: new Date().toISOString() }, ph.phone]);
   await sendVerify(u);
   await startSession(req, res, u);
   return { ok: true, user: { email, first, role } };
