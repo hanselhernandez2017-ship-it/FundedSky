@@ -130,6 +130,14 @@ function stripeMethod(pi) {
   const brand = { visa: 'Visa', mastercard: 'Mastercard', amex: 'Amex', discover: 'Discover' }[c.brand] || 'Card';
   return `${c.wallet ? ({ apple_pay: 'Apple Pay', google_pay: 'Google Pay' }[c.wallet.type] || brand) + ' · ' : ''}${brand} •••• ${c.last4}`;
 }
+// A card was declined: remember why, tell staff, and email the trader once per order
+async function declined(o, reason) {
+  await db.q("UPDATE orders SET meta = meta || $2 WHERE id=$1", [o.id, JSON.stringify({ lastDecline: reason || 'Declined', declinedAt: new Date().toISOString() })]);
+  const u = await db.one('SELECT email FROM users WHERE id=$1', [o.user_id]); I.alert('decline', `:warning: Card declined on ${o.code} (${u ? u.email : ''}): ${reason || 'declined'}`);
+  if (!(o.meta && o.meta.payfailSent)) { await db.q("UPDATE orders SET meta = meta || '{\"payfailSent\":true}'::jsonb WHERE id=$1", [o.id]); const it = (o.items || [])[0] || {}; const cat = await core.catalog();
+    require('./mail').t('payfail', o.user_id, { reason: reason || 'Declined by the bank', plan: ((core.planDef(cat, it.plan) || {}).short) || (o.lines && o.lines[0] && o.lines[0].label) || 'Your', size: it.size ? core.kLabel(it.size) : '', amount: '$' + Number(o.total).toFixed(2), url: require('./auth').BASE() + '/checkout/payment?order=' + o.code }); }
+}
+
 async function payOrder(user, code, body) {
   await refreshMode();
   const o = await db.one('SELECT * FROM orders WHERE code=$1 AND user_id=$2', [clean(code, 30), user.id]);
@@ -153,8 +161,7 @@ async function payOrder(user, code, body) {
     const u = await db.one('SELECT * FROM users WHERE id=$1', [user.id]);
     const r = await I.nmi(c, { type: 'sale', amount: total.toFixed(2), currency: 'USD', payment_token: body.token, orderid: o.code, order_description: o.lines.map((l) => l.label).join(', ').slice(0, 250), email: u.email, first_name: u.first, last_name: u.last, country: u.country, ipaddress: body.ip || '', descriptor: c.descriptor || '' });
     if (r.response === '1') { await markPaid(o, 'tailoredpay', r.transactionid, `Card ${r.cc_number ? '•••• ' + String(r.cc_number).slice(-4) : ''}`.trim()); return { paid: true, code: o.code }; }
-    await db.q("UPDATE orders SET meta = meta || $2 WHERE id=$1", [o.id, JSON.stringify({ lastDecline: r.responsetext || 'Declined', declinedAt: new Date().toISOString() })]);
-    I.alert('decline', `:warning: Card declined on ${o.code} (${user.email}): ${r.responsetext || 'declined'}`);
+    await declined(o, r.responsetext || 'Declined');
     const e = new Error((r.response === '2' ? 'Your card was declined: ' : 'The payment could not be processed: ') + (r.responsetext || 'try another card') + (MODE.card === 'tailoredpay' && MODE.stripe ? '. You can also pay with our backup processor.' : '')); e.status = 402; e.fallback = MODE.card === 'tailoredpay' && MODE.stripe; throw e;
   }
   const stripe = await stripeClient();
@@ -193,7 +200,8 @@ async function payOrder(user, code, body) {
   if (MODE.live) bad('Card payments are not available right now. Try crypto, or contact support.');
   // Built-in test mode: only while no payment provider is connected
   const num = String(body.card || '').replace(/\D/g, '');
-  if (num !== '4242424242424242') bad('Test mode: use the test card 4242 4242 4242 4242 with any future date and any CVC');
+  if (num === '4000000000000002') { await declined(o, 'Declined by the bank (test card)'); const e = new Error('Your card was declined: try another card'); e.status = 402; throw e; }
+  if (num !== '4242424242424242') bad('Test mode: use the test card 4242 4242 4242 4242 with any future date and any CVC, or 4000 0000 0000 0002 to see a decline');
   if (!/^\d{2}\s*\/\s*\d{2}$/.test(String(body.exp || '').trim())) bad('Enter the expiry as MM / YY');
   await markPaid(o, 'test', 'test_' + Date.now(), 'Test card •••• 4242');
   return { paid: true, code: o.code };
@@ -230,7 +238,7 @@ async function webhook(req, res) {
     if (ev.type === 'payment_intent.payment_failed') {
       const pi = ev.data.object; const err = (pi.last_payment_error && pi.last_payment_error.message) || 'Declined';
       const o = pi.metadata && pi.metadata.order ? await db.one('SELECT o.*, u.email FROM orders o JOIN users u ON u.id=o.user_id WHERE o.code=$1', [pi.metadata.order]) : null;
-      if (o) { await db.q('UPDATE orders SET meta = meta || $2 WHERE id=$1', [o.id, JSON.stringify({ lastDecline: err, declinedAt: new Date().toISOString() })]); I.alert('decline', `:warning: Card declined on ${o.code} (${o.email}): ${err}`); }
+      if (o) await declined(o, err);
     }
     if (ev.type === 'charge.refunded' && ev.data.object.refunded) {
       const ch = ev.data.object; const o = await db.one("SELECT * FROM orders WHERE provider='stripe' AND status='paid' AND provider_ref=$1", [ch.payment_intent]);

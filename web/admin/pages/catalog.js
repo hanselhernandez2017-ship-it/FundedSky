@@ -53,7 +53,7 @@ function startCatalog(root) {
     if (p.total && p.uses >= p.total) return ['Used Up', 'ended'];
     return ['Live', 'live'];
   };
-  const log = (area, text, ex = {}) => { S.changes.unshift({ id: uid('c'), area, text, who: ME, when: 'Just now', before: ex.before, after: ex.after, approve: !!ex.approve, approved: false }); };
+  const log = (area, text, ex = {}) => { S.changes.unshift({ id: uid('c'), area, text, who: ME, whoId: BO.me.id, when: 'Just now', before: ex.before, after: ex.after, approve: !!ex.approve, approved: false }); };
   const toast = (t) => { S.toast = t; render(); clearTimeout(toast.t); toast.t = setTimeout(() => { S.toast = ''; render(); }, 2200); };
 
   // ---------- checks before publish ----------
@@ -668,8 +668,8 @@ function startCatalog(root) {
       case 'recOn': S.recovery.on = !S.recovery.on; log('Abandoned Checkout', `Recovery emails ${S.recovery.on ? 'on' : 'off'}`); return true;
       case 'recFlag': S.recovery[el.dataset.k] = el.checked; log('Abandoned Checkout', 'Recovery settings changed'); return true;
       case 'roleCk': { const g = S.roles.grid[el.dataset.r]; const c = +el.dataset.c; g[c] = g[c] ? 0 : 1; log('Permissions', `${el.dataset.r}: ${g[c] ? 'can' : "can't"} ${S.roles.caps[c].toLowerCase()}`); return true; }
-      case 'approveOne': { const c = S.changes.find((x) => x.id === id); if (c.who === ME && !SOLO) { toast('Someone other than ' + ME + ' must approve this'); return 'noRender'; } c.approved = true; c.by2 = ME; return true; }
-      case 'approveAll': { const mine = SOLO ? [] : pending().filter((c) => c.who === ME); pending().filter((c) => SOLO || c.who !== ME).forEach((c) => { c.approved = true; c.by2 = ME; }); toast(mine.length ? `Approved. ${mine.length} of your own changes still need someone else.` : 'Approved'); } return 'noRender';
+      case 'approveOne': { const c = S.changes.find((x) => x.id === id); if ((c.whoId ? c.whoId === BO.me.id : c.who === ME) && !SOLO) { toast('Someone other than ' + ME + ' must approve this'); return 'noRender'; } F.put('catalog.draft', { base: LIVE.version || 1, s: draftOf() }).then(() => F.api('/catalog/changes/' + c.id + '/approve', {})).then(() => { c.approved = true; c.by2 = ME; render(); }).catch((e) => toast(e.message)); return 'noRender'; }
+      case 'approveAll': { const own = (c) => (c.whoId ? c.whoId === BO.me.id : c.who === ME); const mine = SOLO ? [] : pending().filter(own); const L = pending().filter((c) => SOLO || !own(c)); F.put('catalog.draft', { base: LIVE.version || 1, s: draftOf() }).then(() => Promise.all(L.map((c) => F.api('/catalog/changes/' + c.id + '/approve', {}).then(() => { c.approved = true; c.by2 = ME; })))).then(() => { toast(mine.length ? `Approved. ${mine.length} of your own changes still need someone else.` : 'Approved'); render(); }).catch((e) => toast(e.message)); } return 'noRender';
       case 'exportCat': { const blob = new Blob([JSON.stringify(toCat(), null, 2)], { type: 'application/json' }); const a2 = document.createElement('a'); a2.href = URL.createObjectURL(blob); a2.download = 'funded-sky-catalog-v' + S.version + '.json'; document.body.appendChild(a2); a2.click(); setTimeout(() => { URL.revokeObjectURL(a2.href); a2.remove(); }, 500); toast('Catalog downloaded'); return 'noRender'; }
       case 'importCat': S.drawer = { kind: 'import', f: { text: '' } }; return true;
     }

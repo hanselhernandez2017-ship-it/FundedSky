@@ -48,11 +48,13 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 <h1 class="fs-h1" style="margin: 0; font-size: 32px; line-height: 36px; font-weight: 600; letter-spacing: -0.03em;">Create Your Account.</h1>
 <p style="margin: 0; font-size: 15px; line-height: 22px; color: #D4CFCD;">One account for every evaluation, funded account and payout.</p>
 </div>
+<sc-if value="{{ social }}" hint-placeholder-val="{{ false }}">
 <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px;">
 <button type="button" class="fs-ghost" style="height: 48px; background: #111113; border: 1px solid #26262A; border-radius: 4px; color: #F4F2F1; font: inherit; font-size: 14px; font-weight: 500; cursor: pointer;">Google</button>
 <button type="button" class="fs-ghost" style="height: 48px; background: #111113; border: 1px solid #26262A; border-radius: 4px; color: #F4F2F1; font: inherit; font-size: 14px; font-weight: 500; cursor: pointer;">Apple</button>
 </div>
 <div style="display: flex; align-items: center; gap: 12px; font-size: 12px; color: #9C9693;"><span style="flex: 1; height: 1px; background: #26262A;"></span>or sign up with email<span style="flex: 1; height: 1px; background: #26262A;"></span></div>
+</sc-if>
 <form style="display: flex; flex-direction: column; gap: 16px;">
 <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px;">
 <div style="display: flex; flex-direction: column; gap: 6px; min-width: 0;"><label for="first" style="font-size: 13px; color: #9C9693;">First Name</label><input id="first" class="fs-in" type="text" autocomplete="given-name" value="{{ first }}" onChange="{{ setFirst }}" aria-invalid="{{ firstBad }}" style="min-width: 0; height: 48px; box-sizing: border-box; background: #111113; border-radius: 4px; padding: 0 14px; color: #F4F2F1; font: inherit; font-size: 15px; border-color: {{ firstBd }};"><sc-if value="{{ firstBad }}" hint-placeholder-val="{{ false }}"><span style="font-size: 13px; color: #F2777F;">Required.</span></sc-if></div>
@@ -66,11 +68,11 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 <sc-for list="{{ rules }}" as="r" hint-placeholder-count="3"><li style="display: flex; align-items: center; gap: 6px; color: {{ r.color }};"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ r.icon }}"></path></svg>{{ r.label }}</li></sc-for>
 </ul>
 </div>
-<div style="display: flex; flex-direction: column; gap: 6px;"><label for="country" style="font-size: 13px; color: #9C9693;">Country of Residence</label><select id="country" class="fs-in" style="height: 48px; box-sizing: border-box; background: #111113; border-radius: 4px; padding: 0 14px; color: #F4F2F1; font: inherit; font-size: 15px;"><option>United States</option><option>Canada</option><option>United Kingdom</option></select></div>
+<div style="display: flex; flex-direction: column; gap: 6px;"><label for="country" style="font-size: 13px; color: #9C9693;">Country of Residence</label><select id="country" class="fs-in" onChange="{{ setCountry }}" style="height: 48px; box-sizing: border-box; background: #111113; border-radius: 4px; padding: 0 14px; color: #F4F2F1; font: inherit; font-size: 15px;"><sc-for list="{{ countries }}" as="c" hint-placeholder-count="3"><option value="{{ c.n }}" selected="{{ c.sel }}">{{ c.n }}</option></sc-for></select></div>
 <div style="display: flex; flex-direction: column; gap: 6px;">
 <label style="display: flex; align-items: flex-start; gap: 12px; font-size: 14px; line-height: 20px; color: #D4CFCD; cursor: pointer;"><input type="checkbox" class="fs-check" checked="{{ agreed }}" onChange="{{ toggleAgree }}"><span>I agree to the <a href="/terms">Terms</a> and <a href="/privacy">Privacy Policy</a>, and I'm 18 or older.</span></label>
 <sc-if value="{{ agreeBad }}" hint-placeholder-val="{{ false }}"><span style="font-size: 13px; color: #F2777F; padding-left: 32px;">Please accept to continue.</span></sc-if>
-<label style="display: flex; align-items: center; gap: 12px; font-size: 14px; color: #D4CFCD; cursor: pointer;"><input type="checkbox" class="fs-check">Send Me Product Updates and Offers</label>
+<label style="display: flex; align-items: center; gap: 12px; font-size: 14px; color: #D4CFCD; cursor: pointer;"><input type="checkbox" class="fs-check" checked="{{ offers }}" onChange="{{ toggleOffers }}">Send Me Product Updates and Offers</label>
 </div>
 <sc-if value="{{ valid }}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{ submit }}" disabled="{{ busy }}" style="width: 100%; border: 0; cursor: pointer; font: inherit; height: 48px; display: flex; align-items: center; justify-content: center; background: #FFFFFF; color: #111113; border-radius: 4px; font-size: 15px; font-weight: 600; font-stretch: 112%; text-decoration: none;">{{ cta }}</button></sc-if>
 <sc-if value="{{ invalid }}" hint-placeholder-val="{{ true }}"><button type="button" onClick="{{ submit }}" style="height: 48px; background: #FFFFFF; color: #111113; border: 0; border-radius: 4px; font: inherit; font-size: 15px; font-weight: 600; font-stretch: 112%; cursor: pointer;">Create Account</button></sc-if><sc-if value="{{ err }}"><p role="alert" style="margin: 10px 0 0; font-size: 13.5px; line-height: 19px; color: #F2777F;">{{ err }}</p></sc-if>
@@ -83,12 +85,13 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 </x-dc>
 <script type="text/x-dc" data-dc-script data-props='{"mobileLinks":{"editor":"boolean","default":false},"$preview":{"width":1280,"height":1100}}'>
 class Component extends DCLogic {
-  constructor(props) { super(props); this.state = { first: '', last: '', email: '', pw: '', show: false, agreed: false, submitted: false, busy: false, err: '' }; }
+  constructor(props) { super(props); this.state = { first: '', last: '', email: '', pw: '', country: 'United States', offers: false, show: false, agreed: false, submitted: false, busy: false, err: '' }; }
+  componentDidMount() {}
   async submit() {
     this.setState({ submitted: true });
     const v = this.renderVals(); if (!v.valid || this.state.busy) return;
     const st = this.state; this.setState({ busy: true, err: '' });
-    try { await DC.api('/api/auth/signup', { email: st.email.trim(), password: st.pw, first: st.first.trim(), last: st.last.trim(), ref: DC.qs('ref') || undefined }); const n = DC.qs('next'); location.href = '/verify-email' + (n ? '?next=' + encodeURIComponent(n) : ''); }
+    try { await DC.api('/api/auth/signup', { email: st.email.trim(), password: st.pw, first: st.first.trim(), last: st.last.trim(), country: (document.getElementById('country') || {}).value || st.country, offers: !!st.offers, ref: DC.qs('ref') || undefined }); const n = DC.qs('next'); location.href = '/verify-email' + (n ? '?next=' + encodeURIComponent(n) : ''); }
     catch (e) { this.setState({ busy: false, err: e.message }); }
   }
   renderVals() {
@@ -100,6 +103,8 @@ class Component extends DCLogic {
     const valid = Object.keys(ok).every((k) => ok[k]);
     const set = (k) => (e) => this.setState({ [k]: e.target.value, err: '' });
     return {
+      social: false, countries: ["United States", "Canada", "United Kingdom", "Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Antigua and Barbuda", "Argentina", "Armenia", "Australia", "Austria", "Azerbaijan", "Bahamas", "Bahrain", "Bangladesh", "Barbados", "Belarus", "Belgium", "Belize", "Benin", "Bhutan", "Bolivia", "Bosnia and Herzegovina", "Botswana", "Brazil", "Brunei", "Bulgaria", "Burkina Faso", "Burundi", "Cambodia", "Cameroon", "Cape Verde", "Central African Republic", "Chad", "Chile", "China", "Colombia", "Comoros", "Congo", "Costa Rica", "Croatia", "Cuba", "Cyprus", "Czechia", "Denmark", "Djibouti", "Dominica", "Dominican Republic", "DR Congo", "Ecuador", "Egypt", "El Salvador", "Equatorial Guinea", "Eritrea", "Estonia", "Eswatini", "Ethiopia", "Fiji", "Finland", "France", "Gabon", "Gambia", "Georgia", "Germany", "Ghana", "Greece", "Grenada", "Guatemala", "Guinea", "Guinea-Bissau", "Guyana", "Haiti", "Honduras", "Hong Kong", "Hungary", "Iceland", "India", "Indonesia", "Iran", "Iraq", "Ireland", "Israel", "Italy", "Ivory Coast", "Jamaica", "Japan", "Jordan", "Kazakhstan", "Kenya", "Kiribati", "Kosovo", "Kuwait", "Kyrgyzstan", "Laos", "Latvia", "Lebanon", "Lesotho", "Liberia", "Libya", "Liechtenstein", "Lithuania", "Luxembourg", "Macau", "Madagascar", "Malawi", "Malaysia", "Maldives", "Mali", "Malta", "Marshall Islands", "Mauritania", "Mauritius", "Mexico", "Micronesia", "Moldova", "Monaco", "Mongolia", "Montenegro", "Morocco", "Mozambique", "Myanmar", "Namibia", "Nauru", "Nepal", "Netherlands", "New Zealand", "Nicaragua", "Niger", "Nigeria", "North Korea", "North Macedonia", "Norway", "Oman", "Pakistan", "Palau", "Palestine", "Panama", "Papua New Guinea", "Paraguay", "Peru", "Philippines", "Poland", "Portugal", "Puerto Rico", "Qatar", "Romania", "Russia", "Rwanda", "Saint Kitts and Nevis", "Saint Lucia", "Saint Vincent and the Grenadines", "Samoa", "San Marino", "Sao Tome and Principe", "Saudi Arabia", "Senegal", "Serbia", "Seychelles", "Sierra Leone", "Singapore", "Slovakia", "Slovenia", "Solomon Islands", "Somalia", "South Africa", "South Korea", "South Sudan", "Spain", "Sri Lanka", "Sudan", "Suriname", "Sweden", "Switzerland", "Syria", "Taiwan", "Tajikistan", "Tanzania", "Thailand", "Timor-Leste", "Togo", "Tonga", "Trinidad and Tobago", "Tunisia", "Turkey", "Turkmenistan", "Tuvalu", "UAE", "Uganda", "Ukraine", "Uruguay", "Uzbekistan", "Vanuatu", "Vatican City", "Venezuela", "Vietnam", "Yemen", "Zambia", "Zimbabwe"].map((n) => ({ n, sel: n === st.country })),
+      setCountry: (e) => this.setState({ country: e.target.value }), toggleOffers: () => this.setState({ offers: !st.offers }), offers: st.offers,
       first: st.first, last: st.last, email: st.email, pw: st.pw, agreed: st.agreed, rules,
       setFirst: set('first'), setLast: set('last'), setEmail: set('email'), setPw: set('pw'),
       toggleShow: () => this.setState({ show: !st.show }), toggleAgree: () => this.setState({ agreed: !st.agreed }),

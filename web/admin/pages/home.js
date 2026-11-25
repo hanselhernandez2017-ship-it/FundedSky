@@ -113,9 +113,9 @@ function startBoard(root) {
   const F = window.FSG; const BO = F.BO;
   const M = (() => { const P = F.paid(); const ev = BO.accounts.filter((a) => a.kind === 'evaluation'); const fu = BO.accounts.filter((a) => a.kind === 'funded');
     const owed = BO.payouts.filter((p) => ['requested', 'approved'].includes(p.status)).reduce((s, p) => s + p.amount, 0);
-    const liab = fu.filter((a) => a.phase === 'active').reduce((s, a) => s + Math.max(0, a.avail), 0) + owed;
+    const liab = fu.filter((a) => !['breached', 'closed'].includes(a.phase)).reduce((s, a) => s + Math.max(0, a.avail || 0), 0) + owed;
     const revS = F.series(P, 'paid', (o) => o.total, 60); const rev30 = revS.slice(30); const prev30 = F.sum(revS.slice(0, 30));
-    return { P, ev, fu, owed, liab, revS, rev30, prev30, r30: F.sum(rev30), today: P.filter((o) => F.today(o.paid)), liveEval: ev.filter((a) => a.phase === 'active'), liveFund: fu.filter((a) => a.phase === 'active') }; })();
+    return { P, ev, fu, owed, liab, revS, rev30, prev30, r30: F.sum(rev30), today: P.filter((o) => F.today(o.paid)), liveEval: ev.filter((a) => a.phase === 'active'), liveFund: fu.filter((a) => a.phase === 'active' || a.phase === 'review') }; })();
   const plat = [...new Set(M.liveEval.map((a) => a.platform))];
   const fundedS = F.daysIso(30).map((d) => BO.accounts.filter((a) => a.kind === 'funded' && a.created && F.isoET(a.created) <= d && (!a.breached || F.isoET(a.breached) > d) && (!a.closed || F.isoET(a.closed) > d)).length);
   const evalS = F.daysIso(30).map((d) => BO.accounts.filter((a) => a.kind === 'evaluation' && a.created && F.isoET(a.created) <= d && (!a.breached || F.isoET(a.breached) > d) && (!a.passed || F.isoET(a.passed) > d)).length);

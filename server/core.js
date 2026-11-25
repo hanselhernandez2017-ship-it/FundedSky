@@ -189,7 +189,7 @@ async function fulfilOrder(orderId) {
       for (const id of made) await notify(c, o.user_id, `Your account ${id} is ready`, 'Log in to your platform and place your first trade. Your rules are on the account page.', 'account?acct=' + id);
       for (const id of made) { const ac = await c.one('SELECT plan, size, platform FROM accounts WHERE id=$1', [id]); M('ready', o.user_id, { account: id, plan: await pName(ac.plan), size: kLabel(ac.size), platform: ac.platform, login: id, server: 'Funded Sky Simulated Feed', url: require('./auth').BASE() + '/app#account?acct=' + id }); }
     } else if (o.kind === 'reset') {
-      await resetAccount(c, o.meta.account, o.user_id);
+      await resetAccount(c, o.meta.account, o.user_id, o.total);
       made.push(o.meta.account);
     } else if (o.kind === 'activation') {
       made.push(await activateFunded(c, o.meta.account, o.user_id, o.id));
@@ -215,7 +215,7 @@ async function fulfilOrder(orderId) {
   });
 }
 
-async function resetAccount(c, accountId, userId) {
+async function resetAccount(c, accountId, userId, paid = 0) {
   const a = await c.one('SELECT * FROM accounts WHERE id=$1 AND user_id=$2 FOR UPDATE', [accountId, userId]);
   if (!a) bad('Account not found', 404);
   if (a.kind !== 'evaluation') bad('Only evaluations can be reset');
@@ -226,7 +226,7 @@ async function resetAccount(c, accountId, userId) {
   await c.q("UPDATE trades SET note='before reset' WHERE account_id=$1 AND note=''", [a.id]);
   await c.q('DELETE FROM trades WHERE account_id=$1', [a.id]);
   await notify(c, userId, `${a.id} has been reset`, 'Fresh balance, same rules. Good luck.', 'account?acct=' + a.id);
-  M('resetdone', userId, { account: a.id, plan: await pName(a.plan), size: kLabel(a.size), platform: a.platform, url: require('./auth').BASE() + '/app#account?acct=' + a.id });
+  M('resetdone', userId, { account: a.id, plan: await pName(a.plan), size: kLabel(a.size), platform: a.platform, balance: money(st.balance), paid: Number(paid) > 0 ? money(paid) : 'Free', url: require('./auth').BASE() + '/app#account?acct=' + a.id });
 }
 
 // Passed evaluation -> funded account (Prime after agreement; Essential after activation fee)
@@ -245,6 +245,11 @@ async function activateFunded(c, accountId, userId, orderId) {
   return id;
 }
 
+// "Your funded agreement is ready": once the evaluation is passed and identity is verified
+async function agreementReady(c, a) {
+  const cat = await catalog(); const r = R.rulesFor(cat, Object.assign({}, a, { kind: 'funded', rs: null, payout_count: 0 }));
+  M('agreement', a.user_id, { account: a.id, split: (r.split || 90) + '%', payout_rule: `${r.winDays || 5} winning days of $${r.winDayMin || 100}+ for each payout`, url: require('./auth').BASE() + '/app#account?acct=' + a.id });
+}
 async function signAgreement(userId, accountId) {
   return db.tx(async (c) => {
     const a = await c.one('SELECT * FROM accounts WHERE id=$1 AND user_id=$2 FOR UPDATE', [accountId, userId]);
@@ -254,6 +259,7 @@ async function signAgreement(userId, accountId) {
     await c.q("UPDATE users SET agreements = agreements || $2 WHERE id=$1", [userId, JSON.stringify({ funded: new Date().toISOString() })]);
     const cat = await catalog(); const s = sizeDef(cat, a.plan, a.size);
     if (!s.activation) { const id = await activateFunded(c, a.id, userId, null); return { funded: id }; }
+    if (!(a.steps && a.steps.agreement)) M('actfee', userId, { account: a.id, plan: await pName(a.plan), size: kLabel(a.size), fee: money(s.activation), url: require('./auth').BASE() + '/app#account?acct=' + a.id });
     return { activation: s.activation };
   });
 }
@@ -272,6 +278,7 @@ async function requestPayout(userId, accountId, amount, methodId) {
     const m = await c.one('SELECT * FROM payout_methods WHERE id=$1 AND user_id=$2', [methodId, userId]);
     if (!m) bad('Add a payout method first');
     if (new Date(m.unlock_at) > new Date()) bad('This payout method is still in its 48-hour safety hold');
+    if (/usdc/i.test(m.rail) && (((await c.one("SELECT v FROM kv WHERE k='settings.flags'")) || {}).v || {}).cryptoPayouts === false) bad('USDC payouts are switched off right now. Pick another payout method.');
     const gross = round2(net / (qd.split / 100));
     const code = 'PO-' + (await c.one("SELECT nextval('seq_payout') n")).n;
     await c.q(`INSERT INTO payouts(code,account_id,user_id,number,gross,split,amount,method,rail) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
@@ -328,4 +335,4 @@ async function reviewPayout(actorId, code, action, note, batchId) {
   });
 }
 
-module.exports = { referralSettings, priceOf, normPromo, catalog, saveCatalog, planDef, sizeDef, kLabel, priceCart, promoFor, ordCode, createAccount, fulfilOrder, resetAccount, activateFunded, signAgreement, requestPayout, reviewPayout, notify, points, audit };
+module.exports = { agreementReady, referralSettings, priceOf, normPromo, catalog, saveCatalog, planDef, sizeDef, kLabel, priceCart, promoFor, ordCode, createAccount, fulfilOrder, resetAccount, activateFunded, signAgreement, requestPayout, reviewPayout, notify, points, audit };

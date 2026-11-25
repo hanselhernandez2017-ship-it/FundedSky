@@ -20,7 +20,7 @@ async function byCode(code) { if (!code) return null; const c = String(code).toU
 async function summary(uid) {
   const x = (await list()).find((y) => y.user === uid); if (!x) return null;
   const st = await settings(); const t = await tierOf(x);
-  const os = await db.all("SELECT o.total::float total, o.status, o.paid_at FROM orders o JOIN users u ON u.id=o.user_id WHERE u.referred_by=$1 AND o.status IN ('paid','refunded')", [uid]);
+  const os = await db.all("SELECT o.total::float total, o.status, o.paid_at FROM orders o JOIN users u ON u.id=o.user_id WHERE u.referred_by=$1 AND o.status IN ('paid','refunded') AND COALESCE(o.meta->>'chargeback','') NOT IN ('lost','accepted')", [uid]);
   const paid = os.filter((o) => o.status === 'paid'); const old = (o) => !st.hold30 || (Date.now() - new Date(o.paid_at)) > 30 * 86400000;
   const earned = paid.filter(old).reduce((s, o) => s + o.total * t.rate / 100, 0); const held = paid.filter((o) => !old(o)).reduce((s, o) => s + o.total * t.rate / 100, 0);
   const paidOut = ((await kv('store.affiliate.payments')) || []).filter((p) => p.user === uid).reduce((s, p) => s + Number(p.amount || 0), 0);

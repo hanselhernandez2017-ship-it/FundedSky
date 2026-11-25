@@ -57,7 +57,7 @@ function text(e, vars) {
   const rows = (e.r || []).map(([k, v]) => [f(k), f(v)]).filter(([, v]) => v.trim());
   return [f(e.h) + (e.a ? ' ' + f(e.a) : ''), e.p ? f(e.p) : '', e.pg ? `${f(e.pg[0])}: ${f(e.pg[3])}` : '', e.al ? f(e.al[1]) : '', ...[].concat(e.b || []).map(f), e.c ? f(e.c) : '', rows.map(([k, v]) => `${k}: ${v}`).join('\n'), (e.st || []).map(([t, d], i) => `${i + 1}. ${f(t)}: ${f(d)}`).join('\n'), e.cta && vars.url ? `${f(e.cta)}: ${vars.url}` : '', e.n2 ? f(e.n2) : ''].filter(Boolean).join('\n\n');
 }
-async function deliver({ to, subject, body, html, template, from, status, uid }) {
+async function deliver({ to, subject, body, html, template, from, status, uid, unsub }) {
   const c = await I.cfg('resend').catch(() => null);
   const key = (c && c.apiKey) || process.env.RESEND_API_KEY;
   const row = await db.one('INSERT INTO outbox(to_email,subject,body,template,status,user_id) VALUES($1,$2,$3,$4,$5,$6) RETURNING id', [to, subject, body, template || '', status || (key ? 'queued' : 'logged'), uid || null]);
@@ -65,7 +65,7 @@ async function deliver({ to, subject, body, html, template, from, status, uid })
   const base = (c && c.from) || process.env.MAIL_FROM || 'Funded Sky <hello@fundedsky.com>';
   let fromH = base; if (from) { const dom = (base.match(/@([^>\s]+)/) || [])[1]; if (dom) fromH = `${from[0]} <${from[1].split('@')[0]}@${dom}>`; }
   try {
-    const r = await fetch('https://api.resend.com/emails', { method: 'POST', headers: { Authorization: 'Bearer ' + key, 'Content-Type': 'application/json' }, body: JSON.stringify({ from: fromH, to: [to], subject, text: body, html: html || plainHtml(subject, body), tags: template ? [{ name: 'template', value: template }] : undefined }) });
+    const r = await fetch('https://api.resend.com/emails', { method: 'POST', headers: { Authorization: 'Bearer ' + key, 'Content-Type': 'application/json' }, body: JSON.stringify({ from: fromH, to: [to], subject, text: body, html: html || plainHtml(subject, body), tags: template ? [{ name: 'template', value: template }] : undefined, headers: unsub ? { 'List-Unsubscribe': `<${unsub}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' } : undefined }) });
     const j = await r.json().catch(() => ({}));
     await db.q('UPDATE outbox SET status=$2, ext_id=$3 WHERE id=$1', [row.id, r.ok ? 'sent' : 'failed', j.id || null]);
     if (!r.ok) console.error('resend', j.message || r.status);
@@ -76,11 +76,44 @@ function plainHtml(subject, body) {
   const linked = esc(body).replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" style="color:#7CC4FF">$1</a>').replace(/\n/g, '<br>');
   return render({ s: subject, h: subject, b: [], flow: '' }, {}, BRAND0).replace('<div style="padding:16px 26px 28px">', `<div style="padding:16px 26px 28px"><div style="font-size:14.5px;line-height:1.6;color:#D4CFCD">${linked}</div>`);
 }
+// One-click unsubscribe links are signed so nobody can unsubscribe someone else
+const crypto = require('crypto');
+async function unsubSecret() { let r = await kv('secret.unsub'); if (!r) { r = crypto.randomBytes(24).toString('hex'); await db.q("INSERT INTO kv(k,v) VALUES('secret.unsub',$1) ON CONFLICT (k) DO NOTHING", [JSON.stringify(r)]); r = await kv('secret.unsub'); } return r; }
+async function unsubLink(uid) { const sig = crypto.createHmac('sha256', await unsubSecret()).update(String(uid)).digest('hex').slice(0, 32); return `${require('./auth').BASE()}/unsubscribe?u=${uid}&t=${sig}`; }
+async function unsubCheck(uid, t) { const sig = crypto.createHmac('sha256', await unsubSecret()).update(String(uid)).digest('hex').slice(0, 32); return typeof t === 'string' && t.length === 32 && crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(t)); }
+// Rough time zone from country, for quiet hours
+const TZ = { 'United States': 'America/New_York', Canada: 'America/Toronto', Mexico: 'America/Mexico_City', Brazil: 'America/Sao_Paulo', Argentina: 'America/Argentina/Buenos_Aires', Colombia: 'America/Bogota', Chile: 'America/Santiago', Peru: 'America/Lima', 'United Kingdom': 'Europe/London', Ireland: 'Europe/Dublin', Portugal: 'Europe/Lisbon', Germany: 'Europe/Berlin', France: 'Europe/Paris', Spain: 'Europe/Madrid', Italy: 'Europe/Rome', Netherlands: 'Europe/Amsterdam', Poland: 'Europe/Warsaw', Sweden: 'Europe/Stockholm', Norway: 'Europe/Oslo', Switzerland: 'Europe/Zurich', Czechia: 'Europe/Prague', Romania: 'Europe/Bucharest', Ukraine: 'Europe/Kyiv', Turkey: 'Europe/Istanbul', Cyprus: 'Asia/Nicosia', Israel: 'Asia/Jerusalem', UAE: 'Asia/Dubai', 'Saudi Arabia': 'Asia/Riyadh', Egypt: 'Africa/Cairo', Nigeria: 'Africa/Lagos', Ghana: 'Africa/Accra', Kenya: 'Africa/Nairobi', 'South Africa': 'Africa/Johannesburg', Morocco: 'Africa/Casablanca', India: 'Asia/Kolkata', Pakistan: 'Asia/Karachi', Thailand: 'Asia/Bangkok', Vietnam: 'Asia/Ho_Chi_Minh', Malaysia: 'Asia/Kuala_Lumpur', Singapore: 'Asia/Singapore', Indonesia: 'Asia/Jakarta', Philippines: 'Asia/Manila', 'Hong Kong': 'Asia/Hong_Kong', China: 'Asia/Shanghai', 'South Korea': 'Asia/Seoul', Japan: 'Asia/Tokyo', Australia: 'Australia/Sydney', 'New Zealand': 'Pacific/Auckland' };
+const mins = (s) => { const [h, m] = String(s || '0:0').split(':').map(Number); return (h || 0) * 60 + (m || 0); };
+function quietNow(rules, country, d = new Date()) { if (!rules.quiet) return false; const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: TZ[country] || 'America/New_York', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(d).map((x) => [x.type, x.value]));
+  const n = (+p.hour) * 60 + (+p.minute), a = mins(rules.qFrom), b = mins(rules.qTo); return a > b ? n >= a || n < b : n >= a && n < b; }
+const MK = Object.keys(DEFS.E).filter((k) => DEFS.E[k].mk);
+// Whether a trader's own switches, the caps and quiet hours let this email go now: 'send', 'skip' or 'hold'
+async function gate(e, key, u, C) {
+  if (e.req || !u) return 'send';
+  const st = u.settings || {};
+  if (e.mk) {
+    if (st.nMkt !== true) return 'skip';
+    if (C.rules.noMkAfterBreach && (await db.one("SELECT 1 FROM accounts WHERE user_id=$1 AND breached_at > now() - interval '24 hours' LIMIT 1", [u.id]))) return 'skip';
+    const n = await db.one("SELECT count(*) FILTER (WHERE created_at > now() - interval '1 day')::int d, count(*)::int w FROM outbox WHERE user_id=$1 AND template = ANY($2) AND created_at > now() - interval '7 days' AND status NOT IN ('suppressed','test')", [u.id, MK]);
+    if (n.d >= (parseInt(C.rules.capDay, 10) || 1) || n.w >= (parseInt(C.rules.capWeek, 10) || 3)) return 'skip';
+    if (quietNow(C.rules, u.country)) return 'hold';
+    return 'send';
+  }
+  if (key === 'news') return st.nNews === false ? 'skip' : 'send';
+  return st.nEmail === false ? 'skip' : 'send';
+}
+// Marketing held for quiet hours goes out when automations run after quiet hours end
+async function releaseHeld() { const list = (await kv('mail.held')) || []; if (!list.length) return 0; const C = await cfg(); const keep = []; let n = 0;
+  for (const h of list) { const u = await db.one('SELECT id, country FROM users WHERE id=$1', [h.uid]); if (u && quietNow(C.rules, u.country) && new Date(h.at) > new Date(Date.now() - 864e5)) { keep.push(h); continue; } if (u) { await sendT(h.key, h.to, h.vars, Object.assign({}, h.opt, { released: true })); n++; } }
+  await db.q("INSERT INTO kv(k,v) VALUES('mail.held',$1) ON CONFLICT (k) DO UPDATE SET v=$1, updated_at=now()", [JSON.stringify(keep)]); return n; }
 // Templated send. vars: merge fields ({first_name}, {account}, ...) and url for the button.
 async function sendT(key, to, vars = {}, opt = {}) {
   const C = await cfg(); const e = tplOf(C, key);
   if (!e) return;
   if (!e.on && !opt.force) return;
+  const u = opt.uid ? await db.one('SELECT id, country, settings FROM users WHERE id=$1', [opt.uid]) : await db.one('SELECT id, country, settings FROM users WHERE lower(email)=lower($1)', [String(to)]);
+  if (!opt.force) { const g = await gate(e, key, u, C); if (g === 'skip') return; if (g === 'hold' && !opt.released) { const list = (await kv('mail.held')) || []; list.push({ key, to, vars, opt: { uid: u.id }, uid: u.id, at: new Date().toISOString() }); await db.q("INSERT INTO kv(k,v) VALUES('mail.held',$1) ON CONFLICT (k) DO UPDATE SET v=$1, updated_at=now()", [JSON.stringify(list)]); return; } }
+  if (e.mk && u) { vars = Object.assign({ unsub: await unsubLink(u.id), prefs: require('./auth').BASE() + '/app#settings?tab=notif' }, vars); }
   const addr = String(to).toLowerCase(); const sup = C.supp.find((x) => String(x.a).toLowerCase() === addr);
   let status = null;
   if (sup && (sup.k === 'Bounced' || e.mk)) status = 'suppressed';
@@ -88,7 +121,7 @@ async function sendT(key, to, vars = {}, opt = {}) {
   let dest = to; if (C.rules.test && !opt.force) { if (C.rules.testTo && /@/.test(C.rules.testTo) && !/\[/.test(C.rules.testTo)) dest = C.rules.testTo; else status = status || 'test'; }
   const base = require('./auth').BASE(); const V = Object.assign({ url: base + '/dashboard' }, vars);
   const f = (t) => String(t == null ? '' : t).replace(/\{(\w+)\}/g, (m, k) => (V[k] != null ? V[k] : ''));
-  return deliver({ to: dest, subject: f(e.s), body: text(e, V), html: render(e, V, C.brand), template: key, from: DEFS.SENDERS[e.fr] || DEFS.SENDERS.hello, status, uid: opt.uid });
+  return deliver({ to: dest, subject: f(e.s), body: text(e, V), html: render(e, V, C.brand), template: key, from: DEFS.SENDERS[e.fr] || DEFS.SENDERS.hello, status, uid: opt.uid || (u && u.id), unsub: e.mk ? V.unsub : undefined });
 }
 // Fire-and-forget templated email to a user by id.
 function t(key, userId, vars = {}, opt) {
@@ -123,4 +156,4 @@ async function hook(req, res) {
   }
   res.json({ ok: true });
 }
-module.exports = { deliverRaw: deliver, hook,  send, sendT, t, render, cfg, tplOf, DEFS };
+module.exports = { deliverRaw: deliver, hook,  send, sendT, t, render, cfg, tplOf, DEFS, unsubLink, unsubCheck, releaseHeld, quietNow };

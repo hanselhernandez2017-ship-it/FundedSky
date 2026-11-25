@@ -54,13 +54,29 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 <div role="status" style="display: flex; gap: 12px; align-items: center; background: #13202E; border: 1px solid #7CC4FF; border-radius: 8px; padding: 16px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7CC4FF" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"></path></svg><span style="font-size: 14px; line-height: 20px; color: #F4F2F1;">Logged in. Taking you to your dashboard…</span></div>
 </sc-if>
 
+<sc-if value="{{ mfaStep }}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-direction: column; gap: 16px;">
+<p style="margin: 0; font-size: 15px; line-height: 22px; color: #D4CFCD;">Enter the six-digit code from your authenticator app. Lost your phone? Use one of your backup codes.</p>
+<div style="display: flex; flex-direction: column; gap: 6px;">
+<label for="code" style="font-size: 13px; color: #9C9693;">Code</label>
+<input id="code" class="fs-in" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="11" placeholder="000000" value="{{ code }}" onChange="{{ setCode }}" aria-invalid="{{ codeBad }}" aria-describedby="code-err" style="height: 48px; box-sizing: border-box; background: #111113; border-radius: 4px; padding: 0 14px; color: #F4F2F1; font: inherit; font-size: 20px; letter-spacing: 0.2em; text-align: center; border-color: {{ codeBd }};">
+<sc-if value="{{ codeBad }}" hint-placeholder-val="{{ false }}"><span id="code-err" style="font-size: 13px; color: #F2777F;">{{ codeErr }}</span></sc-if>
+</div>
+<button type="button" onClick="{{ submitCode }}" style="height: 48px; background: #FFFFFF; color: #111113; border: 0; border-radius: 4px; font: inherit; font-size: 15px; font-weight: 600; font-stretch: 112%; cursor: pointer;">Verify</button>
+<button type="button" onClick="{{ backToPw }}" style="height: 40px; background: transparent; color: #9C9693; border: 0; font: inherit; font-size: 14px; cursor: pointer;">Use a Different Account</button>
+</div>
+</sc-if>
+
 <sc-if value="{{ notDone }}" hint-placeholder-val="{{ true }}">
 <div style="display: flex; flex-direction: column; gap: 24px;">
+<sc-if value="{{ social }}" hint-placeholder-val="{{ false }}">
 <div style="display: flex; flex-direction: column; gap: 10px;">
 <button type="button" class="fs-ghost" style="height: 48px; background: #111113; border: 1px solid #26262A; border-radius: 4px; color: #F4F2F1; font: inherit; font-size: 15px; font-weight: 500; cursor: pointer;">Continue With Google</button>
 <button type="button" class="fs-ghost" style="height: 48px; background: #111113; border: 1px solid #26262A; border-radius: 4px; color: #F4F2F1; font: inherit; font-size: 15px; font-weight: 500; cursor: pointer;">Continue With Apple</button>
 </div>
 <div style="display: flex; align-items: center; gap: 12px; font-size: 12px; color: #9C9693;"><span style="flex: 1; height: 1px; background: #26262A;"></span>or<span style="flex: 1; height: 1px; background: #26262A;"></span></div>
+
+</sc-if>
 
 <form style="display: flex; flex-direction: column; gap: 16px;">
 <div style="display: flex; flex-direction: column; gap: 6px;">
@@ -90,21 +106,30 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 </x-dc>
 <script type="text/x-dc" data-dc-script data-props='{"mobileLinks":{"editor":"boolean","default":false},"$preview":{"width":1280,"height":900}}'>
 class Component extends DCLogic {
-  constructor(props) { super(props); this.state = { email: '', pw: '', show: false, remember: true, submitted: false, done: false, busy: false, err: '' }; }
+  constructor(props) { super(props); this.state = { email: '', pw: '', show: false, remember: true, submitted: false, done: false, busy: false, err: '', mfa: false, ticket: '', code: '', codeErr: '' }; }
   async submit() {
     const st = this.state; this.setState({ submitted: true, err: '' });
     if (!/.+@.+\..+/.test(st.email) || !st.pw) return;
     this.setState({ busy: true });
-    try { const r = await DC.api('/api/auth/login', { email: st.email.trim(), password: st.pw }); this.setState({ done: true }); const n = DC.qs('next'); location.href = n && n.startsWith('/') && !n.startsWith('//') ? n : (r.role && r.role !== 'trader' && DC.qs('admin') ? '/admin' : '/app'); }
+    try { const r = await DC.api('/api/auth/login', { email: st.email.trim(), password: st.pw, remember: st.remember }); if (r.mfa) { this.setState({ busy: false, mfa: true, ticket: r.ticket, code: '', codeErr: '' }); setTimeout(() => { const c = document.getElementById('code'); if (c) c.focus(); }, 50); return; } this.go(r); }
     catch (e) { this.setState({ busy: false, err: e.message }); }
   }
-  componentDidMount() { this.root = document.getElementById('dc-root'); this.root.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.tagName === 'INPUT') this.submit(); }); }
+  go(r) { this.setState({ done: true, mfa: false }); const n = DC.qs('next'); location.href = n && n.startsWith('/') && !n.startsWith('//') ? n : (r.role && r.role !== 'trader' && (DC.qs('admin') || r.mfa !== undefined || r.mfaSetup) ? '/admin' : '/app'); }
+  async submitCode() {
+    const st = this.state; const c = st.code.trim(); if (!c) { this.setState({ codeErr: 'Enter the code from your app.' }); return; }
+    if (st.busy) return; this.setState({ busy: true, codeErr: '' });
+    try { const r = await DC.api('/api/auth/mfa', { ticket: st.ticket, code: c }); this.go(Object.assign({ mfa: true }, r)); }
+    catch (e) { const timedOut = /timed out/i.test(e.message); this.setState({ busy: false, codeErr: e.message, code: '', mfa: !timedOut, err: timedOut ? e.message : '' }); }
+  }
+  componentDidMount() { this.root = document.getElementById('dc-root'); this.root.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.tagName === 'INPUT') { if (this.state.mfa) this.submitCode(); else this.submit(); } }); }
   renderVals() {
     const st = this.state;
     const emailOk = /.+@.+\..+/.test(st.email); const pwOk = st.pw.length > 0;
     const emailBad = st.submitted && !emailOk; const pwBad = (st.submitted && !pwOk) || !!st.err;
     return {
-      email: st.email, pw: st.pw, remember: st.remember, done: st.done, notDone: !st.done,
+      social: false, email: st.email, pw: st.pw, remember: st.remember, done: st.done, notDone: !st.done && !st.mfa, mfaStep: st.mfa && !st.done,
+      code: st.code, setCode: (e) => this.setState({ code: e.target.value, codeErr: '' }), codeBad: !!st.codeErr, codeBd: st.codeErr ? '#F2777F' : '', codeErr: st.codeErr,
+      submitCode: () => this.submitCode(), backToPw: () => this.setState({ mfa: false, ticket: '', code: '', pw: '' }),
       setEmail: (e) => this.setState({ email: e.target.value, err: '' }), setPw: (e) => this.setState({ pw: e.target.value, err: '' }),
       toggleShow: () => this.setState({ show: !st.show }), toggleRemember: () => this.setState({ remember: !st.remember }),
       pwType: st.show ? 'text' : 'password', showText: st.show ? 'Hide' : 'Show', showLabel: st.show ? 'Hide Password' : 'Show Password',

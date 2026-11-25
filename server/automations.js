@@ -9,9 +9,10 @@ const BASE = () => require('./auth').BASE();
 async function once(key) { const r = await db.one('INSERT INTO auto_sent(key) VALUES($1) ON CONFLICT DO NOTHING RETURNING key', [key]); return !!r; }
 const K = (s) => '$' + Number(s) / 1000 + 'K';
 async function run() {
-  const cat = await core.catalog(); const out = {};
+  const cat = await core.catalog(); const out = {}; const mrules = (await mail.cfg()).rules;
   const hit = (k) => { out[k] = (out[k] || 0) + 1; };
   try { const n = await require('./support').autoClose(); if (n) out.ticketsClosed = n; } catch (e) { console.error('autoClose', e.message); }
+  try { const n = await require('./mail').releaseHeld(); if (n) out.mailReleased = n; } catch (e) { console.error('releaseHeld', e.message); }
   const acc = await db.all("SELECT a.*, u.email, u.first, u.status FROM accounts a JOIN users u ON u.id=a.user_id WHERE u.email NOT LIKE '%@demo.fundedsky.test' AND a.phase IN ('active','passed','breached','review')");
   for (const a of acc) {
     if (a.status === 'banned') continue;
@@ -24,33 +25,39 @@ async function run() {
       if (!traded && new Date(a.created_at) < new Date(Date.now() - 24 * 3600e3) && new Date(a.created_at) > new Date(Date.now() - 7 * 86400e3) && await once('firstday:' + a.id)) { mail.t('firstday', a.user_id, { account: a.id, size: K(a.size), platform: a.platform, url }); hit('firstday'); }
     }
     if (a.kind === 'funded' && a.phase === 'active') {
-      if (a.funded_at && new Date(a.funded_at) > new Date(Date.now() - 7 * 86400e3) && await once('certificate:' + a.id)) { mail.t('certificate', a.user_id, { account: a.id, size: K(a.size), url: BASE() + '/app#rewards?tab=certs' }); hit('certificate'); }
+      if (a.funded_at && new Date(a.funded_at) < new Date(Date.now() - 86400e3) && new Date(a.funded_at) > new Date(Date.now() - 7 * 86400e3) && await once('certificate:' + a.id)) { mail.t('certificate', a.user_id, { account: a.id, size: K(a.size), url: BASE() + '/app#rewards?tab=certs' }); hit('certificate'); }
       { const cp = Number(a.balance) - Number(a.cycle_profit_start || a.start_bal); if (cp > 0 && (a.cycle_win_days || 0) >= (r.winDays || 5) && Number(a.cycle_best) > (r.consistency / 100) * cp && await once('fconsistency:' + a.id + ':' + (a.payout_count || 0))) { mail.t('consistency', a.user_id, { account: a.id, size: K(a.size), what: 'request a payout', share_n: String(Math.round(Number(a.cycle_best) / cp * 100)), limit: r.consistency + '%', url }); hit('consistency'); } }
       if (!(a.payout_count > 0)) { const pend = await db.one("SELECT 1 FROM payouts WHERE account_id=$1 AND status IN ('requested','approved')", [a.id]); const q = R.payoutQuote(cat, a, { pending: !!pend }); if (q.ok && await once('eligible:' + a.id)) { mail.t('eligible', a.user_id, { account: a.id, amount: money(q.max), split: q.split + '%', url: BASE() + '/app#payouts' }); hit('eligible'); } }
     }
     if (a.kind === 'evaluation' && a.phase === 'breached' && a.breached_at) {
       const since = Date.now() - new Date(a.breached_at);
-      if (since < 3 * 86400e3 && await once('resetoffer:' + a.id)) { const s = core.sizeDef(cat, a.plan, a.size); const price = s ? (s.reset ? Number(s.reset) : Math.round(core.priceOf(s) * cat.resetPct / 100)) : 0; mail.t('resetoffer', a.user_id, { account: a.id, size: K(a.size), price: money(price), url: BASE() + '/reset?acct=' + a.id }); hit('resetoffer'); }
-      if (since > 7 * 86400e3) { const after = await db.one("SELECT 1 FROM orders WHERE user_id=$1 AND status='paid' AND paid_at > $2", [a.user_id, a.breached_at]); const active = await db.one("SELECT 1 FROM accounts WHERE user_id=$1 AND phase='active'", [a.user_id]);
+      if (since < 3 * 86400e3 && (since >= 86400e3 || !mrules.noMkAfterBreach) && !(await db.one("SELECT 1 FROM orders WHERE user_id=$1 AND status='paid' AND paid_at > $2", [a.user_id, a.breached_at])) && await once('resetoffer:' + a.id)) { const s = core.sizeDef(cat, a.plan, a.size); const price = s ? (s.reset ? Number(s.reset) : Math.round(core.priceOf(s) * cat.resetPct / 100)) : 0; mail.t('resetoffer', a.user_id, { account: a.id, size: K(a.size), price: money(price), url: BASE() + '/reset?acct=' + a.id }); hit('resetoffer'); }
+      if (since > 30 * 86400e3) { const after = await db.one("SELECT 1 FROM orders WHERE user_id=$1 AND status='paid' AND paid_at > $2", [a.user_id, a.breached_at]); const active = await db.one("SELECT 1 FROM accounts WHERE user_id=$1 AND phase='active'", [a.user_id]);
         if (!after && !active && await once('winback:' + a.user_id)) { mail.t('winback', a.user_id, { url: BASE() + '/checkout' }); hit('winback'); } }
     }
   }
   // payouts: certificate when paid, review ask two days after the first one
   for (const p of await db.all("SELECT p.*, a.size FROM payouts p JOIN accounts a ON a.id=p.account_id WHERE p.status='paid' AND p.paid_at > now() - interval '30 days'")) {
-    if (await once('paycert:' + p.code)) { mail.t('paycert', p.user_id, { amount: money(p.amount), code: p.code, url: BASE() + '/app#rewards?tab=certs' }); hit('paycert'); }
+    if (new Date(p.paid_at) < new Date(Date.now() - 3 * 86400e3) && await once('paycert:' + p.code)) { mail.t('paycert', p.user_id, { amount: money(p.amount), code: p.code, url: BASE() + '/app#rewards?tab=certs' }); hit('paycert'); }
     const first = await db.one("SELECT code FROM payouts WHERE user_id=$1 AND status='paid' ORDER BY paid_at LIMIT 1", [p.user_id]);
-    if (first && first.code === p.code && new Date(p.paid_at) < new Date(Date.now() - 2 * 86400e3) && await once('reviewask:' + p.user_id)) { mail.t('reviewask', p.user_id, { amount: money(p.amount), url: BASE() + '/app#rewards' }); hit('reviewask'); }
+    if (first && first.code === p.code && new Date(p.paid_at) < new Date(Date.now() - 5 * 86400e3) && await once('reviewask:' + p.user_id)) { mail.t('reviewask', p.user_id, { amount: money(p.amount), url: BASE() + '/app#rewards' }); hit('reviewask'); }
   }
-  // first purchase
-  for (const o of await db.all("SELECT DISTINCT ON (user_id) user_id, code, total FROM orders WHERE status='paid' AND paid_at > now() - interval '7 days' ORDER BY user_id, paid_at")) {
-    const n = (await db.one("SELECT count(*)::int n FROM orders WHERE user_id=$1 AND status='paid'", [o.user_id])).n;
-    if (n >= 1 && await once('firstbuy:' + o.user_id)) { mail.t('firstbuy', o.user_id, { order: o.code, url: BASE() + '/app' }); hit('firstbuy'); }
-  }
+  // affiliate statement on the 1st of each month (Eastern Time), for last month
+  { const et = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+    if (et.getDate() === 1) { const prev = new Date(et.getFullYear(), et.getMonth() - 1, 1); const month = prev.toLocaleString('en-US', { month: 'long' }); const ym = prev.getFullYear() + '-' + String(prev.getMonth() + 1).padStart(2, '0');
+      const A = require('./affiliates'); for (const x of (await A.list()).filter((y) => y.status === 'active' && y.user)) { if (!(await once('affstatement:' + x.user + ':' + ym))) continue; const sm = await A.summary(x.user); if (!sm) continue;
+        const os = await db.all("SELECT o.total::float total FROM orders o JOIN users u ON u.id=o.user_id WHERE u.referred_by=$1 AND o.status='paid' AND to_char(o.paid_at AT TIME ZONE 'America/New_York','YYYY-MM')=$2", [x.user, ym]);
+        mail.t('affstatement', x.user, { month, orders: String(os.length), revenue: money(os.reduce((s2, o) => s2 + o.total, 0)), owed: money(sm.owed), url: BASE() + '/app#affiliates' }); hit('affstatement'); } } }
+  // two days after sign-up, for people who have not bought yet: a simple guide to picking a size
+  { const p0 = (cat.plans || []).find((p) => p.active !== false && p.kind === 'evaluation') || (cat.plans || [])[0]; const sz = ((p0 && p0.sizes) || []).filter((z) => z.active !== false).slice(0, 3);
+    const rows = {}; sz.forEach((z, i) => { const r = R.rulesFor(cat, { plan: p0.id, size: z.size, kind: 'evaluation', addons: [] }); rows['s' + (i + 1)] = K(z.size); rows['r' + (i + 1)] = `Target ${money(r.target)} · Max loss ${money(r.maxLoss)}`; });
+    for (const u of await db.all("SELECT id FROM users WHERE role='trader' AND status='active' AND email NOT LIKE '%@demo.fundedsky.test' AND created_at < now() - interval '2 days' AND created_at > now() - interval '14 days' AND NOT EXISTS (SELECT 1 FROM orders o WHERE o.user_id=users.id AND o.status='paid')")) {
+      if (await once('firstbuy:' + u.id)) { mail.t('firstbuy', u.id, Object.assign({ url: BASE() + '/checkout' }, rows)); hit('firstbuy'); } } }
   // abandoned checkout: a reminder with a one-time code, then a last call before it ends
   const rec = Object.assign({ on: true, delay: 2, pct: 10, expiry: 48, oneTime: true, firstOnly: true }, (cat.x || {}).recovery || {});
   if (rec.on) {
     const left = await db.all(`SELECT o.*, u.email FROM orders o JOIN users u ON u.id=o.user_id WHERE o.status='pending' AND o.kind IN ('evaluation','instant','mixed')
-      AND o.created_at < now() - ($1 || ' hours')::interval AND o.created_at > now() - interval '7 days' AND u.email NOT LIKE '%@demo.fundedsky.test'
+      AND o.created_at < now() - ($1 || ' hours')::interval AND o.created_at > now() - interval '7 days' AND u.email NOT LIKE '%@demo.fundedsky.test' AND COALESCE((u.settings->>'nMkt')::boolean, false)
       AND NOT EXISTS (SELECT 1 FROM orders p WHERE p.user_id=o.user_id AND p.status='paid' AND p.created_at > o.created_at)`, [String(+rec.delay || 2)]);
     for (const o of left) {
       if (rec.firstOnly && (await db.one("SELECT 1 FROM orders WHERE user_id=$1 AND status='paid'", [o.user_id]))) continue;

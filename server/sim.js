@@ -40,6 +40,16 @@ async function ingestTrade(c, a, t, day) {
     if (e.type === 'breach') { require('./mail').t(a.kind === 'funded' ? 'fbreach' : 'breach', a.user_id, { account: a.id, size: core.kLabel(a.size), platform: a.platform, rule: String(e.msg || '').split(/[:.(]/)[0].trim() || 'Account rule', floor: '$' + Math.round(na.floor || a.floor).toLocaleString('en-US'), balance: '$' + Math.round(na.balance).toLocaleString('en-US'), time: new Date().toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) + ' ET', url: require('./auth').BASE() + '/app#account?acct=' + a.id }); await core.notify(c, a.user_id, `${a.id} breached`, e.msg + '. You can reset it from the account page.', 'account?acct=' + a.id); if (a.kind === 'funded') require('./integrations').alert('breach', `:red_circle: Funded account ${a.id} breached`); }
     if (e.type === 'dll') await core.notify(c, a.user_id, `Daily loss limit reached on ${a.id}`, e.msg, 'account?acct=' + a.id);
   }
+  // Early warnings, at most once per account per day: 80% of the daily loss limit, and within 20% of the drawdown floor
+  if (!['breached', 'closed'].includes(na.phase)) {
+    const r = R.rulesFor(cat, a); const M = require('./mail'); const m = (v) => '$' + Math.round(Math.abs(v)).toLocaleString('en-US'); const url = require('./auth').BASE() + '/app#account?acct=' + a.id;
+    const once = async (k) => !!(await c.one('INSERT INTO auto_sent(key) VALUES($1) ON CONFLICT DO NOTHING RETURNING key', [k]));
+    const lost = -Number(na.today_pnl); if (r.dll && !na.halted_today && lost >= 0.8 * r.dll && lost < r.dll && await once('dailywarn:' + a.id + ':' + day)) {
+      M.t('dailywarn', a.user_id, { account: a.id, lost: m(lost), limit: m(r.dll), left: m(r.dll - lost), url });
+      await core.notify(c, a.user_id, `${a.id} is at ${Math.round(lost / r.dll * 100)}% of today's loss limit`, `Another ${m(r.dll - lost)} loss pauses trading until 5:00 PM ET.`, 'account?acct=' + a.id); }
+    const room = Number(na.balance) - Number(a.floor); if (r.maxLoss && room > 0 && room <= 0.2 * r.maxLoss && await once('ddwarn:' + a.id + ':' + day)) {
+      M.t('ddwarn', a.user_id, { account: a.id, left: m(room), floor: m(a.floor), balance: m(na.balance), url }); }
+  }
   return na;
 }
 
@@ -56,6 +66,7 @@ async function closeAccountDay(c, a, dayIso) {
     await core.notify(c, a.user_id, `You passed ${a.id}!`, pd && pd.activation ? `Sign the funded agreement and pay the $${pd.activation} activation fee to get your funded account.` : 'Sign the funded agreement to get your funded account.', 'account?acct=' + a.id);
     await core.points(c, a.user_id, 500, 'Passed ' + a.id);
     require('./mail').t('passed', a.user_id, { account: a.id, size: core.kLabel(a.size), platform: a.platform, url: require('./auth').BASE() + '/app#account?acct=' + a.id });
+    { const u = await c.one('SELECT kyc_status FROM users WHERE id=$1', [a.user_id]); if (u && u.kyc_status === 'verified') await core.agreementReady(c, a); }
     require('./integrations').alert('pass', `:tada: ${a.id} passed the evaluation`);
   }
   return { ...na, today_pnl: 0, halted_today: false };

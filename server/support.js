@@ -57,9 +57,10 @@ async function onTraderMessage(ticketId, text, { isNew } = {}) {
       await c.q('INSERT INTO ticket_msgs(ticket_id,author_id,staff,internal,body) VALUES($1,NULL,true,true,$2)', [t.id, `Marked urgent: the trader mentioned ${hit.join(', ')}.${hit.includes('chargeback') ? ' Billing has been told.' : ''}`]); }
     if (hit.includes('chargeback')) require('./integrations').alert('billing', `:warning: Ticket #${t.id} mentions a chargeback: ${t.subject}`);
     if (!t.assignee) { const a = await pickAssignee(c, s, t.category); if (a) { await c.q('UPDATE tickets SET assignee=$2 WHERE id=$1', [t.id, a]); out.assignee = a; } }
-    if (isNew && s.linkReview !== false && catKey(t.category) === 'breach') { const br = await c.one("SELECT id FROM accounts WHERE user_id=$1 AND phase='breached' LIMIT 1", [t.user_id]); if (br) await c.q('UPDATE tickets SET review=true WHERE id=$1', [t.id]); }
+    if (isNew && s.linkReview !== false && catKey(t.category) === 'breach') { const br = await c.one("SELECT id FROM accounts WHERE user_id=$1 AND phase='breached' LIMIT 1", [t.user_id]); if (br) { await c.q('UPDATE tickets SET review=true WHERE id=$1', [t.id]); out.review = true; } }
     if (isNew && s.afterHours !== false && !isOpenNow(s)) { await c.q('INSERT INTO ticket_msgs(ticket_id,author_id,staff,body) VALUES($1,NULL,true,$2)', [t.id, s.ahText || DEF.ahText]); out.afterHours = true; }
   });
+  if (out.review) { const t = await db.one('SELECT user_id FROM tickets WHERE id=$1', [ticketId]); require('./mail').t('appeal', t.user_id, { url: require('./auth').BASE() + '/app#support?tkt=' + ticketId }); }
   return out;
 }
 
