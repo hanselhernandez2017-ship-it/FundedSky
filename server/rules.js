@@ -20,13 +20,61 @@ function catFor(cat, a) {
 function rulesFor(cat0, a) {
   const cat = catFor(cat0, a);
   const R0 = rulesBase(cat, a); const o = (((cat.planRules || {})[a.plan]) || {})[a.size];
-  if (!o) return R0;
+  if (!o) return phaseRules(R0, null, a);
   const R = Object.assign({}, R0);
   // Which overrides apply: an evaluation plan's rule set sets the pass rules on the evaluation, and the loss limits, split and minimum on its funded account
   const keys = R0.instant ? ['goal', 'dll', 'maxLoss', 'consistency', 'split', 'payoutMin'] : R0.kind === 'evaluation' ? ['target', 'dll', 'maxLoss', 'minDays', 'consistency'] : ['dll', 'maxLoss', 'split', 'payoutMin'];
   keys.forEach((k) => { if (o[k] != null && R0[k] != null) R[k] = Number(o[k]); });
   if (o.contracts != null) { R.fullContracts = Number(o.contracts); R.contracts = R0.fullContracts && R0.contracts < R0.fullContracts ? Math.max(1, Math.floor(o.contracts / 2)) : Number(o.contracts); }
+  return phaseRules(R, o[R.kind === 'evaluation' ? 'eval' : 'funded'], a);
+}
+
+// Full rule settings for one phase (catalog planRules[plan][size].eval / .funded). Missing settings keep today's behaviour.
+// ddType: eod | intraday | static. dll: null = no daily limit. dllMode: pause | breach. scaling: [[profit, contracts], ...].
+// consistency: null = no rule. scalp: { hold: seconds, pct: % } or null. news: { win: minutes } or null (allowed).
+// overnight / weekend: false = must be flat by closeAt (ET). inactivity: days without a trade before the account closes.
+// Funded payouts: split, splitFirst, splitFirstCount, cap { first, later, lifetime }, payoutMin, daysBetween, buffer, winDays, winDayMin, reviewAfter, half.
+const num = (v) => (v === '' || v == null ? null : Number(v));
+function phaseRules(R, P, a) {
+  R = Object.assign({ ddType: 'eod', dllMode: 'pause', scaling: null, scalp: null, news: { win: 2 }, overnight: true, weekend: true, closeAt: '16:55', inactivity: null, daysBetween: 0, buffer: null, consOff: false, dllOff: false }, R);
+  if (!P || typeof P !== 'object') return R;
+  const set = (k, v) => { if (v !== undefined) R[k] = v; };
+  if (P.target != null) R.target = Number(P.target);
+  if (P.goal != null && R.instant) R.goal = Number(P.goal);
+  if (P.maxLoss != null) R.maxLoss = Number(P.maxLoss);
+  if (['eod', 'intraday', 'static'].includes(P.ddType)) R.ddType = P.ddType;
+  if (P.lockAt !== undefined && P.lockAt !== '') R.lockAt = num(P.lockAt);
+  if ('dll' in P) { const d = num(P.dll); R.dllOff = d == null || d <= 0; R.dll = R.dllOff ? 0 : d; }
+  if (P.dllMode === 'breach' || P.dllMode === 'pause') R.dllMode = P.dllMode;
+  if (P.contracts != null || P.half != null) { const c = P.contracts != null ? Number(P.contracts) : (R.fullContracts || R.contracts); const wasHalf = !!(R.fullContracts && R.contracts < R.fullContracts); const half = P.half != null ? !!P.half && R.kind === 'funded' : wasHalf; R.fullContracts = c; R.half = half; R.contracts = half && !(a && a.payout_count > 0) ? Math.max(1, Math.floor(c / 2)) : c; }
+  if (Array.isArray(P.scaling) && P.scaling.length) R.scaling = P.scaling.map(([at, c]) => [Number(at), Number(c)]).filter(([at, c]) => c > 0).sort((x, y) => x[0] - y[0]);
+  if (P.minDays != null) { if (R.kind === 'evaluation') R.minDays = Number(P.minDays); else R.winDays = Number(P.minDays); }
+  if (P.winDays != null) R.winDays = Number(P.winDays);
+  if (P.winDayMin != null) R.winDayMin = Number(P.winDayMin);
+  if ('consistency' in P) { const c = num(P.consistency); R.consOff = c == null || c <= 0 || c >= 100; R.consistency = R.consOff ? 100 : c; }
+  if ('scalp' in P) R.scalp = P.scalp && Number(P.scalp.hold) > 0 ? { hold: Number(P.scalp.hold), pct: Number(P.scalp.pct) || 0 } : null;
+  if ('news' in P) R.news = P.news && Number(P.news.win) > 0 ? { win: Number(P.news.win) } : null;
+  set('overnight', P.overnight == null ? undefined : !!P.overnight); set('weekend', P.weekend == null ? undefined : !!P.weekend);
+  if (P.closeAt && /^\d{1,2}:\d{2}$/.test(P.closeAt)) R.closeAt = P.closeAt;
+  if ('inactivity' in P) R.inactivity = num(P.inactivity) || null;
+  if (R.kind === 'funded') {
+    if (P.split != null) R.split = Number(P.split);
+    if (P.splitFirst != null && P.splitFirstCount != null) { const n = (a && a.payout_count || 0) + 1; R.splitFirst = Number(P.splitFirst); R.splitFirstCount = Number(P.splitFirstCount); R.splitLater = R.split; if (n <= R.splitFirstCount) R.split = R.splitFirst; }
+    if (P.cap) { const n = (a && a.payout_count || 0) + 1; const f = num(P.cap.first), l = num(P.cap.later), lt = num(P.cap.lifetime); if (f) R.capFirst = f; if (l || f) R.capLater = l || f; if (lt != null) R.lifetime = lt || Infinity; R.cap = n <= 3 ? R.capFirst : R.capLater; }
+    if (P.payoutMin != null) R.payoutMin = Number(P.payoutMin);
+    if (P.daysBetween != null) R.daysBetween = Number(P.daysBetween) || 0;
+    if ('buffer' in P) R.buffer = num(P.buffer);
+    if (P.reviewAfter != null) R.reviewAfter = Number(P.reviewAfter) || null;
+  }
   return R;
+}
+
+// Contracts allowed right now: the scaling tier reached by closed profit (balance at the start of the day), else the max position size
+function allowedContracts(r, a) {
+  if (!r.scaling) return r.contracts;
+  const profit = Number(a.balance) - Number(a.today_pnl || 0) - Number(a.start_bal);
+  let c = r.scaling[0][1]; r.scaling.forEach(([at, n]) => { if (profit >= at) c = n; });
+  return Math.min(c, r.fullContracts || r.contracts);
 }
 function rulesBase(cat, a) {
   const size = a.size;
@@ -62,8 +110,9 @@ function initialState(cat, { plan, size, kind, rs }) {
 // Trailing floor from the end-of-day high-water mark
 function trailFloor(cat, a, peak) {
   const r = rulesFor(cat, a);
+  if (r.ddType === 'static') return round2(Number(a.start_bal) - r.maxLoss);
   let fl = peak - r.maxLoss;
-  if (r.kind === 'funded') {
+  if (r.kind === 'funded' && r.lockAt != null) {
     const lock = Number(a.start_bal) + (r.lockAt || 0);
     if (a.payout_count > 0) fl = Math.min(fl, Number(a.start_bal));
     else fl = Math.min(fl, lock);
@@ -77,12 +126,19 @@ function applyTrade(cat, a, t) {
   a = { ...a };
   a.balance = round2(Number(a.balance) + Number(t.pnl));
   a.today_pnl = round2(Number(a.today_pnl) + Number(t.pnl));
-  if (t.qty > r.contracts) ev.push({ type: 'warn', msg: `Position of ${t.qty} contracts is above the ${r.contracts} contract limit` });
+  a.last_trade_at = t.ts || new Date();
+  const lim = allowedContracts(r, { ...a, today_pnl: Number(a.today_pnl) - Number(t.pnl), balance: Number(a.balance) - Number(t.pnl) });
+  if (t.qty > lim) ev.push({ type: 'warn', msg: `Position of ${t.qty} contracts is above the ${lim} contract limit${r.scaling ? ' for your scaling level' : ''}` });
+  // Trades held under the scalping minimum: their profit is tracked against the scalping cap
+  if (r.scalp && Number(t.pnl) > 0 && Number(t.hold_sec != null ? t.hold_sec : Number(t.hold_min || 0) * 60) < r.scalp.hold) { a.scalp_profit = round2(Number(a.scalp_profit || 0) + Number(t.pnl)); a.cycle_scalp = round2(Number(a.cycle_scalp || 0) + Number(t.pnl)); }
+  // Intraday trailing: the floor follows the highest balance after every trade, not just at the close
+  if (r.ddType === 'intraday' && a.phase === 'active') { const peak = Math.max(Number(a.peak_eod), Number(a.balance)); a.peak_eod = round2(peak); a.floor = trailFloor(cat, a, peak); }
   if (a.balance <= Number(a.floor)) {
     a.phase = 'breached'; a.breached_at = new Date(); a.breach_reason = `Max loss: balance reached the floor of $${Math.round(a.floor).toLocaleString('en-US')}`;
     ev.push({ type: 'breach', msg: a.breach_reason });
-  } else if (a.today_pnl <= -r.dll && !a.halted_today) {
-    a.halted_today = true; ev.push({ type: 'dll', msg: `Daily loss limit of $${r.dll.toLocaleString('en-US')} reached. Trading paused until the next session.` });
+  } else if (!r.dllOff && r.dll > 0 && a.today_pnl <= -r.dll && !a.halted_today) {
+    if (r.dllMode === 'breach') { a.phase = 'breached'; a.breached_at = new Date(); a.breach_reason = `Daily loss limit: lost $${r.dll.toLocaleString('en-US')} in one day`; ev.push({ type: 'breach', msg: a.breach_reason }); }
+    else { a.halted_today = true; ev.push({ type: 'dll', msg: `Daily loss limit of $${r.dll.toLocaleString('en-US')} reached. Trading paused until the next session.` }); }
   }
   return { a, events: ev };
 }
@@ -106,8 +162,9 @@ function closeDay(cat, a, dayIso, nTrades) {
     }
     if (a.kind === 'evaluation') {
       const profit = Number(a.balance) - Number(a.start_bal);
-      const consOk = profit > 0 && Number(a.best_day) <= (r.consistency / 100) * profit;
-      if (profit >= r.target && a.days_traded >= r.minDays && consOk) {
+      const consOk = r.consOff || (profit > 0 && Number(a.best_day) <= (r.consistency / 100) * profit);
+      const scalpOk = !r.scalp || Number(a.scalp_profit || 0) <= (r.scalp.pct / 100) * r.target;
+      if (profit >= r.target && a.days_traded >= r.minDays && consOk && scalpOk) {
         a.phase = 'passed'; a.passed_at = new Date();
         a.steps = { ...(a.steps || {}), passed: new Date().toISOString() };
         ev.push({ type: 'pass', msg: 'Evaluation passed' });
@@ -126,7 +183,8 @@ function evalChecks(cat, a) {
   return {
     target: { ok: profit >= r.target, have: profit, need: r.target },
     days: { ok: a.days_traded >= r.minDays, have: a.days_traded, need: r.minDays },
-    consistency: { ok: profit > 0 && consPct <= r.consistency, have: consPct, need: r.consistency }
+    consistency: { ok: r.consOff || (profit > 0 && consPct <= r.consistency), have: consPct, need: r.consOff ? null : r.consistency, off: r.consOff },
+    scalp: r.scalp ? { ok: Number(a.scalp_profit || 0) <= (r.scalp.pct / 100) * r.target, have: Number(a.scalp_profit || 0), need: round2((r.scalp.pct / 100) * r.target), hold: r.scalp.hold } : null
   };
 }
 
@@ -141,18 +199,20 @@ function payoutQuote(cat, a, opts = {}) {
   const winOk = (a.cycle_win_days || 0) >= needDays;
   checks.push({ k: 'win', label: `${needDays} winning day${needDays > 1 ? 's' : ''} of $${r.winDayMin}+ this cycle`, ok: winOk, have: a.cycle_win_days || 0, need: needDays });
   const consPct = cycleProfit > 0 ? Math.round((Number(a.cycle_best) / cycleProfit) * 100) : 0;
-  const consOk = cycleProfit > 0 && consPct <= r.consistency;
-  checks.push({ k: 'cons', label: `Best day at or under ${r.consistency}% of cycle profit`, ok: consOk, have: consPct, need: r.consistency });
+  if (!r.consOff) { const consOk = cycleProfit > 0 && consPct <= r.consistency; checks.push({ k: 'cons', label: `Best day at or under ${r.consistency}% of cycle profit`, ok: consOk, have: consPct, need: r.consistency }); }
+  if (r.buffer > 0) checks.push({ k: 'buffer', label: `Profit above the $${r.buffer.toLocaleString('en-US')} buffer`, ok: bal - start > r.buffer, have: round2(bal - start), need: r.buffer });
+  const lastPay = opts.lastPayoutAt || a.last_payout_at; if (r.daysBetween > 0 && lastPay) { const d = (Date.now() - new Date(lastPay)) / 864e5; checks.push({ k: 'gap', label: `${r.daysBetween} day${r.daysBetween > 1 ? 's' : ''} since the last payout`, ok: d >= r.daysBetween, have: Math.floor(d), need: r.daysBetween }); }
+  if (r.scalp && cycleProfit > 0) { const sp = Math.round(Number(a.cycle_scalp || 0) / cycleProfit * 100); checks.push({ k: 'scalp', label: `Profit from trades held under ${r.scalp.hold} seconds at or under ${r.scalp.pct}%`, ok: sp <= r.scalp.pct, have: sp, need: r.scalp.pct }); }
   if (r.instant && !(a.payout_count > 0)) {
     const goalOk = bal - start >= r.goal;
     checks.push({ k: 'goal', label: `Profit goal of $${r.goal.toLocaleString('en-US')} before the first payout`, ok: goalOk, have: round2(bal - start), need: r.goal });
   }
-  const withdrawable = Math.max(0, round2(bal - start - r.cushion));
+  const withdrawable = Math.max(0, round2(bal - start - (r.buffer != null ? r.buffer : r.cushion)));
   const lifetimeLeft = Math.max(0, r.lifetime - Number(a.paid_total || 0));
   const maxNet = Math.max(0, Math.floor(Math.min(withdrawable * r.split / 100, r.cap, lifetimeLeft)));
   const minOk = maxNet >= r.payoutMin;
   checks.push({ k: 'min', label: `At least $${r.payoutMin} available`, ok: minOk, have: maxNet, need: r.payoutMin });
-  if (a.phase !== 'active') reasons.push(a.phase === 'review' ? 'This account is under review after 6 payouts' : 'Account is not active');
+  if (a.phase !== 'active') reasons.push(a.phase === 'review' ? `This account is under review after ${r.reviewAfter || 6} payouts` : 'Account is not active');
   if (opts.pending) reasons.push('A payout request is already in review');
   checks.filter((c) => !c.ok).forEach((c) => reasons.push(c.label));
   return {
@@ -161,4 +221,4 @@ function payoutQuote(cat, a, opts = {}) {
   };
 }
 
-module.exports = { snapshot, catFor, rulesFor, initialState, trailFloor, applyTrade, closeDay, evalChecks, payoutQuote };
+module.exports = { snapshot, catFor, rulesFor, phaseRules, allowedContracts, initialState, trailFloor, applyTrade, closeDay, evalChecks, payoutQuote };

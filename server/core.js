@@ -10,6 +10,7 @@ async function catalog(force) {
   CAT = row.data; CAT_AT = Date.now(); return CAT;
 }
 async function saveCatalog(data, by) {
+  try { const prev = (await db.one('SELECT data FROM catalog WHERE id=1')).data; require('./planmigr').syncPhases(data, prev); } catch (e) { console.error('rule sync', e.message); }
   await db.q('UPDATE catalog SET data=$1, updated_by=$2, updated_at=now() WHERE id=1', [data, by || null]);
   CAT = data; CAT_AT = Date.now();
 }
@@ -220,7 +221,7 @@ async function resetAccount(c, accountId, userId, paid = 0) {
   if (!a) bad('Account not found', 404);
   if (a.kind !== 'evaluation') bad('Only evaluations can be reset');
   const cat = await catalog(); const st = R.initialState(cat, a);
-  await c.q(`UPDATE accounts SET phase='active', balance=$2, peak_eod=$3, floor=$4, today_pnl=0, halted_today=false, days_traded=0, best_day=0, breach_reason=NULL, breached_at=NULL, reset_count=reset_count+1, today_date=$5, steps='{}' WHERE id=$1`,
+  await c.q(`UPDATE accounts SET phase='active', balance=$2, peak_eod=$3, floor=$4, today_pnl=0, halted_today=false, days_traded=0, best_day=0, breach_reason=NULL, breached_at=NULL, reset_count=reset_count+1, scalp_profit=0, cycle_scalp=0, last_trade_at=now(), today_date=$5, steps='{}' WHERE id=$1`,
     [a.id, st.balance, st.peak_eod, st.floor, tradeDate()]);
   await c.q('DELETE FROM days WHERE account_id=$1', [a.id]);
   await c.q("UPDATE trades SET note='before reset' WHERE account_id=$1 AND note=''", [a.id]);
@@ -311,8 +312,8 @@ async function reviewPayout(actorId, code, action, note, batchId) {
       await c.q("UPDATE payouts SET status='paid', paid_at=now(), batch=$2 WHERE id=$1", [p.id, batch]);
       const r = R.rulesFor(cat, a);
       const count = a.payout_count + 1;
-      const phase = count >= r.reviewAfter ? 'review' : a.phase;
-      await c.q(`UPDATE accounts SET payout_count=$2, paid_total=paid_total+$3, floor=LEAST(floor, start_bal), cycle_profit_start=balance, cycle_win_days=0, cycle_best=0, phase=$4 WHERE id=$1`, [a.id, count, p.amount, phase]);
+      const phase = r.reviewAfter && count >= r.reviewAfter ? 'review' : a.phase;
+      await c.q(`UPDATE accounts SET payout_count=$2, paid_total=paid_total+$3, floor=${r.ddType === 'static' ? 'floor' : 'LEAST(floor, start_bal)'}, cycle_profit_start=balance, cycle_win_days=0, cycle_best=0, cycle_scalp=0, last_payout_at=now(), phase=$4 WHERE id=$1`, [a.id, count, p.amount, phase]);
       await points(c, p.user_id, 250, 'Payout ' + p.code);
       M('paysent', p.user_id, { amount: money(p.amount), method: p.method, ref: p.provider_ref || p.code, url: require('./auth').BASE() + '/app#payouts' });
       await notify(c, p.user_id, `Payout ${p.code} sent`, `${money(p.amount)} sent to ${p.method}.`, 'payouts');

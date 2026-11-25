@@ -31,6 +31,8 @@ function startCatalog(root) {
     plans.forEach((p) => p.sizes.forEach((z) => { const inst = p.kind === 'funded'; const base = (inst ? (cat.instantRules || {}) : (cat.evalRules || {}))[z.size]; if (!base) return; const o = (((cat.planRules || {})[p.id]) || {})[z.size] || {}; const com = inst ? cat.instantCommon || {} : cat.evalCommon || {}; const fc = cat.fundedCommon || {};
       const live = { id: uid('r'), plan: p.id, size: z.size, version: o.version || 1, status: z.active ? 'live' : 'retired', target: o.target != null ? o.target : inst ? base.goal : base.target, daily: o.dll != null ? o.dll : base.dll, dd: o.maxLoss != null ? o.maxLoss : base.maxLoss, ddType: 'Trailing EOD', contracts: o.contracts != null ? o.contracts : base.contracts, minDays: o.minDays != null ? o.minDays : (com.minDays || 0), consistency: o.consistency != null ? o.consistency : (inst ? com.consistency : (cat.evalCommon || {}).consistency), split: o.split != null ? o.split : inst ? com.splitLater : fc.split, payoutMin: o.payoutMin != null ? o.payoutMin : (inst ? com.payoutMin : fc.payoutMin), accounts: (BO.accounts || []).filter((a) => a.plan === p.id && a.size === z.size && !['breached', 'closed'].includes(a.phase)).length };
       if (inst) { const cp = (cat.instantCaps || {})[z.size] || {}; Object.assign(live, { capFirst: cp.first || 0, capLater: cp.later || 0, capLife: cp.lifetime || 0 }); }
+      { const fcp = (cat.fundedCaps || {})[z.size] || {}; live.ph = { eval: o.eval, funded: o.funded }; live.fd = inst ? { maxLoss: base.maxLoss, dll: base.dll, contracts: base.contracts, winDays: com.winDays, winDayMin: com.winDayMin, consistency: com.consistency, lockAt: com.cushion, buffer: com.cushion, reviewAfter: com.reviewAfter, splitFirst: com.splitFirst, splitFirstCount: com.splitFirstCount, half: false }
+        : { maxLoss: base.maxLoss, dll: base.dll, contracts: base.contracts, winDays: fc.winDays, winDayMin: fc.winDayMin, consistency: fc.consistency, lockAt: fc.lockAbove, buffer: fc.cushion, reviewAfter: fc.reviewAfter, half: fc.halfContractsUntilFirstPayout !== false, capFirst: fcp.first, capLater: fcp.later, capLife: fcp.lifetime }; }
       rules.push(live); ((X.oldRules || {})[p.id + ':' + z.size] || []).forEach((r) => rules.push(Object.assign({}, r, { id: uid('r'), status: 'retired', accounts: 0 }))); }));
     return { plans, platforms: Object.keys(PLAT_NAME).map((id) => Object.assign({ id, name: PLAT_NAME[id], adapter: 'Simulator', visible: true }, ((X.platforms || []).find((x) => x.id === id) || {}))), addons, bundles, promos, rules, version: cat.version || 1 };
   }
@@ -189,7 +191,7 @@ function startCatalog(root) {
     c.promos = S.promos.filter((q) => q.kind === 'code' && q.code).map(promoOut);
     c.autos = S.promos.filter((q) => q.kind === 'auto').map(promoOut);
     S.batches.forEach((b) => { const q = S.promos.find((x) => x.id === b.promo); if (!q) return; (b.codes || []).forEach((code) => c.promos.push(Object.assign(promoOut(q), { code, name: `${q.name} (${b.prefix} batch)`, perTrader: 1, once: true, total: 1 }))); });
-    c.planRules = {}; S.plans.forEach((p) => p.sizes.forEach((z) => { const r = live(p.id, z.size); if (!r || !z.active) return; const inst = p.kind === 'funded'; (c.planRules[p.id] = c.planRules[p.id] || {})[z.size] = Object.assign(inst ? { goal: +r.target } : { target: +r.target }, { dll: +r.daily, maxLoss: +r.dd, contracts: +r.contracts, minDays: +r.minDays, consistency: +r.consistency, split: +r.split, payoutMin: +r.payoutMin, version: r.version });
+    c.planRules = {}; S.plans.forEach((p) => p.sizes.forEach((z) => { const r = live(p.id, z.size); if (!r || !z.active) return; const inst = p.kind === 'funded'; (c.planRules[p.id] = c.planRules[p.id] || {})[z.size] = Object.assign(inst ? { goal: +r.target } : { target: +r.target }, { dll: +r.daily, maxLoss: +r.dd, contracts: +r.contracts, minDays: +r.minDays, consistency: +r.consistency, split: +r.split, payoutMin: +r.payoutMin, version: r.version }, rulePhases(r));
       const base = inst ? (c.instantRules = c.instantRules || {}) : c.evalRules; if (!base[z.size] || p.id === (S.plans.find((x) => (x.kind === 'funded') === inst && x.sizes.some((y) => y.size === z.size && y.active)) || {}).id) base[z.size] = inst ? { dll: +r.daily, goal: +r.target, maxLoss: +r.dd, contracts: +r.contracts } : { dll: +r.daily, target: +r.target, maxLoss: +r.dd, contracts: +r.contracts };
       if (inst && +r.capFirst > 0) (c.instantCaps = c.instantCaps || {})[z.size] = { first: +r.capFirst, later: +r.capLater || +r.capFirst, lifetime: +r.capLife || 0 }; }));
     const rp = []; S.plans.forEach((p) => p.sizes.forEach((z) => { const f = (S.fees[p.id] || {})[z.size]; if (z.active && +z.price > 0 && f && f.reset) rp.push(f.reset / z.price * 100); })); if (rp.length) c.resetPct = Math.round(rp.reduce((a, b) => a + b, 0) / rp.length);
@@ -294,14 +296,74 @@ function startCatalog(root) {
     </tbody></table></div></div><p class="hint">Turning a size on that has no price shows up in Checks Before Publish and blocks publishing.</p>`;
   }
 
+  // ---------- full rule sets: every rule, per phase (evaluation and funded) ----------
+  const DDK = { 'Trailing EOD': 'eod', 'Trailing Intraday': 'intraday', 'Static': 'static' }; const DDL = { eod: 'Trailing EOD', intraday: 'Trailing Intraday', static: 'Static' };
+  const scalTxt = (s) => (Array.isArray(s) ? s.map(([a, c]) => `${a}:${c}`).join(', ') : (s || ''));
+  const scalArr = (t) => String(t || '').split(',').map((x) => x.trim().split(':').map(Number)).filter((x) => x.length === 2 && x.every((n) => !isNaN(n)) && x[1] > 0);
+  function ruleFull(r) {
+    if (r.e_dd != null || r.f_dd != null) return r;
+    const inst = (plan(r.plan) || {}).kind === 'funded'; const ph = r.ph || {}; const E = ph.eval || {}, U = ph.funded || {}; const fd = r.fd || {};
+    const v = (o, k, d) => (o[k] !== undefined && o[k] !== null && o[k] !== '' ? o[k] : d);
+    const flags = (o, p, d) => ({ [p + 'scalp']: o.scalp ? 'limited' : 'allowed', [p + 'scalpHold']: (o.scalp || {}).hold || 11, [p + 'scalpPct']: (o.scalp || {}).pct || 50,
+      [p + 'news']: 'news' in o ? (o.news ? 'restricted' : 'allowed') : 'restricted', [p + 'newsWin']: (o.news || {}).win || 2,
+      [p + 'overnight']: o.overnight === false ? 'no' : 'yes', [p + 'weekend']: o.weekend === false ? 'no' : 'yes', [p + 'closeAt']: o.closeAt || '16:55', [p + 'inactivity']: o.inactivity || 0 });
+    if (!inst) Object.assign(r, { e_target: v(E, 'target', r.target), e_dd: v(E, 'maxLoss', r.dd), e_ddType: v(E, 'ddType', DDK[r.ddType] || 'eod'), e_dll: 'dll' in E ? (E.dll || 0) : r.daily, e_dllMode: v(E, 'dllMode', 'pause'),
+      e_contracts: v(E, 'contracts', r.contracts), e_scaling: scalTxt(E.scaling), e_minDays: v(E, 'minDays', r.minDays), e_consistency: 'consistency' in E ? (E.consistency || 0) : r.consistency }, flags(E, 'e_'));
+    Object.assign(r, { f_goal: inst ? v(U, 'goal', r.target) : 0, f_dd: v(U, 'maxLoss', v(fd, 'maxLoss', r.dd)), f_ddType: v(U, 'ddType', 'eod'), f_lockAt: v(U, 'lockAt', v(fd, 'lockAt', 100)), f_dll: 'dll' in U ? (U.dll || 0) : v(fd, 'dll', r.daily), f_dllMode: v(U, 'dllMode', 'pause'),
+      f_contracts: v(U, 'contracts', v(fd, 'contracts', r.contracts)), f_half: (U.half != null ? U.half : v(fd, 'half', !inst)) ? 'yes' : 'no', f_scaling: scalTxt(U.scaling), f_minDays: v(U, 'minDays', v(fd, 'winDays', 5)), f_winDayMin: v(U, 'winDayMin', v(fd, 'winDayMin', 100)),
+      f_consistency: 'consistency' in U ? (U.consistency || 0) : v(fd, 'consistency', r.consistency), f_split: v(U, 'split', r.split), f_splitFirst: v(U, 'splitFirst', v(fd, 'splitFirst', 0)), f_splitFirstCount: v(U, 'splitFirstCount', v(fd, 'splitFirstCount', 0)),
+      f_capFirst: v(U.cap || {}, 'first', r.capFirst || v(fd, 'capFirst', 0)), f_capLater: v(U.cap || {}, 'later', r.capLater || v(fd, 'capLater', 0)), f_capLife: v(U.cap || {}, 'lifetime', r.capLife || v(fd, 'capLife', 0)),
+      f_payoutMin: v(U, 'payoutMin', r.payoutMin), f_daysBetween: v(U, 'daysBetween', 0), f_buffer: 'buffer' in U ? (U.buffer || 0) : v(fd, 'buffer', 100), f_reviewAfter: v(U, 'reviewAfter', v(fd, 'reviewAfter', 6)) }, flags(U, 'f_'));
+    return r;
+  }
+  // Phase objects saved to the catalog (planRules[plan][size].eval / .funded) and the summary fields the other views read
+  function rulePhases(r) {
+    ruleFull(r); const inst = (plan(r.plan) || {}).kind === 'funded'; const n = (x) => +x || 0;
+    const flags = (p) => ({ scalp: r[p + 'scalp'] === 'limited' ? { hold: n(r[p + 'scalpHold']), pct: n(r[p + 'scalpPct']) } : null, news: r[p + 'news'] === 'restricted' ? { win: n(r[p + 'newsWin']) || 2 } : null,
+      overnight: r[p + 'overnight'] !== 'no', weekend: r[p + 'weekend'] !== 'no', closeAt: r[p + 'closeAt'] || '16:55', inactivity: n(r[p + 'inactivity']) || null });
+    const out = { funded: Object.assign({ maxLoss: n(r.f_dd), ddType: r.f_ddType, lockAt: n(r.f_lockAt), dll: n(r.f_dll) || null, dllMode: r.f_dllMode, contracts: n(r.f_contracts), half: r.f_half === 'yes', scaling: scalArr(r.f_scaling),
+      minDays: n(r.f_minDays), winDayMin: n(r.f_winDayMin), consistency: n(r.f_consistency) || null, split: n(r.f_split), splitFirst: n(r.f_splitFirst) || undefined, splitFirstCount: n(r.f_splitFirst) ? n(r.f_splitFirstCount) : undefined,
+      cap: { first: n(r.f_capFirst), later: n(r.f_capLater) || n(r.f_capFirst), lifetime: n(r.f_capLife) }, payoutMin: n(r.f_payoutMin), daysBetween: n(r.f_daysBetween), buffer: n(r.f_buffer), reviewAfter: n(r.f_reviewAfter) || null }, inst ? { goal: n(r.f_goal) } : {}, flags('f_')) };
+    if (!inst) out.eval = Object.assign({ target: n(r.e_target), maxLoss: n(r.e_dd), ddType: r.e_ddType, dll: n(r.e_dll) || null, dllMode: r.e_dllMode, contracts: n(r.e_contracts), scaling: scalArr(r.e_scaling), minDays: n(r.e_minDays), consistency: n(r.e_consistency) || null }, flags('e_'));
+    return out;
+  }
+  function ruleSync(r) { const inst = (plan(r.plan) || {}).kind === 'funded'; const p = inst ? 'f_' : 'e_';
+    Object.assign(r, { target: +(inst ? r.f_goal : r.e_target) || 0, dd: +r[p + 'dd'] || 0, ddType: DDL[r[p + 'ddType']] || 'Trailing EOD', daily: +r[p + 'dll'] || 0, contracts: +r[p + 'contracts'] || 0, minDays: +r[p + 'minDays'] || 0, consistency: +r[p + 'consistency'] || 0,
+      split: +r.f_split || 0, payoutMin: +r.f_payoutMin || 0, capFirst: +r.f_capFirst || 0, capLater: +r.f_capLater || 0, capLife: +r.f_capLife || 0 }); r.ph = rulePhases(r); return r; }
+  function ruleForm(f) {
+    ruleFull(f); const inst = (plan(f.plan) || {}).kind === 'funded';
+    const I = (k, l, hint, ph) => `<div class="fl"><label>${l}</label><input type="number" min="0" value="${f[k] === 0 && ph ? '' : f[k]}" ${ph ? `placeholder="${ph}"` : ''} data-df="${k}">${hint ? `<span class="hint">${hint}</span>` : ''}</div>`;
+    const T = (k, l, hint, ph) => `<div class="fl"><label>${l}</label><input type="text" value="${esc(f[k] || '')}" ${ph ? `placeholder="${ph}"` : ''} data-df="${k}">${hint ? `<span class="hint">${hint}</span>` : ''}</div>`;
+    const Sel = (k, l, opts, hint) => `<div class="fl"><label>${l}</label><select data-df="${k}">${opts.map(([v, t]) => `<option value="${v}" ${String(f[k]) === v ? 'selected' : ''}>${t}</option>`).join('')}</select>${hint ? `<span class="hint">${hint}</span>` : ''}</div>`;
+    const phase = (p, title, sub) => `<div class="sec"><h4>${title}</h4>${sub ? `<div class="hint" style="margin:-4px 0 10px">${sub}</div>` : ''}<div class="fg2">
+      ${p === 'e_' ? I('e_target', 'Profit Target ($)') : inst ? I('f_goal', 'Profit Goal Before First Payout ($)', '', 'None') : ''}
+      ${I(p + 'dd', 'Maximum Loss Limit ($)')}${Sel(p + 'ddType', 'Drawdown Type', [['eod', 'End of Day (Trailing)'], ['intraday', 'Intraday (Trailing)'], ['static', 'Static']])}
+      ${p === 'f_' ? I('f_lockAt', 'Drawdown Stops Trailing at Profit Of ($)', 'Once profit passes this, the floor stays put', 'Never') : ''}
+      ${I(p + 'dll', 'Daily Loss Limit ($)', '', 'No Limit')}${Sel(p + 'dllMode', 'When the Daily Limit Is Hit', [['pause', 'Pause Until Next Session'], ['breach', 'Fail the Account']])}
+      ${I(p + 'contracts', 'Maximum Position Size (Contracts)', '10 micros count as 1 mini')}${T(p + 'scaling', 'Contract Scaling', 'Profit:contracts, e.g. 0:3, 1500:6, 3000:10', 'Off')}
+      ${p === 'f_' ? Sel('f_half', 'Half Size Until First Payout', [['no', 'No'], ['yes', 'Yes']]) : ''}
+      ${I(p + 'minDays', p === 'e_' ? 'Minimum Trading Days' : 'Winning Days per Payout')}${p === 'f_' ? I('f_winDayMin', 'Winning Day Minimum ($)') : ''}
+      ${I(p + 'consistency', 'Consistency Rule (%)', 'Best day as a share of total profit', 'None')}
+      ${Sel(p + 'scalp', 'Scalping', [['allowed', 'Allowed'], ['limited', 'Limited']])}
+      ${f[p + 'scalp'] === 'limited' ? I(p + 'scalpHold', 'Minimum Hold (Seconds)') + I(p + 'scalpPct', 'Max Profit From Short Trades (%)', p === 'e_' ? 'Share of the profit target' : 'Share of the payout cycle profit') : ''}
+      ${Sel(p + 'news', 'News Trading', [['allowed', 'Allowed'], ['restricted', 'Restricted']])}${f[p + 'news'] === 'restricted' ? I(p + 'newsWin', 'No Trades Within (Minutes)', 'Before and after high-impact news') : ''}
+      ${Sel(p + 'overnight', 'Hold Overnight', [['yes', 'Allowed'], ['no', 'Not Allowed']])}${Sel(p + 'weekend', 'Hold Over the Weekend', [['yes', 'Allowed'], ['no', 'Not Allowed']])}
+      ${f[p + 'overnight'] === 'no' || f[p + 'weekend'] === 'no' ? T(p + 'closeAt', 'Flat By (ET, 24-Hour)', '', '16:55') : ''}${I(p + 'inactivity', 'Close After Days Without a Trade', '', 'Never')}
+      </div></div>`;
+    const pay = `<div class="sec"><h4>Payouts</h4><div class="fg2">${I('f_split', 'Profit Split (%)')}${I('f_splitFirst', 'Split for the First Payouts (%)', 'Leave blank to use the same split', 'Same')}${+f.f_splitFirst ? I('f_splitFirstCount', 'Number of First Payouts') : ''}
+      ${I('f_capFirst', 'Max Payout, First 3 ($)')}${I('f_capLater', 'Max Payout After That ($)')}${I('f_capLife', 'Lifetime Payout Limit ($)', '', 'No Limit')}
+      ${I('f_payoutMin', 'Minimum Payout ($)')}${I('f_daysBetween', 'Days Between Payouts', '', 'Any Time')}${I('f_buffer', 'Buffer ($)', 'Profit that stays in the account', 'No Buffer')}${I('f_reviewAfter', 'Review After This Many Payouts', '', 'Never')}</div></div>`;
+    return (inst ? '' : phase('e_', 'Evaluation', 'Rules while the trader is working toward the profit target.')) + phase('f_', inst ? 'Funded Account' : 'Funded Account', inst ? 'Instant accounts start funded.' : 'Rules once the evaluation is passed.') + pay;
+  }
+
   function vRules() {
     const list = S.rules.filter((r) => S.ruleFilter === 'all' || r.plan === S.ruleFilter).sort((a, b) => a.plan.localeCompare(b.plan) || a.size - b.size || b.version - a.version);
-    const rows = list.map((r) => `<tr><td><b>${esc(plan(r.plan).name)}</b></td><td>${K(r.size)}</td><td class="mono">v${r.version}</td><td>${badgeSt(r.status)}</td><td class="num">${money(r.target)}</td><td class="num">${money(r.daily)}</td><td class="num">${money(r.dd)}</td><td>${esc(r.ddType)}</td><td class="num">${r.contracts}</td><td class="num">${r.minDays}</td><td class="num">${r.consistency}%</td><td class="num">${r.split}%</td><td class="num">${r.accounts}</td><td>${r.status !== 'retired' ? `<button class="lnk" data-act="newRule" data-id="${r.id}">New Version</button>` : ''}${r.status === 'draft' ? ` · <button class="lnk" data-act="delRule" data-id="${r.id}">Discard</button>` : ''}</td></tr>`).join('');
+    const rows = list.map((r) => { ruleFull(r); const inst = (plan(r.plan) || {}).kind === 'funded'; const p = inst ? 'f_' : 'e_'; const pc = (x) => (+x ? x + '%' : 'None'); const lim = (x) => (+x ? money(+x) : 'No Limit'); return `<tr><td><b>${esc(plan(r.plan).name)}</b></td><td>${K(r.size)}</td><td class="mono">v${r.version}</td><td>${badgeSt(r.status)}</td><td class="num">${+r.target ? money(r.target) : '—'}</td><td class="num">${money(+r[p + 'dd'])}</td><td>${esc(DDL[r[p + 'ddType']] || r.ddType)}</td><td class="num">${lim(r[p + 'dll'])}</td><td class="num">${r[p + 'contracts']}${r[p + 'scaling'] ? ' <span class="hint">Scaling</span>' : ''}</td><td class="num">${inst ? pc(r.f_consistency) : pc(r.e_consistency) + ' · ' + pc(r.f_consistency)}</td><td class="num">${r.f_split}%</td><td class="num">${+r.f_capFirst ? money(+r.f_capFirst) : '—'}</td><td class="num">${r.accounts}</td><td>${r.status !== 'retired' ? `<button class="lnk" data-act="newRule" data-id="${r.id}">New Version</button>` : ''}${r.status === 'draft' ? ` · <button class="lnk" data-act="delRule" data-id="${r.id}">Discard</button>` : ''}</td></tr>`; }).join('');
     const missing = S.plans.filter((p) => p.status !== 'retired' && (S.ruleFilter === 'all' || p.id === S.ruleFilter)).flatMap((p) => p.sizes.filter((z) => z.active && !S.rules.some((r) => r.plan === p.id && r.size === z.size && r.status !== 'retired')).map((z) => `<tr><td><b>${esc(p.name)}</b></td><td>${K(z.size)}</td><td class="mono">—</td><td><span class="b err plain">None</span></td><td colspan="9" class="hint">This size is on sale but has no rules yet.</td><td><button class="lnk" data-act="firstRule" data-id="${p.id}|${z.size}">Create Rule Set</button></td></tr>`)).join('');
     return `<div class="ph"><div><h1>Rule Sets</h1><p>The trading rules behind each plan and size. A rule set in use is never edited: a change creates a new version, and accounts already sold keep the version they bought.</p></div>
     <div class="act"><div class="seg">${[['all', 'All Plans'], ...S.plans.map((p) => [p.id, p.name])].map(([k, l]) => `<button class="${S.ruleFilter === k ? 'on' : ''}" data-act="ruleFilter" data-k="${k}">${esc(l)}</button>`).join('')}</div></div></div>
-    <div class="card"><div class="tsc"><table class="t nw"><thead><tr><th>Plan</th><th>Size</th><th>Version</th><th>Status</th><th class="num">Target</th><th class="num">Daily Loss</th><th class="num">Drawdown</th><th>Drawdown Type</th><th class="num">Max Contracts</th><th class="num">Min Days</th><th class="num">Consistency</th><th class="num">Split</th><th class="num">Accounts</th><th></th></tr></thead><tbody>${missing}${rows}</tbody></table></div></div>
-    <p class="hint">Rule amounts are examples until the real plan rules are set.</p>`;
+    <div class="card"><div class="tsc"><table class="t nw"><thead><tr><th>Plan</th><th>Size</th><th>Version</th><th>Status</th><th class="num">Target</th><th class="num">Max Loss</th><th>Drawdown</th><th class="num">Daily Loss</th><th class="num">Max Contracts</th><th class="num">Consistency</th><th class="num">Split</th><th class="num">Payout Cap</th><th class="num">Accounts</th><th></th></tr></thead><tbody>${missing}${rows}</tbody></table></div></div>
+    <p class="hint">Consistency shows evaluation · funded. Open New Version to see and change every rule: drawdown type, daily limit, scaling, scalping, news, overnight holds, inactivity, buffer and payouts.</p>`;
   }
 
   function vAddons() {
@@ -774,8 +836,7 @@ function startCatalog(root) {
     } else if (d.kind === 'rule') {
       title = `${f.first ? 'New Rule Set' : 'New Rule Set Version'} · ${plan(f.plan).name} ${K(f.size)}`;
       body = `<div class="hint" style="font-size:13px">${f.first ? 'The first rules for this size, filled in from the nearest size so you can adjust them. It saves as a draft and goes live when you publish.' : `This creates v${f.version} as a draft. On publish it becomes live for new purchases; the ${f.accounts} accounts on the current version keep their rules.`}</div>
-      <div class="fg2">${[['target', 'Profit Target ($)'], ['daily', 'Daily Loss Limit ($)'], ['dd', 'Max Drawdown ($)'], ['contracts', 'Max Contracts'], ['minDays', 'Minimum Trading Days'], ['consistency', 'Consistency Rule (%)'], ['split', 'Profit Split (%)'], ['payoutMin', 'Minimum Payout ($)']].concat(plan(f.plan).kind === 'funded' ? [['capFirst', 'Max Payout, First 3 ($)'], ['capLater', 'Max Payout After That ($)'], ['capLife', 'Lifetime Payout Limit ($)']] : []).map(([k, l]) => `<div class="fl"><label>${l}</label><input type="number" min="0" value="${f[k]}" data-df="${k}"></div>`).join('')}
-      <div class="fl"><label>Drawdown Type</label><select data-df="ddType">${['Trailing EOD', 'Trailing Intraday', 'Static'].map((x) => `<option ${f.ddType === x ? 'selected' : ''}>${x}</option>`).join('')}</select></div></div>`;
+      ${ruleForm(f)}`;
       foot = '<button class="pill" data-act="closeDrw">Cancel</button><button class="pill pri" data-act="saveDrw">Create Draft Version</button>';
     } else if (d.kind === 'sched') {
       const p = plan(S.planId), z = p.sizes[f.i];
@@ -908,6 +969,7 @@ function startCatalog(root) {
       case 'firstRule': { const [pid, szs] = String(id).split('|'); const sz = +szs; const pl = plan(pid); const peers = S.rules.filter((x) => x.plan === pid && x.status !== 'retired').sort((a, b) => Math.abs(a.size - sz) - Math.abs(b.size - sz) || b.version - a.version); const ref = peers[0] || S.rules.filter((x) => x.status !== 'retired' && (plan(x.plan).kind === 'funded') === (pl.kind === 'funded'))[0]; const f = ref ? sz / ref.size : 1; const sc = (v, step) => Math.round((+v || 0) * f / step) * step;
         const r = ref ? { plan: pid, size: sz, target: sc(ref.target, 250), daily: sc(ref.daily, 25), dd: sc(ref.dd, 250), ddType: ref.ddType, contracts: Math.max(1, Math.round(ref.contracts * f)), minDays: ref.minDays, consistency: ref.consistency, split: ref.split, payoutMin: ref.payoutMin } : { plan: pid, size: sz, target: 0, daily: 0, dd: 0, ddType: 'Trailing EOD', contracts: 1, minDays: 0, consistency: 0, split: 90, payoutMin: 250 };
         if (pl.kind === 'funded') Object.assign(r, ref ? { capFirst: sc(ref.capFirst, 250), capLater: sc(ref.capLater, 250), capLife: sc(ref.capLife, 500) } : { capFirst: 0, capLater: 0, capLife: 0 });
+        if (ref) { const fr = ruleFull(JSON.parse(JSON.stringify(ref))); Object.keys(fr).filter((k) => /^[ef]_/.test(k)).forEach((k) => { const val = fr[k]; r[k] = typeof val === 'number' && /_(dd|dll|target|goal|cap\w*|buffer|lockAt|winDayMin)$/.test(k) ? sc(val, 25) : /_contracts$/.test(k) ? Math.max(1, Math.round(val * f)) : val; }); }
         openDrawer('rule', Object.assign(r, { version: 1, accounts: 0, first: true })); return; }
       case 'delRule': S.rules = S.rules.filter((x) => x.id !== id); log('Rule Sets', 'Discarded a draft rule set version'); break;
       case 'editAddon': { const ad = addon(id) || { id: '', name: '[New Add-On]', pricing: 'flat', value: 0, discountable: true, effect: '', status: 'draft' }; openDrawer('addon', Object.assign({}, ad, { on: Object.fromEntries(S.plans.map((x) => [x.id, !!x.addons[ad.id]])) })); return; }
@@ -952,7 +1014,7 @@ function startCatalog(root) {
       render(); return;
     }
     if (!D) return;
-    if (el.dataset.df) { const k = el.dataset.df; D[k] = el.type === 'number' ? num(el.value) : el.value; if (['pricing', 'vtype', 'copy', 'plan', 'size', 'prefix'].includes(k)) render(); return; }
+    if (el.dataset.df) { const k = el.dataset.df; D[k] = el.type === 'number' ? num(el.value) : el.value; if (['pricing', 'vtype', 'copy', 'plan', 'size', 'prefix'].includes(k) || /^[ef]_(scalp|news|overnight|weekend|splitFirst)$/.test(k)) render(); return; }
     if (el.dataset.dfv) { D.vals[el.dataset.dfv] = el.value; return; }
     if (el.dataset.dft2) { D.tg[el.dataset.dft2] = el.checked; return; }
     if (el.dataset.dfa) { const arr = D[el.dataset.dfa]; const v = el.dataset.v; D[el.dataset.dfa] = el.checked ? [...arr, v] : arr.filter((x) => x !== v); return; }
@@ -982,7 +1044,7 @@ function startCatalog(root) {
       if (!f.id) { f.id = uid('pr'); S.promos.push(f); } else Object.assign(S.promos.find((x) => x.id === f.id), f);
       log('Promotions', `${S.drawer.f.id && S.promos.find((x) => x.id === f.id) ? 'Saved' : 'Created'} ${f.name}${f.kind === 'code' ? ' (' + f.code + ')' : ''}`);
     } else if (kind === 'rule') {
-      const r = Object.assign({}, f, { id: uid('r'), status: 'draft', accounts: 0 }); delete r.first; S.rules.push(r); const prev = liveRule(r.plan, r.size); log('Rule Sets', `Draft v${r.version} for ${plan(r.plan).name} ${K(r.size)}`, { before: prev ? `v${prev.version}: ${money(prev.target)} / ${money(prev.dd)}` : 'None', after: `v${r.version}: ${money(+r.target)} / ${money(+r.dd)}`, approve: true });
+      const r = ruleSync(Object.assign({}, f, { id: uid('r'), status: 'draft', accounts: 0 })); delete r.first; S.rules.push(r); const prev = liveRule(r.plan, r.size); log('Rule Sets', `Draft v${r.version} for ${plan(r.plan).name} ${K(r.size)}`, { before: prev ? `v${prev.version}: ${money(prev.target)} / ${money(prev.dd)}` : 'None', after: `v${r.version}: ${money(+r.target)} / ${money(+r.dd)}`, approve: true });
     } else if (kind === 'sched') {
       const p = plan(S.planId), z = p.sizes[f.i]; z.sched = { price: +f.price, date: f.date }; log('Prices', `${p.name} ${K(z.size)} scheduled for ${fmtD(f.date)}`, { before: money(z.price), after: money(+f.price), approve: true });
     } else if (kind === 'newplan') {
