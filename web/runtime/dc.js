@@ -52,7 +52,7 @@
     const vals = comp.renderVals ? comp.renderVals() : {};
     const html = render(tpl, vals);
     const next = document.createElement('div'); next.innerHTML = html;
-    if (window.morphdom) window.morphdom(root, next, { childrenOnly: true, onBeforeElUpdated: (from, to) => { if (from === document.activeElement && (from.tagName === 'INPUT' || from.tagName === 'TEXTAREA') && from.type !== 'checkbox' && from.type !== 'radio') { to.value = from.value; } return true; } });
+    if (window.morphdom) window.morphdom(root, next, { childrenOnly: true, onBeforeElUpdated: (from, to) => { if (from.hasAttribute && from.hasAttribute('data-keep')) return false; if (from === document.activeElement && (from.tagName === 'INPUT' || from.tagName === 'TEXTAREA') && from.type !== 'checkbox' && from.type !== 'radio') { to.value = from.value; } return true; } });
     else root.innerHTML = html;
     root._fns = FNS;
     if (comp.componentDidUpdate) comp.componentDidUpdate();

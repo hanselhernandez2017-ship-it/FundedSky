@@ -9,10 +9,10 @@ const dec = (s) => { if (!s || !String(s).startsWith('enc:')) return s; try { co
 
 // Field types: text (shown), secret (write-only, masked), select
 const PROVIDERS = {
-  tailoredpay: { name: 'TailoredPay', cat: 'Payments', role: 'Main card processor', desc: 'Cards, Apple Pay and Google Pay through your TailoredPay merchant account (NMI gateway).', docs: 'https://www.tailoredpay.com',
+  tailoredpay: { name: 'TailoredPay', cat: 'Payments', role: 'Backup card processor', desc: 'Optional. Offered to the buyer when Stripe declines a card. Becomes the main processor only if Stripe is not connected.', docs: 'https://www.tailoredpay.com',
     fields: [['gatewayUrl', 'Gateway URL', 'text', 'https://secure.nmi.com'], ['securityKey', 'Private Security Key', 'secret'], ['tokenizationKey', 'Public Tokenization Key (Collect.js)', 'text'], ['descriptor', 'Statement Descriptor', 'text', 'FUNDEDSKY']] },
-  stripe: { name: 'Stripe', cat: 'Payments', role: 'Backup card processor', desc: 'Used when TailoredPay is off or declines. Hosted Stripe Checkout.', docs: 'https://dashboard.stripe.com/apikeys',
-    fields: [['secretKey', 'Secret Key (sk_live_ or sk_test_)', 'secret'], ['webhookSecret', 'Webhook Signing Secret (whsec_)', 'secret']] },
+  stripe: { name: 'Stripe', cat: 'Payments', role: 'Main card processor', desc: 'Cards on your own checkout page with Stripe\'s secure card fields, plus Apple Pay and Google Pay. Refunds and disputes sync back.', docs: 'https://dashboard.stripe.com/apikeys',
+    fields: [['publishableKey', 'Publishable Key (pk_live_ or pk_test_)', 'text'], ['secretKey', 'Secret Key (sk_live_ or sk_test_)', 'secret'], ['webhookSecret', 'Webhook Signing Secret (whsec_)', 'secret'], ['descriptor', 'Statement Descriptor Suffix (optional)', 'text', '']] },
   confirmo: { name: 'Confirmo', cat: 'Payments', role: 'Crypto payments', desc: 'USDC, USDT and other coins at checkout. Settles to your Confirmo balance.', docs: 'https://docs.confirmo.net',
     fields: [['apiKey', 'API Key', 'secret'], ['callbackPassword', 'Callback Password', 'secret'], ['settlement', 'Settlement Currency', 'text', 'USDC']] },
   rise: { name: 'Rise', cat: 'Payouts', role: 'Trader payouts', desc: 'Invites traders to Rise and sends approved payouts from your Rise team.', docs: 'https://docs.riseworks.io',

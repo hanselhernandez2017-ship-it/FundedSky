@@ -66,7 +66,7 @@ const THEME_JS = (want) => `<script>(function(){var t='dark';try{t=localStorage.
 {
   const css = rd('rs.css'); const js = rd('tr_data.js') + rd('rs_app.js');
   const RESET = (th) => `${HEAD('Funded Sky: reset your account', THEME_JS(th) + `<style>html,body{margin:0;background:#08080A}${css}${SELECT_CSS(th === 'light' ? '5E636C' : '9C9693')}</style>`)}<body><div class="rs" id="rsroot" data-mobile="0"></div><div id="fsload" style="position:fixed;inset:0;display:grid;place-items:center;font:500 14px system-ui;color:#9C9693">Loading…</div>
-<script src="/static/pay.js"></script>
+<script src="/static/morphdom.js"></script><script src="/static/pay.js"></script>
 <script>
 function startReset(root) {
 ${js}

@@ -90,15 +90,15 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 <button type="button" class="fs-opt" aria-pressed="{{ m.on }}" onClick="{{ m.pick }}" style="height: 48px; background: {{ m.bg }}; border: 1px solid {{ m.bd }}; border-radius: 8px; color: {{ m.fg }}; font: inherit; font-size: 14px; font-weight: 500; cursor: pointer;">{{ m.label }}</button>
 </sc-for>
 </div>
-<sc-if value="{{ isCard }}" hint-placeholder-val="{{ true }}"><sc-if value="{{ stripe }}"><p style="margin: 0; background: #111113; border: 1px solid #26262A; border-radius: 8px; padding: 18px; font-size: 14px; line-height: 20px; color: #D4CFCD;">{{ secureNote }}</p></sc-if><sc-if value="{{ testMode }}">
+<sc-if value="{{ isCard }}" hint-placeholder-val="{{ true }}"><sc-if value="{{ hostedNote }}"><p style="margin: 0; background: #111113; border: 1px solid #26262A; border-radius: 8px; padding: 18px; font-size: 14px; line-height: 20px; color: #D4CFCD;">{{ secureNote }}</p></sc-if><sc-if value="{{ cardForm }}">
 <div style="background: #111113; border: 1px solid #26262A; border-radius: 8px; padding: 18px; display: flex; flex-direction: column; gap: 14px;">
-<div style="display: flex; flex-direction: column; gap: 6px;"><label for="card" style="font-size: 13px; color: #9C9693;">Card Number</label><input id="card" class="fs-in" value="{{ card }}" onChange="{{ set_card }}" type="text" inputmode="numeric" autocomplete="cc-number" placeholder="1234 1234 1234 1234" style="height: 48px; box-sizing: border-box; background: #08080A; border-radius: 4px; padding: 0 14px; color: #F4F2F1; font-family: 'Geist Mono', monospace; font-size: 15px;"></div>
+<div style="display: flex; flex-direction: column; gap: 6px;"><label for="card" style="font-size: 13px; color: #9C9693;">Card Number</label><sc-if value="{{ testMode }}"><input id="card" class="fs-in" value="{{ card }}" onChange="{{ set_card }}" type="text" inputmode="numeric" autocomplete="cc-number" placeholder="1234 1234 1234 1234" style="height: 48px; box-sizing: border-box; background: #08080A; border-radius: 4px; padding: 0 14px; color: #F4F2F1; font-family: 'Geist Mono', monospace; font-size: 15px;"></sc-if><sc-if value="{{ sx }}"><div id="sx-num" data-keep class="fs-in sxf" style="height: 48px; box-sizing: border-box; background: #08080A; border-radius: 4px; padding: 0 14px; display: flex; flex-direction: column; justify-content: center;"></div></sc-if></div>
 <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px;">
-<div style="display: flex; flex-direction: column; gap: 6px; min-width: 0;"><label for="exp" style="font-size: 13px; color: #9C9693;">Expiry</label><input id="exp" class="fs-in" value="{{ exp }}" onChange="{{ set_exp }}" type="text" inputmode="numeric" autocomplete="cc-exp" placeholder="MM / YY" style="height: 48px; min-width: 0; box-sizing: border-box; background: #08080A; border-radius: 4px; padding: 0 14px; color: #F4F2F1; font-family: 'Geist Mono', monospace; font-size: 15px;"></div>
-<div style="display: flex; flex-direction: column; gap: 6px; min-width: 0;"><label for="cvc" style="font-size: 13px; color: #9C9693;">CVC</label><input id="cvc" class="fs-in" value="{{ cvc }}" onChange="{{ set_cvc }}" type="text" inputmode="numeric" autocomplete="cc-csc" placeholder="123" style="height: 48px; min-width: 0; box-sizing: border-box; background: #08080A; border-radius: 4px; padding: 0 14px; color: #F4F2F1; font-family: 'Geist Mono', monospace; font-size: 15px;"></div>
+<div style="display: flex; flex-direction: column; gap: 6px; min-width: 0;"><label for="exp" style="font-size: 13px; color: #9C9693;">Expiry</label><sc-if value="{{ testMode }}"><input id="exp" class="fs-in" value="{{ exp }}" onChange="{{ set_exp }}" type="text" inputmode="numeric" autocomplete="cc-exp" placeholder="MM / YY" style="height: 48px; min-width: 0; box-sizing: border-box; background: #08080A; border-radius: 4px; padding: 0 14px; color: #F4F2F1; font-family: 'Geist Mono', monospace; font-size: 15px;"></sc-if><sc-if value="{{ sx }}"><div id="sx-exp" data-keep class="fs-in sxf" style="height: 48px; min-width: 0; box-sizing: border-box; background: #08080A; border-radius: 4px; padding: 0 14px; display: flex; flex-direction: column; justify-content: center;"></div></sc-if></div>
+<div style="display: flex; flex-direction: column; gap: 6px; min-width: 0;"><label for="cvc" style="font-size: 13px; color: #9C9693;">CVC</label><sc-if value="{{ testMode }}"><input id="cvc" class="fs-in" value="{{ cvc }}" onChange="{{ set_cvc }}" type="text" inputmode="numeric" autocomplete="cc-csc" placeholder="123" style="height: 48px; min-width: 0; box-sizing: border-box; background: #08080A; border-radius: 4px; padding: 0 14px; color: #F4F2F1; font-family: 'Geist Mono', monospace; font-size: 15px;"></sc-if><sc-if value="{{ sx }}"><div id="sx-cvc" data-keep class="fs-in sxf" style="height: 48px; min-width: 0; box-sizing: border-box; background: #08080A; border-radius: 4px; padding: 0 14px; display: flex; flex-direction: column; justify-content: center;"></div></sc-if></div>
 </div>
 </div>
-<p style="margin: 10px 0 0; font-size: 12.5px; color: #9C9693;">Test mode: use 4242 4242 4242 4242, any future date and any CVC. No real charge.</p></sc-if></sc-if>
+<p style="margin: 10px 0 0; font-size: 12.5px; color: #9C9693;">{{ cardNote }}</p></sc-if></sc-if>
 <sc-if value="{{ isApple }}" hint-placeholder-val="{{ false }}"><p style="margin: 0; background: #111113; border: 1px solid #26262A; border-radius: 8px; padding: 18px; font-size: 14px; line-height: 20px; color: #D4CFCD;">{{ appleNote }}</p></sc-if>
 <sc-if value="{{ isCrypto }}" hint-placeholder-val="{{ false }}"><p style="margin: 0; background: #111113; border: 1px solid #26262A; border-radius: 8px; padding: 18px; font-size: 14px; line-height: 20px; color: #D4CFCD;">{{ cryptoNote }}</p></sc-if>
 </fieldset>
@@ -167,7 +167,7 @@ class Component extends DCLogic {
     } catch (e) { this.setState({ busy: false, err: e.message, fallback: !!e.fallback }); }
   }
   renderVals() {
-    const st = this.state; const sum = st.sum; const cfg = st.cfg || { card: 'test' }; const test = cfg.card === 'test' && !cfg.live; const tp = cfg.card === 'tailoredpay';
+    const st = this.state; const sum = st.sum; const cfg = st.cfg || { card: 'test' }; const test = cfg.card === 'test' && !cfg.live; const tp = cfg.card === 'tailoredpay'; const sx = cfg.card === 'stripe' && !!cfg.stripePk; if (sx) FSPAY.watchCard();
     const methods = [['card', 'Card'], ['apple', 'Apple Pay'], ['crypto', 'Crypto']].map(([id, label]) => {
       const sel = st.method === id;
       return { label, on: sel, bg: sel ? '#13202E' : '#111113', bd: sel ? '#7CC4FF' : '#26262A', fg: sel ? '#F4F2F1' : '#D4CFCD', pick: () => this.setState({ method: id, err: '' }) };
@@ -175,17 +175,18 @@ class Component extends DCLogic {
     const set = (k) => (e) => this.setState({ [k]: e.target.value, err: '' });
     const total = sum ? FSX.money(sum.total) : '…';
     return {
-      methods, isCard: st.method === 'card', isApple: st.method === 'apple', isCrypto: st.method === 'crypto', stripe: !test, testMode: test,
-      appleNote: cfg.card === 'stripe' || cfg.stripeBackup ? "You'll confirm with Apple Pay on Stripe's secure page." : 'Apple Pay is not available yet. Use a card.',
+      methods, isCard: st.method === 'card', isApple: st.method === 'apple', isCrypto: st.method === 'crypto', stripe: !test, testMode: test, sx, cardForm: test || sx, hostedNote: !test && !sx,
+      cardNote: sx ? 'Card details go straight to Stripe. Funded Sky never sees your card number.' : 'Test mode: use 4242 4242 4242 4242, any future date and any CVC. No real charge.',
+      appleNote: String(cfg.card).startsWith('stripe') || cfg.stripeBackup ? "You'll confirm with Apple Pay on Stripe's secure page." : 'Apple Pay is not available yet. Use a card.',
       agreed: st.agreed, notAgreed: !st.agreed, toggleAgree: () => this.setState({ agreed: !st.agreed }),
       f_email: st.email, f_pw: st.pw, f_first: st.first, f_last: st.last, card: st.card, exp: st.exp, cvc: st.cvc,
       set_email: set('email'), set_pw: set('pw'), set_first: set('first'), set_last: set('last'), set_country: set('country'), set_card: set('card'), set_exp: set('exp'), set_cvc: set('cvc'),
       countries: COUNTRIES.map((n) => ({ n, on: n === st.country })),
       sumTitle: sum ? sum.title : 'Loading…', sumSub: sum ? sum.sub : '', lines: sum ? sum.lines : [], total,
       payLabel: st.busy ? 'Working…' : 'Pay ' + total, payLabel0: 'Pay ' + total, payShort: st.busy ? '…' : 'Pay', busy: st.busy, err: st.err, submit: () => this.submit(), fallback: !!st.fallback, payBackup: () => this.submit(true),
-      secureNote: tp ? 'Press Pay and enter your card in the secure payment window. Funded Sky never sees your card number.' : 'You enter your card on our payment processor\'s secure page after you press Pay.',
+      secureNote: tp ? 'Press Pay and enter your card in the secure payment window. Funded Sky never sees your card number.' : sx ? '' : 'You enter your card on our payment processor\'s secure page after you press Pay.',
       cryptoNote: cfg.crypto ? 'Pay with USDC, USDT or other coins on Confirmo\'s secure page. Crypto payments are final.' : 'Crypto checkout is not available yet. Use a card.',
-      trust1: 'Your accounts appear in your dashboard as soon as payment clears', trust2: test ? 'Test mode: no real charge' : tp ? 'Cards processed securely by TailoredPay' : 'Card payments processed by Stripe',
+      trust1: 'Your accounts appear in your dashboard as soon as payment clears', trust2: test ? 'Test mode: no real charge' : tp ? 'Cards processed securely by TailoredPay' : 'Cards processed securely by Stripe',
       backHref: '/checkout', loginHref: '/login?next=' + encodeURIComponent('/checkout/payment' + location.search)
     };
   }

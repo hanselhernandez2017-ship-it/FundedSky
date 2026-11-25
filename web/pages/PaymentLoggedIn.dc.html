@@ -96,12 +96,12 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 </sc-for>
 <sc-if value="{{ isNew }}" hint-placeholder-val="{{ false }}">
 <div style="background: #111113; border: 1px solid #26262A; border-radius: 8px; padding: 18px; display: flex; flex-direction: column; gap: 14px;">
-<div style="display: flex; flex-direction: column; gap: 6px;"><label for="card" style="font-size: 13px; color: #9C9693;">Card Number</label><input id="card" class="fs-in" value="{{ card }}" onChange="{{ set_card }}" type="text" inputmode="numeric" autocomplete="cc-number" placeholder="1234 1234 1234 1234" style="height: 48px; box-sizing: border-box; background: #08080A; border-radius: 4px; padding: 0 14px; color: #F4F2F1; font-family: 'Geist Mono', monospace; font-size: 15px;"></div>
+<div style="display: flex; flex-direction: column; gap: 6px;"><label for="card" style="font-size: 13px; color: #9C9693;">Card Number</label><sc-if value="{{ testMode }}"><input id="card" class="fs-in" value="{{ card }}" onChange="{{ set_card }}" type="text" inputmode="numeric" autocomplete="cc-number" placeholder="1234 1234 1234 1234" style="height: 48px; box-sizing: border-box; background: #08080A; border-radius: 4px; padding: 0 14px; color: #F4F2F1; font-family: 'Geist Mono', monospace; font-size: 15px;"></sc-if><sc-if value="{{ sx }}"><div id="sx-num" data-keep class="fs-in sxf" style="height: 48px; box-sizing: border-box; background: #08080A; border-radius: 4px; padding: 0 14px; display: flex; flex-direction: column; justify-content: center;"></div></sc-if></div>
 <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px;">
-<div style="display: flex; flex-direction: column; gap: 6px; min-width: 0;"><label for="exp" style="font-size: 13px; color: #9C9693;">Expiry</label><input id="exp" class="fs-in" value="{{ exp }}" onChange="{{ set_exp }}" type="text" inputmode="numeric" autocomplete="cc-exp" placeholder="MM / YY" style="height: 48px; min-width: 0; box-sizing: border-box; background: #08080A; border-radius: 4px; padding: 0 14px; color: #F4F2F1; font-family: 'Geist Mono', monospace; font-size: 15px;"></div>
-<div style="display: flex; flex-direction: column; gap: 6px; min-width: 0;"><label for="cvc" style="font-size: 13px; color: #9C9693;">CVC</label><input id="cvc" class="fs-in" value="{{ cvc }}" onChange="{{ set_cvc }}" type="text" inputmode="numeric" autocomplete="cc-csc" placeholder="123" style="height: 48px; min-width: 0; box-sizing: border-box; background: #08080A; border-radius: 4px; padding: 0 14px; color: #F4F2F1; font-family: 'Geist Mono', monospace; font-size: 15px;"></div>
+<div style="display: flex; flex-direction: column; gap: 6px; min-width: 0;"><label for="exp" style="font-size: 13px; color: #9C9693;">Expiry</label><sc-if value="{{ testMode }}"><input id="exp" class="fs-in" value="{{ exp }}" onChange="{{ set_exp }}" type="text" inputmode="numeric" autocomplete="cc-exp" placeholder="MM / YY" style="height: 48px; min-width: 0; box-sizing: border-box; background: #08080A; border-radius: 4px; padding: 0 14px; color: #F4F2F1; font-family: 'Geist Mono', monospace; font-size: 15px;"></sc-if><sc-if value="{{ sx }}"><div id="sx-exp" data-keep class="fs-in sxf" style="height: 48px; min-width: 0; box-sizing: border-box; background: #08080A; border-radius: 4px; padding: 0 14px; display: flex; flex-direction: column; justify-content: center;"></div></sc-if></div>
+<div style="display: flex; flex-direction: column; gap: 6px; min-width: 0;"><label for="cvc" style="font-size: 13px; color: #9C9693;">CVC</label><sc-if value="{{ testMode }}"><input id="cvc" class="fs-in" value="{{ cvc }}" onChange="{{ set_cvc }}" type="text" inputmode="numeric" autocomplete="cc-csc" placeholder="123" style="height: 48px; min-width: 0; box-sizing: border-box; background: #08080A; border-radius: 4px; padding: 0 14px; color: #F4F2F1; font-family: 'Geist Mono', monospace; font-size: 15px;"></sc-if><sc-if value="{{ sx }}"><div id="sx-cvc" data-keep class="fs-in sxf" style="height: 48px; min-width: 0; box-sizing: border-box; background: #08080A; border-radius: 4px; padding: 0 14px; display: flex; flex-direction: column; justify-content: center;"></div></sc-if></div>
 </div>
-<p style="margin: 0; font-size: 12.5px; color: #9C9693;">Test mode: use 4242 4242 4242 4242, any future date and any CVC. No real charge.</p>
+<p style="margin: 0; font-size: 12.5px; color: #9C9693;">{{ cardNote }}</p>
 </div>
 </sc-if>
 </fieldset>
@@ -170,17 +170,18 @@ class Component extends DCLogic {
     try { location.href = await FSX.checkout.pay(st.sum, st); } catch (e) { this.setState({ busy: false, err: e.message, fallback: !!e.fallback }); }
   }
   renderVals() {
-    const st = this.state; const sum = st.sum; const me = st.me || {}; const cfg = st.cfg || { card: 'test' }; const test = cfg.card === 'test' && !cfg.live; const tp = cfg.card === 'tailoredpay';
+    const st = this.state; const sum = st.sum; const me = st.me || {}; const cfg = st.cfg || { card: 'test' }; const test = cfg.card === 'test' && !cfg.live; const tp = cfg.card === 'tailoredpay'; const sx = cfg.card === 'stripe' && !!cfg.stripePk; if (sx) FSPAY.watchCard();
     const defs = [
-      { id: 'card', label: test ? 'Test Card' : 'Card', sub: test ? 'Test mode, no real charge' : tp ? 'Secure card window' : 'On our payment processor\'s secure page', isDefault: true },
-      { id: 'apple', label: 'Apple Pay or Google Pay', sub: cfg.card === 'stripe' || cfg.stripeBackup ? 'On Stripe\'s secure page' : 'Not available yet', isDefault: false },
+      { id: 'card', label: test ? 'Test Card' : 'Card', sub: test ? 'Test mode, no real charge' : sx ? 'Visa, Mastercard, Amex and Discover' : tp ? 'Secure card window' : 'On our payment processor\'s secure page', isDefault: true },
+      { id: 'apple', label: 'Apple Pay or Google Pay', sub: String(cfg.card).startsWith('stripe') || cfg.stripeBackup ? 'On Stripe\'s secure page' : 'Not available yet', isDefault: false },
       { id: 'crypto', label: 'Crypto', sub: cfg.crypto ? 'USDC, USDT and more through Confirmo' : 'Not available yet', isDefault: false }
     ];
     const methods = defs.map((d) => { const sel = st.method === d.id; return Object.assign({}, d, { on: sel, bg: sel ? '#13202E' : '#111113', bd: sel ? '#7CC4FF' : '#26262A', pick: () => this.setState({ method: d.id, err: '' }) }); });
     const set = (k) => (e) => this.setState({ [k]: e.target.value, err: '' });
     const total = sum ? FSX.money(sum.total) : '…';
     return {
-      methods, isNew: st.method === 'card' && test,
+      methods, isNew: st.method === 'card' && (test || sx), testMode: test, sx,
+      cardNote: sx ? 'Card details go straight to Stripe. Funded Sky never sees your card number.' : 'Test mode: use 4242 4242 4242 4242, any future date and any CVC. No real charge.',
       agreed: st.agreed, notAgreed: !st.agreed, toggleAgree: () => this.setState({ agreed: !st.agreed }),
       card: st.card, exp: st.exp, cvc: st.cvc, set_card: set('card'), set_exp: set('exp'), set_cvc: set('cvc'),
       ini: ((me.first || '')[0] || '') + ((me.last || '')[0] || ''), firstName: me.first || '', fullName: `${me.first || ''} ${me.last || ''}`, emailLine: `${me.email || ''}${me.country ? ' · ' + me.country : ''}`,
@@ -189,7 +190,7 @@ class Component extends DCLogic {
       payLabel: st.busy ? 'Working…' : 'Pay ' + total, payLabel0: 'Pay ' + total, payShort: st.busy ? '…' : 'Pay', busy: st.busy, err: st.err, submit: () => this.submit(), fallback: !!st.fallback, payBackup: () => this.submit(true),
       secureNote: tp ? 'Press Pay and enter your card in the secure payment window. Funded Sky never sees your card number.' : 'You enter your card on our payment processor\'s secure page after you press Pay.',
       cryptoNote: cfg.crypto ? 'Pay with USDC, USDT or other coins on Confirmo\'s secure page. Crypto payments are final.' : 'Crypto checkout is not available yet. Use a card.',
-      trust1: 'Your accounts appear in your dashboard as soon as payment clears', trust2: test ? 'Test mode: no real charge' : tp ? 'Cards processed securely by TailoredPay' : 'Card payments processed by Stripe',
+      trust1: 'Your accounts appear in your dashboard as soon as payment clears', trust2: test ? 'Test mode: no real charge' : tp ? 'Cards processed securely by TailoredPay' : 'Cards processed securely by Stripe',
       backHref: sum && sum.source === 'order' ? '/app/billing' : '/checkout', guestHref: '/logout?next=' + encodeURIComponent('/checkout/payment' + location.search)
     };
   }
