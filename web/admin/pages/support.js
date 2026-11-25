@@ -173,7 +173,7 @@ function startSupport(root) {
       <div class="thr">${t.msgs.map(msg).join('')}</div>
       <div class="cmp ${C.mode === 'note' ? 'note' : ''}"><div class="cmpt"><div class="tabs sm">${[['reply', 'Reply'], ['note', 'Internal Note']].map(([k, l]) => `<button class="${C.mode === k ? 'on' : ''}" data-act="cmode" data-k="${k}">${l}</button>`).join('')}</div><select data-bind="macro" aria-label="Insert a saved reply"><option value="">Insert Saved Reply</option>${MACROS.slice().sort((a, b) => (b.cat === t.cat) - (a.cat === t.cat) || b.uses - a.uses).map((m) => `<option value="${m.id}">${esc(m.name)}</option>`).join('')}</select></div>
         <textarea data-live="compose" data-key="cmp" placeholder="${C.mode === 'note' ? 'Only your team sees notes' : `Reply to ${esc(first(t))}`}">${esc(C.text)}</textarea>
-        <div class="cmpf"><span class="hint">${C.mode === 'note' ? 'Not sent to the trader' : t.ch === 'email' ? 'Sends from support@fundedsky.com' : t.ch === 'chat' ? 'Sends in the live chat, and by email if they left' : 'Sends as a Discord direct message'}</span>${C.mode === 'note' ? '<button class="pill pri" data-act="send" data-k="note">Add Note</button>' : '<button class="pill" data-act="send" data-k="reply">Send</button><button class="pill pri" data-act="send" data-k="solve">Send and Solve</button>'}</div></div>`;
+        <div class="cmpf"><span class="hint">${C.mode === 'note' ? 'Not sent to the trader' : t.ch === 'email' ? 'Sends from support@fundedsky.com' : t.ch === 'chat' ? 'Sends in the live chat, and by email if they left' : t.ch === 'discord' ? 'Sends as a Discord direct message' : 'Shows in their dashboard and goes to them by email'}</span>${C.mode === 'note' ? '<button class="pill pri" data-act="send" data-k="note">Add Note</button>' : '<button class="pill" data-act="send" data-k="reply">Send</button><button class="pill pri" data-act="send" data-k="solve">Send and Solve</button>'}</div></div>`;
   }
   function vCtx() {
     const t = cur(); if (!t) return ''; const T = tr(t);
@@ -303,7 +303,7 @@ function startSupport(root) {
       <button class="pill" data-act="newTicket">+ New Ticket</button></div>
     <div class="body ${inbox ? 'inbox' : 'wide'} ${S.mconv ? 'mconv' : ''}"><div class="mnav"><select id="mnavsel" aria-label="Go to section">${mnavHtml()}</select></div><nav class="nav" aria-label="Support">${navHtml()}</nav>
       ${inbox ? `<section class="tl1" aria-label="Tickets">${vList()}</section><section class="cv1" aria-label="Conversation">${vConv()}</section><div class="cx-bg ${S.ctx ? 'open' : ''}" data-act="ctx"></div><aside class="cx ${S.ctx ? 'open' : ''}" aria-label="Trader">${vCtx()}</aside>` : `<main class="main">${views[S.view]()}</main>`}
-    </div>${drawer()}${S.toast ? `<div class="toast" role="status">${esc(S.toast)}</div>` : ''}`;
+    </div>${S.fresh ? `<div class="toast" role="status" style="display:flex;gap:12px;align-items:center;bottom:72px">New tickets or replies<button class="pill sm pri" data-act="freshGo">Refresh</button></div>` : ''}${drawer()}${S.toast ? `<div class="toast" role="status">${esc(S.toast)}</div>` : ''}`;
     Object.entries(keep).forEach(([s, v]) => { const el = root.querySelector(s); if (el) el.scrollTop = v; });
     if (S.scrollThread) { const th = root.querySelector('.thr'); if (th) th.scrollTop = th.scrollHeight; S.scrollThread = false; }
     if (S.focus) { const el = root.querySelector(`[data-key="${S.focus.k}"]`); if (el) { el.focus(); try { el.setSelectionRange(S.focus.s, S.focus.s); } catch (x) { /* not text */ } } S.focus = null; }
@@ -337,7 +337,7 @@ function startSupport(root) {
         if (k === 'refund' && !ords.length) { toast('This trader has no paid orders'); return; }
         if (!acct && k !== 'refund') { toast('No trading account'); return; }
         const f = { refund: { orders: ords, order: (ords[0] || [])[0], amount: (ords[0] || [])[2], reason: 'notrade', close: true }, reset: { acct, reason: 'error' }, extend: { acct, days: '7' }, switch: { acct, plat: 'NinjaTrader' } }[k];
-        S.drawer = { kind: k, f }; break; }
+        S.drawer = { kind: k, f }; S.ctx = false; break; }
       case 'closeDrw': S.drawer = null; break;
       case 'artSt': D.st = k; break;
       case 'saveDrw': saveDrawer(); return;
@@ -400,6 +400,10 @@ function startSupport(root) {
   const DEEP = () => { try { const raw = decodeURIComponent((location.hash || '').slice(1)); if (!raw) return; const [hv, hq] = raw.split('?'); const P = {}; (hq || '').split('&').forEach((kv) => { const [k, v] = kv.split('='); if (k) P[k] = v || ''; }); ROUTE(hv, P); } catch (e) { /* no deep link */ } };
   DEEP();
   window.addEventListener('hashchange', () => { if (!root.isConnected) return; if ('drawer' in S) S.drawer = null; DEEP(); render(); const mm = root.querySelector('.main'); if (mm) mm.scrollTop = 0; });
+  // Watch for new tickets and replies; offer a refresh rather than reloading under someone's hands
+  let SIG = null; const poll = () => { if (!root.isConnected) return; F.api('/tickets/sig').then((r) => { if (SIG === null) SIG = r.sig; else if (r.sig !== SIG && !S.fresh) { S.fresh = true; render(); } }).catch(() => {}); };
+  poll(); setInterval(poll, 20000);
+  root.addEventListener('click', (ev) => { if (ev.target.closest('[data-act=freshGo]')) { location.hash = S.view === 'inbox' ? `inbox?q=${S.q}${S.sel ? '&t=' + S.sel : ''}` : S.view; location.reload(); } });
   render();
 
 }

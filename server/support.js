@@ -64,7 +64,7 @@ async function onTraderMessage(ticketId, text, { isNew } = {}) {
 }
 
 // Ask for a rating when a ticket is solved
-async function onSolved(t) { const s = await settings(); if (s.csat === false) return false;
+async function onSolved(t) { await db.q('UPDATE tickets SET rating=NULL, rated_at=NULL WHERE id=$1', [t.id]); const s = await settings(); if (s.csat === false) return false;
   require('./mail').t('closed', t.user_id, { ticket: t.id, subject: t.subject, url: `${require('./auth').BASE()}/app#support?tkt=${t.id}&rate=1` }); return true; }
 
 // Close tickets waiting on the trader past the setting

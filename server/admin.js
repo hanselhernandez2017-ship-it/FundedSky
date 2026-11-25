@@ -168,6 +168,7 @@ function router(h) {
   r.post('/orders/:code/refund', h(async (req) => { need(req.user, 'finance', 'support');
     if (['support', 'risk'].includes(req.user.role)) { const o = await db.one('SELECT total FROM orders WHERE code=$1', [clean(req.params.code, 30)]); const lim = await require('./support').refundLimit(req.user); if (o && Number(o.total) > lim) bad(`This refund is over your limit of $${lim}. Send it for approval instead.`, 403); }
     return pay.refund(req.user.id, req.params.code, clean(req.body.note, 300)); }));
+  r.get('/tickets/sig', h(async () => { const r = await db.one('SELECT (SELECT count(*)::int FROM tickets) n, (SELECT COALESCE(max(id),0) FROM ticket_msgs) m, (SELECT max(updated_at) FROM tickets) u'); return { sig: `${r.n}.${r.m}.${r.u ? new Date(r.u).getTime() : 0}` }; }));
   r.post('/tickets/:id/reply', h(async (req) => {
     need(req.user, 'support', 'risk', 'finance');
     const t = await db.one('SELECT * FROM tickets WHERE id=$1', [+req.params.id]); if (!t) bad('Ticket not found', 404);
