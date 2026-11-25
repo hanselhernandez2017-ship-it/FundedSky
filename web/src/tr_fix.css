@@ -1,7 +1,7 @@
 /* ===== pixel pass ===== */
 .fsbo .ach{margin:0 0 28px}
 .fsbo .ach .yl{left:0}
-.fsbo .kv span{white-space:nowrap;padding-right:12px}
+.fsbo .kv>div>span{white-space:nowrap;padding-right:12px}
 .fsbo .kv b{min-width:0}
 .fsbo .hbtns{display:flex;gap:10px;flex-wrap:wrap}
 .fsbo .content>.sec.first:has(.hero):is(.g21,.grid2){align-items:center}
@@ -11,7 +11,7 @@
 .fsbo .cert .cb>span{display:flex;flex-direction:column;gap:2px;min-width:0}
 .fsbo .cert .cb>span small{font-size:11.5px;color:var(--fa)}
 .fsbo .tkh{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:14px 0 20px}
-.fsbo table.t th:nth-child(4),.fsbo table.t td:nth-child(4){padding-right:24px}
+.fsbo table.t th:nth-child(4),.fsbo table.t td:nth-child(4){padding-right:24px}.fsbo table.t th:last-child,.fsbo table.t td:last-child{padding-right:0}
 .fsbo .gz>div{justify-content:flex-start}
 .fsbo .gz .vzr b{font-size:19px}
 .fsbo .ftl.five{grid-template-columns:repeat(5,minmax(0,1fr))}
@@ -25,11 +25,12 @@
   .fsbo .vzchips.scr{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-left:-16px!important;margin-right:-16px!important;padding:0 16px}
   .fsbo .vzchips.scr::-webkit-scrollbar{display:none}
   .fsbo .hbtns>*{flex:1 1 0;justify-content:center;text-align:center}
+  .fsbo .hbtns>.btn{white-space:normal;height:auto;min-height:40px;padding-top:10px;padding-bottom:10px;line-height:1.3;min-width:0}
   .fsbo .sh:has(.r) .lab{display:none}
   .fsbo .sh h2{white-space:normal}
   .fsbo .sh .kpi b{font-size:20px}
   .fsbo .sh .kpi span{display:none}
-  .fsbo .trk{display:none}
+  .fsbo div.trk{display:none}
   .fsbo .steps span{display:block}
   .fsbo .steps.wide>div{align-items:center}
   .fsbo .steps.wide>div span{padding-top:0}
@@ -104,8 +105,8 @@
 @media (max-width:360px){.fsbo .mclk .cd2{display:none}}
 @media (max-width:860px){.fsbo .mclk .cd2,.fsbo .mclk #ckl2{font-family:'Mona Sans',system-ui,sans-serif;font-size:12.5px;font-weight:500}}
 /* plan cards: fill the row, every size on one line */
-.fsbo .tiles.plans{grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr))}
-.fsbo .pln{min-width:0;container-type:inline-size}
+.fsbo .tiles.plans{grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr))}.fsbo .tiles.plans>.pln{display:grid;grid-row:span 6;grid-template-rows:subgrid;row-gap:10px;align-content:start}.fsbo .tiles.plans>.pln>.tag,.fsbo .tiles.plans>.pln>.btn{justify-self:start;align-self:start}.fsbo .tiles.plans>.pln>.btn{align-self:end}@media (max-width:860px){.fsbo .tiles.plans>.pln>.tag.ph{display:none}}
+.fsbo .pln{min-width:0}.fsbo .pzw{min-width:0;container-type:inline-size}
 .fsbo .pz{grid-template-columns:repeat(var(--n,4),minmax(0,1fr))}
 .fsbo .pz>div{min-width:0;height:auto;min-height:76px;padding:10px}
 .fsbo .pz b{font-size:16px;white-space:nowrap}

@@ -57,8 +57,8 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 <sc-if value="{{ notDone }}" hint-placeholder-val="{{ true }}">
 <div style="display: flex; flex-direction: column; gap: 24px;">
 <div style="display: flex; flex-direction: column; gap: 10px;">
-<button type="button" class="fs-ghost" style="height: 48px; background: #111113; border: 1px solid #26262A; border-radius: 4px; color: #F4F2F1; font: inherit; font-size: 15px; font-weight: 500; cursor: pointer;">Continue with Google</button>
-<button type="button" class="fs-ghost" style="height: 48px; background: #111113; border: 1px solid #26262A; border-radius: 4px; color: #F4F2F1; font: inherit; font-size: 15px; font-weight: 500; cursor: pointer;">Continue with Apple</button>
+<button type="button" class="fs-ghost" style="height: 48px; background: #111113; border: 1px solid #26262A; border-radius: 4px; color: #F4F2F1; font: inherit; font-size: 15px; font-weight: 500; cursor: pointer;">Continue With Google</button>
+<button type="button" class="fs-ghost" style="height: 48px; background: #111113; border: 1px solid #26262A; border-radius: 4px; color: #F4F2F1; font: inherit; font-size: 15px; font-weight: 500; cursor: pointer;">Continue With Apple</button>
 </div>
 <div style="display: flex; align-items: center; gap: 12px; font-size: 12px; color: #9C9693;"><span style="flex: 1; height: 1px; background: #26262A;"></span>or<span style="flex: 1; height: 1px; background: #26262A;"></span></div>
 
@@ -107,7 +107,7 @@ class Component extends DCLogic {
       email: st.email, pw: st.pw, remember: st.remember, done: st.done, notDone: !st.done,
       setEmail: (e) => this.setState({ email: e.target.value, err: '' }), setPw: (e) => this.setState({ pw: e.target.value, err: '' }),
       toggleShow: () => this.setState({ show: !st.show }), toggleRemember: () => this.setState({ remember: !st.remember }),
-      pwType: st.show ? 'text' : 'password', showText: st.show ? 'Hide' : 'Show', showLabel: st.show ? 'Hide password' : 'Show password',
+      pwType: st.show ? 'text' : 'password', showText: st.show ? 'Hide' : 'Show', showLabel: st.show ? 'Hide Password' : 'Show Password',
       emailBad, pwBad, emailBd: emailBad ? '#F2777F' : '', pwBd: pwBad ? '#F2777F' : '', pwErr: st.err || 'Enter your password.',
       submit: () => this.submit(),
       signupHref: '/signup' + (DC.qs('next') ? '?next=' + encodeURIComponent(DC.qs('next')) : ''), forgotHref: '/forgot-password'

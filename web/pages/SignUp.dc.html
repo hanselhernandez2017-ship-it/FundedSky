@@ -103,7 +103,7 @@ class Component extends DCLogic {
       first: st.first, last: st.last, email: st.email, pw: st.pw, agreed: st.agreed, rules,
       setFirst: set('first'), setLast: set('last'), setEmail: set('email'), setPw: set('pw'),
       toggleShow: () => this.setState({ show: !st.show }), toggleAgree: () => this.setState({ agreed: !st.agreed }),
-      pwType: st.show ? 'text' : 'password', showText: st.show ? 'Hide' : 'Show', showLabel: st.show ? 'Hide password' : 'Show password',
+      pwType: st.show ? 'text' : 'password', showText: st.show ? 'Hide' : 'Show', showLabel: st.show ? 'Hide Password' : 'Show Password',
       firstBad: bad('first'), lastBad: bad('last'), emailBad: bad('email'), pwBad: bad('pw'), agreeBad: bad('agree'),
       firstBd: bad('first') ? '#F2777F' : '', lastBd: bad('last') ? '#F2777F' : '', emailBd: bad('email') ? '#F2777F' : '', pwBd: bad('pw') ? '#F2777F' : '',
       valid, invalid: !valid, submit: () => this.submit(), busy: st.busy, cta: st.busy ? 'Creating…' : 'Create Account', err: st.err,
