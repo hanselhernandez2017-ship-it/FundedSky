@@ -241,6 +241,12 @@ function router(h) {
     need(req.user);
     const c = req.body; if (!c || !Array.isArray(c.plans) || !c.evalRules) bad('Catalog is missing plans or rules');
     for (const p of c.plans) for (const s of p.sizes) if (!(s.price > 0)) bad(`Every size needs a price (${p.name})`);
+    // Every size on sale needs its trading rules and payout limits, or accounts of that size can't be priced or paid
+    const kK = (n) => '$' + Math.round(n / 1000) + 'K';
+    for (const p of c.plans) for (const s of p.sizes) { const inst = p.id === 'instant' || p.kind === 'funded';
+      const R = (inst ? c.instantRules : c.evalRules) || {}, CAP = (inst ? c.instantCaps : c.fundedCaps) || {};
+      if (!R[s.size]) bad(`${p.short || p.name} ${kK(s.size)} has no rule set. Create one in Rule Sets first.`);
+      if (!CAP[s.size] || !(CAP[s.size].first > 0)) bad(`${p.short || p.name} ${kK(s.size)} has no payout limits. Add them in Rule Sets first.`); }
     for (const pr of c.promos || []) if (pr.pct > (c.maxPromoPct || 30)) bad(`Promos are capped at ${c.maxPromoPct || 30}% off`);
     // Price and rule changes need a different person's approval (Team > Approval Rules), unless there is only one staff member
     if (await ruleOn('price')) { const cur = await core.catalog(); const sig = (x) => JSON.stringify({ p: (x.plans || []).map((p) => [p.id, (p.sizes || []).map((z) => [z.size, z.price, z.activation, z.reset])]), r: x.evalRules, f: x.fundedRules, i: x.instantCommon });
