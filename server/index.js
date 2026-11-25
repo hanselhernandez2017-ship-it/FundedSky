@@ -53,7 +53,7 @@ app.get('/api/catalog', h(async () => { const c = await core.catalog(); const RR
 app.get('/api/public-config', h(async () => { const m = await pay.refreshMode(); const crisp = await I.cfg('crisp'); const ph = await I.cfg('posthog'); const ss = await I.cfg('sumsub');
   const kv2 = await db.all("SELECT k, v FROM kv WHERE k IN ('settings.flags','settings.maint')"); const g = (k) => (kv2.find((r) => r.k === k) || {}).v || {};
   const ann = await db.one("SELECT v FROM kv WHERE k='list.announcements'"); const now = new Date().toISOString().slice(0, 10);
-  return { announcements: ((ann && ann.v) || []).filter((a) => a.live && (!a.ends || a.ends >= now) && (!a.starts || a.starts <= new Date().toISOString())), flags: g('settings.flags'), maint: g('settings.maint').on ? g('settings.maint').msg : '', card: m.card, stripePk: m.stripePk || '', backup: m.backup || '', stripeBackup: m.backup === 'stripe', crypto: m.crypto, live: m.live, tokenizationKey: m.tokenizationKey || '', gatewayUrl: m.gatewayUrl || '', crisp: crisp ? crisp.websiteId : '', posthog: ph ? { key: ph.projectKey, host: ph.host } : null, sumsub: !!ss }; }));
+  return { announcements: ((ann && ann.v) || []).filter((a) => a.live && (!a.ends || a.ends >= now) && (!a.starts || a.starts <= new Date().toISOString())), flags: g('settings.flags'), maint: g('settings.maint').on ? g('settings.maint').msg : '', card: m.card, stripePk: m.stripePk || '', backup: m.backup || '', stripeBackup: m.backup === 'stripe', crypto: m.crypto, live: m.live, tokenizationKey: m.tokenizationKey || '', gatewayUrl: m.gatewayUrl || '', crisp: crisp ? crisp.websiteId : '', support: await require('./support').publicInfo(), posthog: ph ? { key: ph.projectKey, host: ph.host } : null, sumsub: !!ss }; }));
 app.get('/api/me', h(async (req) => (req.user ? { user: { email: req.user.email, first: req.user.first, last: req.user.last, role: req.user.role, verified: req.user.verified, country: req.user.country } } : { user: null })));
 app.post('/api/auth/signup', limit(8, 60000), h((req, res) => auth.signup(req, res)));
 app.post('/api/auth/login', limit(10, 60000), h((req, res) => auth.login(req, res)));
@@ -67,7 +67,7 @@ app.post('/api/cart/price', h(async (req) => core.priceCart(req.body.items, { pr
 // ---------- trader ----------
 const T = express.Router(); T.use(auth.needUser);
 // A suspended trader can sign in, read their dashboard and talk to support, but cannot buy, get paid or redeem
-T.use((req, res, next) => { if (req.method !== 'POST' || !req.user || req.user.status !== 'suspended') return next(); if (/^\/(tickets|notifications|settings|password|profile|kyc|tax|sessions|journal|courses)/.test(req.path)) return next(); return res.status(403).json({ error: 'Your account is suspended. Contact support for details.' }); });
+T.use((req, res, next) => { if (req.method !== 'POST' || !req.user || req.user.status !== 'suspended') return next(); if (/^\/(tickets|articles|notifications|settings|password|profile|kyc|tax|sessions|journal|courses)/.test(req.path)) return next(); return res.status(403).json({ error: 'Your account is suspended. Contact support for details.' }); });
 T.get('/trader/boot', h(async (req) => { const host = (process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`).replace(/^https?:\/\//, ''); return trader.boot(req.user, req.sess, host); }));
 const maintOn = async () => { const r = await db.one("SELECT v FROM kv WHERE k='settings.maint'"); return r && r.v.on ? r.v.msg : ''; };
 T.post('/orders', h(async (req) => { const m = await maintOn(); if (m) bad(m, 503); if (await auth.blockedReq(req, req.user.email)) bad('This purchase could not be completed. Contact support.', 403); { const sw = ((await db.one("SELECT v FROM kv WHERE k='store.risk.switches'")) || {}).v || {}; if (sw.sales) bad('New purchases are paused for a short time. Try again soon.', 503); } return pay.createOrder(req.user, req.body); }));
@@ -92,15 +92,27 @@ T.post('/notifications/read', h(async (req) => { if (req.body.all) await db.q('U
 T.post('/tickets', h(async (req) => {
   const s = clean(req.body.subject, 160); if (!s) bad('Add a subject');
   const t = await db.one('INSERT INTO tickets(user_id,subject,category,channel) VALUES($1,$2,$3,$4) RETURNING id', [req.user.id, s, clean(req.body.category, 60) || 'General', 'Web']);
-  require('./mail').t('ticket', req.user.id, { ticket: t.id, subject: s, url: require('./auth').BASE() + '/app#support?tkt=' + t.id });
-  await db.q('INSERT INTO ticket_msgs(ticket_id,author_id,body) VALUES($1,$2,$3)', [t.id, req.user.id, clean(req.body.body, 5000) || s]);
+  const body = clean(req.body.body, 5000) || s;
+  await db.q('INSERT INTO ticket_msgs(ticket_id,author_id,body) VALUES($1,$2,$3)', [t.id, req.user.id, body]);
+  const SUP = require('./support'); const r = await SUP.onTraderMessage(t.id, body, { isNew: true }); const ss = await SUP.settings();
+  require('./mail').t('ticket', req.user.id, { ticket: t.id, subject: s, reply_time: r.afterHours ? (ss.ahText || SUP.replyText(ss)) : SUP.replyText(ss), url: require('./auth').BASE() + '/app#support?tkt=' + t.id });
+  I.alert('ticket', `:speech_balloon: New ticket #${t.id}${r.urgent ? ' (urgent)' : ''}: ${s}`);
   return { id: t.id };
 }));
 T.post('/tickets/:id/reply', h(async (req) => {
   const t = await db.one('SELECT * FROM tickets WHERE id=$1 AND user_id=$2', [+req.params.id, req.user.id]); if (!t) bad('Ticket not found', 404);
   await db.q('INSERT INTO ticket_msgs(ticket_id,author_id,body) VALUES($1,$2,$3)', [t.id, req.user.id, clean(req.body.body, 5000)]);
   await db.q("UPDATE tickets SET status='open', updated_at=now() WHERE id=$1", [t.id]);
+  await require('./support').onTraderMessage(t.id, clean(req.body.body, 5000));
 }));
+T.post('/tickets/:id/rate', h(async (req) => {
+  const t = await db.one('SELECT * FROM tickets WHERE id=$1 AND user_id=$2', [+req.params.id, req.user.id]); if (!t) bad('Ticket not found', 404);
+  if (t.status !== 'solved') bad('You can rate a ticket once it is solved');
+  const good = !!req.body.good; await db.q('UPDATE tickets SET rating=$2, rated_at=now() WHERE id=$1', [t.id, good ? 'good' : 'bad']);
+  if (!good) { await db.q('INSERT INTO ticket_msgs(ticket_id,author_id,body) VALUES($1,$2,$3)', [t.id, req.user.id, clean(req.body.body, 2000) || 'This is not solved yet.']); await db.q("UPDATE tickets SET status='open', updated_at=now() WHERE id=$1", [t.id]); }
+  return { reopened: !good };
+}));
+T.post('/articles/stat', h(async (req) => { await require('./support').articleStat(req.body.t, req.body.kind); }));
 const SETTING_KEYS = ['nEmail', 'nSms', 'nPush', 'nNews', 'nMkt', 'nComp', 'mfaPay'];
 T.post('/settings', h(async (req) => { const o = {}; for (const k of SETTING_KEYS) if (k in req.body) o[k] = !!req.body[k]; await db.q('UPDATE users SET settings = settings || $2 WHERE id=$1', [req.user.id, JSON.stringify(o)]); }));
 T.post('/profile', h(async (req) => { await db.q('UPDATE users SET phone=$2 WHERE id=$1', [req.user.id, clean(req.body.phone, 40)]); }));

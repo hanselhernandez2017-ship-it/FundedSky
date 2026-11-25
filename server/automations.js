@@ -11,6 +11,7 @@ const K = (s) => '$' + Number(s) / 1000 + 'K';
 async function run() {
   const cat = await core.catalog(); const out = {};
   const hit = (k) => { out[k] = (out[k] || 0) + 1; };
+  try { const n = await require('./support').autoClose(); if (n) out.ticketsClosed = n; } catch (e) { console.error('autoClose', e.message); }
   const acc = await db.all("SELECT a.*, u.email, u.first, u.status FROM accounts a JOIN users u ON u.id=a.user_id WHERE u.email NOT LIKE '%@demo.fundedsky.test' AND a.phase IN ('active','passed','breached','review')");
   for (const a of acc) {
     if (a.status === 'banned') continue;

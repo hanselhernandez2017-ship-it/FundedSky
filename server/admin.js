@@ -12,6 +12,12 @@ const { bad, clean, shortDate, ago, round2, tradeDate } = require('./util');
 const can = (u, ...roles) => u.role === 'admin' || roles.includes(u.role);
 const need = (u, ...roles) => { if (!can(u, ...roles)) bad('Your role cannot do this', 403); };
 
+// Reinstate a breached account at its balance from the start of the breach day
+const reinstate = (id) => db.q(`UPDATE accounts SET phase='active', breach_reason=NULL,
+  balance = balance - CASE WHEN today_date = (breached_at AT TIME ZONE 'America/New_York')::date THEN LEAST(today_pnl, 0) ELSE 0 END,
+  floor = LEAST(floor, balance - CASE WHEN today_date = (breached_at AT TIME ZONE 'America/New_York')::date THEN LEAST(today_pnl, 0) ELSE 0 END - 1),
+  today_pnl = CASE WHEN today_date = (breached_at AT TIME ZONE 'America/New_York')::date THEN 0 ELSE today_pnl END, halted_today=false, breached_at=NULL WHERE id=$1`, [id]);
+
 function router(h) {
   const r = express.Router();
 
@@ -65,7 +71,7 @@ function router(h) {
       accounts: acctOut,
       orders: orders.map((o) => ({ id: o.id, code: o.code, user: o.user_id, tid: o.tid, name: `${o.first} ${o.last}`, email: o.email, kind: o.kind, lines: o.lines, items: o.items, subtotal: Number(o.subtotal), discount: Number(o.discount), total: Number(o.total), promo: o.promo, status: o.status, method: o.pay_method, provider: o.provider, created: o.created_at, paid: o.paid_at, refunded: o.refunded_at, accounts: (o.meta && o.meta.accounts) || [], account: o.meta && o.meta.account })),
       payouts: payouts.map((p) => ({ code: p.code, account: p.account_id, user: p.user_id, tid: p.tid, name: `${p.first} ${p.last}`, email: p.email, country: p.country, kyc: p.kyc_status, tax: p.tax_status, rise: p.rise_status, tx: p.tx_hash, ref: p.provider_ref, number: p.number, gross: Number(p.gross), split: p.split, amount: Number(p.amount), method: p.method, rail: p.rail, status: p.status, batch: p.batch, note: p.note, reviewer: p.reviewed_by, requested: p.requested_at, approved: p.approved_at, paid: p.paid_at, denied: p.denied_at })),
-      tickets: tickets.map((t) => ({ id: t.id, user: t.user_id, tid: t.tid, name: `${t.first} ${t.last}`, email: t.email, subject: t.subject, category: t.category, channel: t.channel, status: t.status, priority: t.priority, created: t.created_at, updated: t.updated_at, assignee: t.assignee, msgs: msgs.filter((m) => m.ticket_id === t.id).map((m) => ({ staff: m.staff, internal: m.internal, by: m.afirst, body: m.body, at: m.created_at })) })),
+      tickets: tickets.map((t) => ({ id: t.id, user: t.user_id, tid: t.tid, name: `${t.first} ${t.last}`, email: t.email, subject: t.subject, category: t.category, channel: t.channel, status: t.status, priority: t.priority, created: t.created_at, updated: t.updated_at, assignee: t.assignee, review: t.review, rating: t.rating, rated: t.rated_at, msgs: msgs.filter((m) => m.ticket_id === t.id).map((m) => ({ staff: m.staff, internal: m.internal, by: m.afirst, body: m.body, at: m.created_at })) })),
       outbox, audit: auditRows.map((a) => ({ at: a.created_at, by: a.first ? `${a.first} ${a.last}` : 'System', action: a.action, target: a.target, meta: a.meta })),
       methods: methods.map((m) => ({ user: m.user_id, rail: m.rail, label: m.label, def: m.is_default, unlock: m.unlock_at, created: m.created_at })),
       daily, content: Object.fromEntries(notes.map((n) => [n.k.slice(8), n.v]))
@@ -91,7 +97,7 @@ function router(h) {
     const id = clean(req.params.id, 40); const a = await db.one('SELECT * FROM accounts WHERE id=$1', [id]); if (!a) bad('Account not found', 404);
     const act = req.params.action;
     if (act === 'breach') { need(req.user, 'risk'); await db.q("UPDATE accounts SET phase='breached', breached_at=now(), breach_reason=$2 WHERE id=$1", [id, clean(req.body.reason, 200) || 'Closed by risk review']); await core.notify(null, a.user_id, `${id} was closed`, clean(req.body.reason, 200) || 'Closed by risk review. Contact support with questions.', 'account?acct=' + id); }
-    else if (act === 'reinstate') { need(req.user, 'risk'); await db.q("UPDATE accounts SET phase='active', breached_at=NULL, breach_reason=NULL, floor=LEAST(floor, balance - 1) WHERE id=$1", [id]); await core.notify(null, a.user_id, `${id} was reinstated`, 'Your account is active again.', 'account?acct=' + id); }
+    else if (act === 'reinstate') { need(req.user, 'risk'); await reinstate(id); await core.notify(null, a.user_id, `${id} was reinstated`, 'Your account is active again.', 'account?acct=' + id); }
     else if (act === 'pause') { need(req.user, 'risk'); await db.q("UPDATE accounts SET sim = sim || '{\"paused\":true}' WHERE id=$1", [id]); }
     else if (act === 'resume') { need(req.user, 'risk'); await db.q("UPDATE accounts SET sim = sim - 'paused' WHERE id=$1", [id]); }
     else if (act === 'fastforward') { need(req.user); return sim.fastForward(id, parseInt(req.body.days, 10) || 5); }
@@ -159,7 +165,9 @@ function router(h) {
   }));
   r.put('/settings-alerts-legacy', h(async (req) => { need(req.user); await db.q("INSERT INTO kv(k,v) VALUES('settings.alerts',$1) ON CONFLICT (k) DO UPDATE SET v=$1, updated_at=now()", [JSON.stringify(req.body || {})]); }));
   r.post('/users/:id/tax', h(async (req) => { need(req.user, 'finance', 'support'); const st = ['none', 'requested', 'on_file'].includes(req.body.status) ? req.body.status : 'none'; await db.q('UPDATE users SET tax_status=$2 WHERE id=$1', [+req.params.id, st]); await core.audit(req.user.id, 'user.tax', String(req.params.id), { st }); }));
-  r.post('/orders/:code/refund', h(async (req) => { need(req.user, 'finance', 'support'); return pay.refund(req.user.id, req.params.code, clean(req.body.note, 300)); }));
+  r.post('/orders/:code/refund', h(async (req) => { need(req.user, 'finance', 'support');
+    if (['support', 'risk'].includes(req.user.role)) { const o = await db.one('SELECT total FROM orders WHERE code=$1', [clean(req.params.code, 30)]); const lim = await require('./support').refundLimit(req.user); if (o && Number(o.total) > lim) bad(`This refund is over your limit of $${lim}. Send it for approval instead.`, 403); }
+    return pay.refund(req.user.id, req.params.code, clean(req.body.note, 300)); }));
   r.post('/tickets/:id/reply', h(async (req) => {
     need(req.user, 'support', 'risk', 'finance');
     const t = await db.one('SELECT * FROM tickets WHERE id=$1', [+req.params.id]); if (!t) bad('Ticket not found', 404);
@@ -169,9 +177,9 @@ function router(h) {
     await core.notify(null, t.user_id, 'Support replied: ' + t.subject, body.slice(0, 140), 'support?tkt=' + t.id);
     const u = await db.one('SELECT email, first FROM users WHERE id=$1', [t.user_id]);
     await require('./mail').sendT('reply', u.email, { first_name: u.first, ticket: t.id, subject: t.subject, agent: req.user.first, snippet: body.slice(0, 90), message: body, url: `${require('./auth').BASE()}/app#support?tkt=${t.id}` }, { uid: t.user_id });
-    if (req.body.solve) require('./mail').t('closed', t.user_id, { ticket: t.id, subject: t.subject, url: `${require('./auth').BASE()}/app#support?tkt=${t.id}` });
+    if (req.body.solve && t.status !== 'solved') await require('./support').onSolved(t);
   }));
-  r.post('/tickets/:id/status', h(async (req) => { const st = ['open', 'pending', 'solved', 'hold'].includes(req.body.status) ? req.body.status : 'open'; await db.q('UPDATE tickets SET status=$2, updated_at=now() WHERE id=$1', [+req.params.id, st]); }));
+  r.post('/tickets/:id/status', h(async (req) => { const st = ['open', 'pending', 'solved', 'hold'].includes(req.body.status) ? req.body.status : 'open'; const t = await db.one('SELECT * FROM tickets WHERE id=$1', [+req.params.id]); if (!t) bad('Ticket not found', 404); await db.q('UPDATE tickets SET status=$2, updated_at=now() WHERE id=$1', [t.id, st]); if (st === 'solved' && t.status !== 'solved') await require('./support').onSolved(t); await core.audit(req.user.id, 'ticket.status', String(t.id), { status: st }); }));
 
   r.put('/catalog', h(async (req) => {
     need(req.user);
@@ -268,6 +276,32 @@ function router(h) {
   r.post('/tickets/:id/category', h(async (req) => { await db.q('UPDATE tickets SET category=$2, updated_at=now() WHERE id=$1', [+req.params.id, clean(req.body.category, 60) || 'General']); }));
   r.post('/tickets/:id/note', h(async (req) => { const body = clean(req.body.body, 5000); if (!body) bad('Write a note first'); await db.q('INSERT INTO ticket_msgs(ticket_id,author_id,staff,internal,body) VALUES($1,$2,true,true,$3)', [+req.params.id, req.user.id, body]); }));
   r.post('/tickets/:id/priority', h(async (req) => { await db.q('UPDATE tickets SET priority=$2 WHERE id=$1', [+req.params.id, ['low', 'normal', 'high', 'urgent'].includes(req.body.priority) ? req.body.priority : 'normal']); }));
+  // Breach reviews: one person proposes, a different person confirms; the trader hears the outcome
+  const REVK = 'store.support.reviews'; const revs = async () => ((await db.one('SELECT v FROM kv WHERE k=$1', [REVK])) || { v: {} }).v || {};
+  const saveRevs = (v) => db.q('INSERT INTO kv(k,v) VALUES($1,$2) ON CONFLICT (k) DO UPDATE SET v=$2, updated_at=now()', [REVK, JSON.stringify(v)]);
+  const revTicket = async (tid) => { const t = await db.one('SELECT * FROM tickets WHERE id=$1', [+tid]); if (!t) bad('Ticket not found', 404); const a = await db.one("SELECT * FROM accounts WHERE user_id=$1 AND phase='breached' ORDER BY breached_at DESC NULLS LAST LIMIT 1", [t.user_id]); return { t, a }; };
+  r.post('/tickets/:id/review', h(async (req) => { need(req.user, 'support', 'risk'); const { t, a } = await revTicket(req.params.id); if (!a) bad('This trader has no closed account to review'); await db.q("UPDATE tickets SET review=true, category='Breach Dispute', updated_at=now() WHERE id=$1", [t.id]); }));
+  r.post('/reviews/:tid/propose', h(async (req) => { need(req.user, 'support', 'risk'); const { t, a } = await revTicket(req.params.tid); if (!a) bad('The account is no longer closed');
+    const k = 'BR-' + t.id; const v = await revs(); if (v[k] && v[k].st !== 'open') bad('This review already has a decision');
+    const decision = req.body.decision === 'reinstated' ? 'reinstated' : 'upheld'; const note = clean(req.body.note, 2000);
+    v[k] = { st: 'second', decision, first: req.user.first, firstId: req.user.id, note, acct: a.id, at: new Date().toISOString() }; await saveRevs(v);
+    await db.q('INSERT INTO ticket_msgs(ticket_id,author_id,staff,internal,body) VALUES($1,$2,true,true,$3)', [t.id, req.user.id, `${req.user.first} proposed: ${decision === 'reinstated' ? 'reinstate' : 'uphold the closure'}. ${note}`.trim()]);
+    await core.audit(req.user.id, 'review.propose', k, { decision }); }));
+  r.post('/reviews/:tid/confirm', h(async (req) => { need(req.user, 'risk'); const { t } = await revTicket(req.params.tid); const k = 'BR-' + t.id; const v = await revs(); const rv = v[k];
+    if (!rv || rv.st !== 'second') bad('Nothing is waiting for a second reviewer'); if (rv.firstId === req.user.id) bad('A different person must confirm this decision', 403);
+    if (rv.decision === 'reinstated') { const a = await db.one('SELECT * FROM accounts WHERE id=$1', [rv.acct]); if (!a || a.phase !== 'breached') bad('The account is no longer closed'); await reinstate(a.id); }
+    v[k] = Object.assign({}, rv, { st: rv.decision, second: req.user.first, secondId: req.user.id, decidedAt: new Date().toISOString() }); await saveRevs(v);
+    const u = await db.one('SELECT id, email, first FROM users WHERE id=$1', [t.user_id]);
+    const msg = rv.decision === 'reinstated' ? `Hi ${u.first}, we reviewed the closure of ${rv.acct} and reinstated it. It's active again at its balance from the start of that day.${rv.note ? '\n\n' + rv.note : ''}` : `Hi ${u.first}, we reviewed the closure of ${rv.acct}. The trades show the rule was broken, so the closure stands.${rv.note ? '\n\n' + rv.note : ''}\n\nYou can reset the account from its page.`;
+    await db.q('INSERT INTO ticket_msgs(ticket_id,author_id,staff,body) VALUES($1,$2,true,$3)', [t.id, req.user.id, msg]);
+    await db.q('INSERT INTO ticket_msgs(ticket_id,author_id,staff,internal,body) VALUES($1,$2,true,true,$3)', [t.id, req.user.id, `${k} decided: ${rv.decision === 'reinstated' ? 'account reinstated' : 'closure upheld'} by ${rv.first} and ${req.user.first}.`]);
+    await db.q("UPDATE tickets SET status='solved', updated_at=now() WHERE id=$1", [t.id]);
+    await core.notify(null, u.id, rv.decision === 'reinstated' ? `${rv.acct} was reinstated` : `Review of ${rv.acct} finished`, msg.slice(0, 140), 'support?tkt=' + t.id);
+    await require('./mail').sendT('reply', u.email, { first_name: u.first, ticket: t.id, subject: t.subject, agent: req.user.first, snippet: msg.slice(0, 90), message: msg, url: `${require('./auth').BASE()}/app#support?tkt=${t.id}` });
+    await require('./support').onSolved(t);
+    await core.audit(req.user.id, 'review.confirm', k, { decision: rv.decision }); return v[k]; }));
+  r.post('/reviews/:tid/back', h(async (req) => { need(req.user, 'risk'); const k = 'BR-' + (+req.params.tid); const v = await revs(); if (v[k] && ['upheld', 'reinstated'].includes(v[k].st)) bad('This review is already decided'); delete v[k]; await saveRevs(v);
+    await db.q('INSERT INTO ticket_msgs(ticket_id,author_id,staff,internal,body) VALUES($1,$2,true,true,$3)', [+req.params.tid, req.user.id, `${req.user.first} sent the review back for another look.`]); }));
   // ---- Generic lists stored in kv: announcements, macros, blocklist, countries, incidents ----
   const KV = ['announcements', 'macros', 'blocklist', 'countries', 'incidents', 'affiliates', 'docs', 'complaints'];
   r.put('/list/:key', h(async (req) => { if (!KV.includes(req.params.key)) bad('Unknown list'); need(req.user, 'support', 'risk', 'finance'); await db.q('INSERT INTO kv(k,v) VALUES($1,$2) ON CONFLICT (k) DO UPDATE SET v=$2, updated_at=now()', ['list.' + req.params.key, JSON.stringify(req.body.value || [])]); await core.audit(req.user.id, 'list.' + req.params.key, '', {}); }));
