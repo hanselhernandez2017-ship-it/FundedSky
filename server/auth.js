@@ -5,6 +5,8 @@ const { rid, bad, clean, emailOk } = require('./util');
 const COOKIE = 'fs_sess';
 const BASE = () => process.env.PUBLIC_URL || 'http://localhost:' + (process.env.PORT || 3000);
 
+// The trader behind a referral link code (a trader's own code, or an active affiliate's code); null when unknown
+async function refOf(refCode) { if (!refCode) return null; const r = await db.one('SELECT id FROM users WHERE ref_code=$1', [clean(refCode, 40)]); if (r) return r.id; const al = ((await db.one("SELECT v FROM kv WHERE k='list.affiliates'")) || {}).v || []; const m = al.find((x) => x.code && String(x.code).toUpperCase() === String(refCode).toUpperCase() && x.status === 'active'); return m ? m.user : null; }
 function parseCookies(h) { const o = {}; (h || '').split(';').forEach((p) => { const i = p.indexOf('='); if (i > 0) o[p.slice(0, i).trim()] = decodeURIComponent(p.slice(i + 1).trim()); }); return o; }
 function setCookie(res, token, days = 30) {
   const secure = BASE().startsWith('https') ? '; Secure' : '';
@@ -83,7 +85,7 @@ async function signup(req, res) {
   if (await blockedReq(req, email)) bad('We could not create an account. Contact support if you think this is a mistake.');
   if (await db.one('SELECT 1 FROM users WHERE email=$1', [email])) bad('An account with this email already exists. Log in instead.');
   const n = (await db.one("SELECT nextval('seq_tid') n")).n;
-  let ref = null; const refCode = req.body.ref || parseCookies(req.headers.cookie).fs_ref; if (refCode) { const r = await db.one('SELECT id FROM users WHERE ref_code=$1', [clean(refCode, 40)]); ref = r ? r.id : null; if (!ref) { const al = ((await db.one("SELECT v FROM kv WHERE k='list.affiliates'")) || {}).v || []; const m = al.find((x) => x.code && String(x.code).toUpperCase() === String(refCode).toUpperCase() && x.status === 'active'); if (m) ref = m.user; } }
+  let ref = null; const refCode = req.body.ref || parseCookies(req.headers.cookie).fs_ref; if (refCode) { const r = await db.one('SELECT id FROM users WHERE upper(ref_code)=upper($1)', [clean(refCode, 40)]); ref = r ? r.id : null; if (!ref) { const m = await require('./affiliates').byCode(refCode); if (m) ref = m.user; } }
   // Staff roles (ADMIN_EMAILS or a Team invite) are only given once the email is confirmed, in verifyEmail
   const role = 'trader';
   const u = await db.one(`INSERT INTO users(tid,email,pass_hash,first,last,country,role,ref_code,referred_by,settings,agreements,phone) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
@@ -185,9 +187,11 @@ async function changePassword(req) {
   const u = await db.one('SELECT * FROM users WHERE id=$1', [req.user.id]);
   if (!(await bcrypt.compare(String(req.body.current || ''), u.pass_hash))) bad('Your current password is not right');
   const pass = String(req.body.password || ''); pwRule(pass);
+  if (await bcrypt.compare(pass, u.pass_hash)) bad('Your new password must be different from your current one');
   await db.q('UPDATE users SET pass_hash=$2 WHERE id=$1', [u.id, await bcrypt.hash(pass, 10)]);
   await db.q('DELETE FROM sessions WHERE user_id=$1 AND token<>$2', [u.id, req.sess]);
   await db.q("UPDATE tokens SET used=true WHERE user_id=$1 AND kind='reset'", [u.id]);
+  mail.t('pwchanged', u.id, { time: new Date().toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) + ' ET', device: require('./util').uaLabel(req.get('user-agent')), location: req.get('cf-ipcountry') || req.get('x-vercel-ip-country') || 'Unknown', url: BASE() + '/forgot-password' });
   return { ok: true };
 }
-module.exports = { ipIn, netRule, normIp, parseCookies, blockedReq, loadUser, needUser, needStaff, staffOk, mfaLogin, startSession, needAdmin, signup, login, logout, forgot, resetPassword, resetCheck, verifyEmail, resendVerify, changeEmail, changePassword, STAFF, BASE };
+module.exports = { ipIn, netRule, normIp, parseCookies, refOf, blockedReq, loadUser, needUser, needStaff, staffOk, mfaLogin, startSession, needAdmin, signup, login, logout, forgot, resetPassword, resetCheck, verifyEmail, resendVerify, changeEmail, changePassword, STAFF, BASE };

@@ -256,7 +256,7 @@ function startCatalog(root) {
 
   function vPlan() {
     const p = plan(S.planId); if (!p) return vPlans();
-    const sizeRows = p.sizes.map((z, i) => { const r = liveRule(p.id, z.size); return `<tr><td class="swc">${sw(z.active, 'sizeActive', `data-i="${i}"`, 'Sell ' + K(z.size))}</td><td><b>${K(z.size)}</b><div class="hint mono">${p.slug.toUpperCase().replace('PLAN-', 'PLAN')}-${z.size / 1000}K</div></td>
+    const sizeRows = p.sizes.map((z, i) => { const r = liveRule(p.id, z.size); return `<tr><td class="swc">${sw(z.active, 'sizeActive', `data-i="${i}"`, 'Sell ' + K(z.size))}</td><td><b>${K(z.size)}</b><div class="hint mono nw">${p.slug.toUpperCase().replace('PLAN-', 'PLAN')}-${z.size / 1000}K</div></td>
       <td style="width:110px"><input type="number" min="0" value="${z.price || ''}" placeholder="Price" data-bind="size.price" data-i="${i}" style="width:80px" aria-label="Price ${K(z.size)}"></td>
       <td style="width:110px"><input type="number" min="0" value="${z.compare || ''}" placeholder="None" data-bind="size.compare" data-i="${i}" style="width:80px" aria-label="Compare-at ${K(z.size)}"></td>
       <td style="width:110px"><input type="number" min="0" value="${z.floor || ''}" placeholder="None" data-bind="size.floor" data-i="${i}" style="width:80px" aria-label="Floor ${K(z.size)}"></td>
@@ -264,7 +264,7 @@ function startCatalog(root) {
       <td style="min-width:120px">${r ? `<button class="lnk" data-act="go" data-v="rules">v${r.version}</button><div class="hint nw">${money(r.target)} Target</div><div class="hint nw">${money(r.dd)} Drawdown</div>` : (z.active ? `<span class="il"><span class="b err plain">None</span><button class="lnk" data-act="firstRule" data-id="${p.id}|${z.size}">Create Rule Set</button></span>` : '<span class="hint">—</span>')}</td></tr>`; }).join('');
     const platRows = S.platforms.map((x) => `<tr><td class="swc">${sw(p.platforms[x.id], 'planPlat', `data-id="${x.id}"`, x.name)}</td><td><b>${x.name}</b></td><td><span class="b plain">${x.adapter}</span></td><td class="nw"><label class="chk"><input type="radio" name="defp" ${p.defPlatform === x.id ? 'checked' : ''} data-act="defPlat" data-id="${x.id}" ${p.platforms[x.id] ? '' : 'disabled'}> Default</label></td></tr>`).join('');
     const adRows = S.addons.map((a) => `<tr><td class="swc">${sw(p.addons[a.id], 'planAddon', `data-id="${a.id}"`, a.name)}</td><td><b>${esc(a.name)}</b><div class="hint">${esc(a.effect)}</div></td><td>${a.pricing === 'flat' ? money(a.value) : a.value + '% of size price'}</td><td>${p.sizes.filter((z) => z.active && z.price).map((z) => `<span class="hint">${K(z.size)} ${money(a.pricing === 'flat' ? a.value : Math.round(z.price * a.value / 100))}</span>`).join(' · ')}</td></tr>`).join('');
-    const bRows = S.bundles.map((b) => `<tr><td class="swc">${sw(p.bundles[b.id], 'planBundle', `data-id="${b.id}"`, b.name)}</td><td class="nw"><b>${esc(b.name)}</b></td><td>${bundleSummary(b)}</td><td class="nw" style="color:var(--mu)">${b.stacks ? 'Codes stack' : 'No codes on top'}</td></tr>`).join('');
+    const bRows = S.bundles.map((b) => `<tr><td class="swc">${sw(p.bundles[b.id], 'planBundle', `data-id="${b.id}"`, b.name)}</td><td><b>${esc(b.name)}</b><div class="hint">${bundleSummary(b)} · ${b.stacks ? 'Codes stack' : 'No codes on top'}</div></td></tr>`).join('');
     return `<div class="crumb"><a data-act="go" data-v="plans">Plans</a> / ${esc(p.name)}</div>
     <div class="ph"><div><h1>${esc(p.name)}</h1><p>Changes here are saved to the draft and go live together when you publish.</p></div><div class="act"><button class="pill" data-act="dupPlan">Duplicate</button>${p.status !== 'retired' ? '<button class="pill dng" data-act="retirePlan">Retire</button>' : '<button class="pill" data-act="restorePlan">Restore</button>'}<button class="pill" data-act="pvFrom" data-id="${p.id}">Preview at Checkout</button></div></div>
     <div class="card"><div class="ch"><h3>Details</h3></div><div class="cb fg"><div class="fg3">
@@ -276,9 +276,9 @@ function startCatalog(root) {
       <div class="fl"><label>Checkout Order</label><input type="number" min="1" value="${p.sort}" data-bind="plan.sort"></div></div>
       <div class="fl"><label>Description at Checkout</label><input value="${esc(p.desc)}" data-bind="plan.desc"></div></div></div>
     <div class="card"><div class="ch"><h3>Sizes and Prices</h3><span class="lab">Floor = the lowest any discount can take this size</span></div>
-      <div class="tsc"><table class="t"><thead><tr><th>Sell</th><th>Size and SKU</th><th>Price ($)</th><th>Compare-At ($)</th><th>Floor ($)</th><th>Scheduled Price</th><th>Rule Set</th></tr></thead><tbody>${sizeRows}</tbody></table></div></div>
+      <div class="tsc"><table class="t szt"><thead><tr><th>Sell</th><th>Size and SKU</th><th>Price ($)</th><th>Compare-At ($)</th><th>Floor ($)</th><th>Scheduled Price</th><th>Rule Set</th></tr></thead><tbody>${sizeRows}</tbody></table></div></div>
     <div class="two">
-    <div class="card m0"><div class="ch"><h3>Platforms</h3><span class="lab">All on the simulator until a partner is signed</span></div><div class="tsc"><table class="t"><tbody>${platRows}</tbody></table></div></div>
+    <div class="card m0"><div class="ch"><h3>Platforms</h3><span class="lab">All on the simulator until a partner is signed</span></div><div class="tsc"><table class="t szt"><tbody>${platRows}</tbody></table></div></div>
     <div class="card m0"><div class="ch"><h3>Bundles</h3><div class="r"><button class="lnk" data-act="go" data-v="bundles">Manage Bundles</button></div></div><div class="tsc"><table class="t"><tbody>${bRows}</tbody></table></div></div>
     </div>
     <div class="card" style="margin-top:14px"><div class="ch"><h3>Add-Ons</h3><div class="r"><button class="lnk" data-act="go" data-v="addons">Manage Add-Ons</button></div></div><div class="tsc"><table class="t"><tbody>${adRows}</tbody></table></div></div>`;
@@ -726,7 +726,7 @@ function startCatalog(root) {
   function extClick(a, el) {
     const id = el.dataset.id, i = +el.dataset.i, D = S.drawer && S.drawer.f;
     switch (a) {
-      case 'editIntg': location.href = '/admin/settings#integrations'; return 'noRender';
+      case 'editIntg': location.href = '/admin/settings#int'; return 'noRender';
       case 'intgShow': D.show[el.dataset.k] = !D.show[el.dataset.k]; return true;
       case 'intgEnv': if (D.id === 'stripe' && el.dataset.k === 'live') { toast("Stripe can't be used for live payments here"); return 'noRender'; } D.env = el.dataset.k; return true;
       case 'intgCopy': toast('Webhook URL copied'); return 'noRender';

@@ -4,13 +4,16 @@ const db = require('./db');
 const core = require('./core');
 const R = require('./rules');
 const mail = require('./mail');
-const { money } = require('./util');
+const { money, round2 } = require('./util');
+const cents = (v) => '$' + round2(v).toLocaleString('en-US', { minimumFractionDigits: round2(v) % 1 ? 2 : 0, maximumFractionDigits: 2 });
 const BASE = () => require('./auth').BASE();
 async function once(key) { const r = await db.one('INSERT INTO auto_sent(key) VALUES($1) ON CONFLICT DO NOTHING RETURNING key', [key]); return !!r; }
 const K = (s) => '$' + Number(s) / 1000 + 'K';
 async function run() {
+  // competitions start and end on their dates (Eastern Time)
+  const sched = await require('./comps').schedule().catch((e) => { console.error('comps schedule', e.message); return {}; });
   await require('./comps').sync().catch((e) => console.error('comps sync', e.message));
-  const cat = await core.catalog(); const out = {}; const mrules = (await mail.cfg()).rules;
+  const cat = await core.catalog(); const out = {}; if (sched.started) out.compsStarted = sched.started; if (sched.ended) out.compsEnded = sched.ended; const mrules = (await mail.cfg()).rules;
   const hit = (k) => { out[k] = (out[k] || 0) + 1; };
   try { const n = await require('./support').autoClose(); if (n) out.ticketsClosed = n; } catch (e) { console.error('autoClose', e.message); }
   try { const n = await require('./mail').releaseHeld(); if (n) out.mailReleased = n; } catch (e) { console.error('releaseHeld', e.message); }
@@ -51,7 +54,7 @@ async function run() {
   { const et = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
     if (et.getDate() === 1) { const prev = new Date(et.getFullYear(), et.getMonth() - 1, 1); const month = prev.toLocaleString('en-US', { month: 'long' }); const ym = prev.getFullYear() + '-' + String(prev.getMonth() + 1).padStart(2, '0');
       const A = require('./affiliates'); for (const x of (await A.list()).filter((y) => y.status === 'active' && y.user)) { if (!(await once('affstatement:' + x.user + ':' + ym))) continue; const sm = await A.summary(x.user); if (!sm) continue;
-        const os = await db.all("SELECT o.total::float total FROM orders o JOIN users u ON u.id=o.user_id WHERE u.referred_by=$1 AND o.status='paid' AND to_char(o.paid_at AT TIME ZONE 'America/New_York','YYYY-MM')=$2", [x.user, ym]);
+        const os = (await A.orders([x.user])).filter((o) => o.aff === x.user && o.status === 'paid' && new Date(o.paid_at).toLocaleDateString('en-CA', { timeZone: 'America/New_York' }).slice(0, 7) === ym);
         mail.t('affstatement', x.user, { month, orders: String(os.length), revenue: money(os.reduce((s2, o) => s2 + o.total, 0)), owed: money(sm.owed), url: BASE() + '/app#affiliates' }); hit('affstatement'); } } }
   // two days after sign-up, for people who have not bought yet: a simple guide to picking a size
   { const p0 = (cat.plans || []).find((p) => p.active !== false && p.kind === 'evaluation') || (cat.plans || [])[0]; const sz = ((p0 && p0.sizes) || []).filter((z) => z.active !== false).slice(0, 3);
@@ -70,10 +73,10 @@ async function run() {
       if (await once('abandon1:' + o.user_id + ':' + (rec.oneTime ? 'x' : o.code))) {
         const code = 'BACK-' + Math.random().toString(36).slice(2, 7).toUpperCase();
         await db.q("INSERT INTO coupons(code,user_id,pct,label,kind,expires_at) VALUES($1,$2,$3,$4,'discount', now() + ($5 || ' hours')::interval)", [code, o.user_id, +rec.pct || 10, `Checkout reminder: ${+rec.pct || 10}% off`, String(+rec.expiry || 48)]);
-        mail.t('abandon1', o.user_id, { size: it.size ? K(it.size) : 'evaluation', plan: ((core.planDef(cat, it.plan) || {}).short) || '', platform: it.platform || '', price: money(Number(o.total) * (1 - (+rec.pct || 10) / 100)), code, pct: (+rec.pct || 10) + '%', hours: String(+rec.expiry || 48), url: BASE() + '/checkout/payment?order=' + o.code }); hit('abandon1');
+        mail.t('abandon1', o.user_id, { size: it.size ? K(it.size) : 'evaluation', plan: ((core.planDef(cat, it.plan) || {}).short) || '', platform: it.platform || '', price: cents(Number(o.total) * (1 - (+rec.pct || 10) / 100)), code, pct: (+rec.pct || 10) + '%', hours: String(+rec.expiry || 48), url: BASE() + '/checkout/payment?order=' + o.code + '&code=' + encodeURIComponent(code) }); hit('abandon1');
       } else {
         const c = await db.one("SELECT * FROM coupons WHERE user_id=$1 AND used=false AND label LIKE 'Checkout reminder%' AND expires_at > now() ORDER BY created_at DESC LIMIT 1", [o.user_id]);
-        if (c && new Date(c.expires_at) - Date.now() < 12 * 3600e3 && await once('abandon2:' + c.code)) { mail.t('abandon2', o.user_id, { code: c.code, pct: Number(c.pct) + '%', full: money(o.total), url: BASE() + '/checkout/payment?order=' + o.code }); hit('abandon2'); }
+        if (c && new Date(c.expires_at) - Date.now() < 12 * 3600e3 && await once('abandon2:' + c.code)) { mail.t('abandon2', o.user_id, { code: c.code, pct: Number(c.pct) + '%', full: cents(o.total), url: BASE() + '/checkout/payment?order=' + o.code + '&code=' + encodeURIComponent(c.code) }); hit('abandon2'); }
       }
     }
   }

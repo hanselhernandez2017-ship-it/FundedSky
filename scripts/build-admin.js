@@ -12,7 +12,13 @@ module.exports = ({ SRC, DIST, HEAD, out, rd }) => {
     .replace(/new Date\(2026, 10, 22 - ago\)/g, 'new Date(Date.now() - ago * 864e5)').replace(/d\.getFullYear\(\) !== 2026/g, 'd.getFullYear() !== new Date().getFullYear()');
   const boot = (call) => `
 (async function () {
-  const r = await fetch('/api/admin/boot', { credentials: 'same-origin' });
+  // What to load: bigger lists after Load More (kept for this browser tab), and the trader, account, payout or order named in the link
+  window.__BOQ = function () { const p = new URLSearchParams();
+    try { const m = JSON.parse(sessionStorage.getItem('fs_bo_more') || '{}'); ['lu', 'la', 'lo', 'lp'].forEach((k) => { if (+m[k]) p.set(k, +m[k]); }); } catch (e) { /* storage off */ }
+    try { const raw = decodeURIComponent(location.hash || ''); const P = {}; (raw.split('?')[1] || '').split('&').forEach((kv) => { const i = kv.indexOf('='); if (i > 0) P[kv.slice(0, i)] = kv.slice(i + 1); });
+      const W = { wu: P.trader || P.uid || (/^#user\\b/.test(raw) ? P.id : ''), wa: P.acct, wp: P.payout, wo: P.order || (/\\/admin\\/finance$/.test(location.pathname) ? P.o : '') }; Object.keys(W).forEach((k) => { if (W[k]) p.set(k, String(W[k]).slice(0, 60)); }); } catch (e) { /* no deep link */ }
+    const q = p.toString(); return q ? '?' + q : ''; };
+  const r = await fetch('/api/admin/boot' + window.__BOQ(), { credentials: 'same-origin' });
   if (r.status === 401) { location.href = '/login?next=' + encodeURIComponent(location.pathname + location.hash); return; }
   if (r.status === 403) { location.href = '/app'; return; }
   window.__BO = await r.json(); window.__BO_DEF = ${fs.readFileSync(path.join(__dirname, '..', 'server', 'content-seed.json'), 'utf8')};

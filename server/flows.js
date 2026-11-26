@@ -46,14 +46,24 @@ async function taxSelf(user, b) {
   const address = clean(b.address, 200); if (address.length < 8) bad('Enter your full street address');
   const crow = require('./phone').DIAL.find((x) => x[0].toLowerCase() === clean(b.country, 60).toLowerCase()); if (!crow) bad('Choose your country from the list');
   if (formType === 'W-9' && crow[0] !== 'United States') bad('A W-9 is for US persons. Contact support if you live outside the US.');
+  if (formType === 'W-8BEN' && crow[0] === 'United States') bad('A W-8BEN is for people outside the US. Contact support if you live in the US.');
   if (b.certify !== true) bad('Tick the box to confirm the form is correct');
   if (clean(b.signature, 120).toLowerCase() !== name.toLowerCase()) bad('Type your full legal name to sign, exactly as above');
-  const form = { formType, name, tin, tinLast4: tin.slice(-4), address, country: crow[0], signedAt: new Date().toISOString() };
+  // The tax number and address are encrypted at rest (same key as wallet addresses); read them back with taxFormOf()
+  const form = { formType, name, tin: I.enc(tin), tinLast4: tin.slice(-4), address: I.enc(address), country: crow[0], signedAt: new Date().toISOString() };
   await db.q('INSERT INTO kv(k,v) VALUES($1,$2) ON CONFLICT (k) DO UPDATE SET v=$2, updated_at=now()', ['taxform.' + user.id, JSON.stringify(form)]);
   await db.q("UPDATE users SET tax_status='on_file', tax_ref=$2 WHERE id=$1", [user.id, 'self:' + formType]);
   await core.audit(user.id, 'tax.form', user.tid, { formType });
   return { ok: true, formType, onFile: true };
 }
+// The stored form with the tax number and address decrypted, for staff tools that need the full form
+async function taxFormOf(userId) { const r = await db.one('SELECT v FROM kv WHERE k=$1', ['taxform.' + userId]); if (!r || !r.v) return null; return Object.assign({}, r.v, { tin: I.dec(r.v.tin), address: I.dec(r.v.address) }); }
+// One-time on boot: forms saved before encryption was added are rewritten with the tax number and address encrypted
+async function taxEncryptOld() { const rows = await db.all("SELECT k, v FROM kv WHERE k LIKE 'taxform.%'"); let n = 0;
+  for (const r of rows) { const v = r.v || {}; const plain = (x) => typeof x === 'string' && x && !x.startsWith('enc:'); if (!plain(v.tin) && !plain(v.address)) continue;
+    if (plain(v.tin)) { if (!v.tinLast4) v.tinLast4 = v.tin.slice(-4); v.tin = I.enc(v.tin); } if (plain(v.address)) v.address = I.enc(v.address);
+    await db.q('UPDATE kv SET v=$2 WHERE k=$1', [r.k, JSON.stringify(v)]); n++; }
+  return n; }
 async function taxForm(user, body) {
   const c = await I.cfg('track1099'); if (!c) { if (body && body.formType !== undefined) return taxSelf(user, body); bad('Fill in the tax form in Settings, Tax Form.'); }
   if (!c.companyId) bad('Tax forms are not fully set up yet. Contact support.');
@@ -71,11 +81,12 @@ async function taxSync(user) {
 }
 
 // ---------- Rise ----------
-async function riseInvite(user) {
+// riseEmail: the Rise account email the trader saved with their Rise payout method (their sign-in email when left out)
+async function riseInvite(user, riseEmail) {
   const c = await I.cfg('rise'); if (!c || !c.privateKey || !c.teamNanoid) return null;
   try {
     const cl = await I.rise(c);
-    await cl.invites.send({ nanoid: c.teamNanoid, invites: [{ email: user.email }], role: 'contractor' });
+    await cl.invites.send({ nanoid: c.teamNanoid, invites: [{ email: riseEmail || user.email }], role: 'contractor' });
     await db.q("UPDATE users SET rise_status='invited' WHERE id=$1", [user.id]);
     return 'invited';
   } catch (e) { console.error('rise invite', e.message); return 'error: ' + e.message; }
@@ -94,8 +105,10 @@ async function riseSend(actorId, code, batchId) {
   const p = await db.one('SELECT p.*, u.email FROM payouts p JOIN users u ON u.id=p.user_id WHERE p.code=$1', [clean(code, 30)]);
   if (!p) bad('Payout not found', 404); await core.canSend(p.code);
   const cl = await I.rise(c);
-  const ru = await riseFindUser(cl, c.teamNanoid, p.email);
-  if (!ru) { await riseInvite({ id: p.user_id, email: p.email }); bad('This trader has not joined your Rise team yet. We sent them a new invite.'); }
+  // Paid to the Rise email saved with the payout method; older Rise methods have none and use the trader's sign-in email
+  const saved = p.dest ? I.dec(p.dest) : ''; const riseTo = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(saved) ? saved : p.email;
+  const ru = await riseFindUser(cl, c.teamNanoid, riseTo);
+  if (!ru) { await riseInvite({ id: p.user_id, email: p.email }, riseTo); bad('This trader has not joined your Rise team yet. We sent them a new invite.'); }
   const r = await cl.payments.sendPayment({ from: c.teamNanoid, to: [{ to: ru.nanoid, amount_cents: Math.round(Number(p.amount) * 100), currency_symbol: 'USD' }], pay_now: true, idempotencyKey: 'fs-' + p.code });
   if (r.failed_payments && r.failed_payments.length) bad('Rise did not send it: ' + JSON.stringify(r.failed_payments[0]).slice(0, 200));
   const tx = r.data && (r.data.transaction || r.data.transaction_nanoid || r.data.nanoid);
@@ -110,9 +123,9 @@ async function riseHook(req, res) {
     const { WebhookValidator } = await import('@riseworks/sdk');
     const ev = new WebhookValidator(c.webhookSecret).validateEvent(req.body.toString('utf8'), req.headers['x-rise-signature']);
     const t = ev.event_type || ''; const email = ev.data && (ev.data.email || (ev.data.user && ev.data.user.email));
-    if (/invite\.(accepted|completed)/.test(t) && email) await db.q("UPDATE users SET rise_status='active' WHERE lower(email)=lower($1)", [email]);
+    if (/invite\.(accepted|completed)/.test(t) && email) await db.q("UPDATE users SET rise_status='active' WHERE lower(email)=lower($1) OR id IN (SELECT user_id FROM payout_methods WHERE rail='Rise' AND dest_hash=$2)", [email, I.mac('Rise:' + String(email).toLowerCase())]);
     await pay.hookLog('rise', t, true, email || ''); res.json({ received: true });
   } catch (e) { await pay.hookLog('rise', 'bad signature', false, e.message); res.status(400).send('bad signature'); }
 }
 
-module.exports = { sumsubToken, sumsubHook, taxForm, taxSync, riseInvite, riseSend, riseHook };
+module.exports = { sumsubToken, sumsubHook, taxForm, taxFormOf, taxEncryptOld, taxSync, riseInvite, riseSend, riseHook };

@@ -127,6 +127,7 @@ table.t{width:100%;border-collapse:collapse}
 .b{vertical-align:middle}
 .t td.nw,.t .nw{white-space:nowrap}
 .t td.swc{width:64px}
+.t.szt td,.t.szt th{padding-left:12px;padding-right:12px}.t.szt td:first-child,.t.szt th:first-child{padding-left:16px}
 .two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:start}
 .two.wl{grid-template-columns:minmax(0,1.2fr) minmax(0,1fr)}.two.wl2{grid-template-columns:minmax(0,1.3fr) minmax(0,1fr)}
 .card.m0{margin:0}

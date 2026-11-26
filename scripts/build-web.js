@@ -51,7 +51,7 @@ ${js}
   }
   window.__FSrefresh = async function (keep) { var d = await load(); if (!d) return; window.__FS = d; mount(keep); };
   load().then(function (d) { if (!d) return; window.__FS = d; mount({}); FSPAY.boot({ email: d.ME.email, first: d.ME.first, last: d.ME.lastFull }); }).catch(function (e) { console.error(e); var l = document.getElementById('fsload'); if (l) l.innerHTML = 'Could not load your dashboard. <a href="" style="color:#7CC4FF">Try again</a>'; });
-  var rt; addEventListener('resize', function () { clearTimeout(rt); rt = setTimeout(function () { if (window.__FS && (innerWidth <= MOB) !== mobileNow) mount({}); }, 200); });
+  var rt; addEventListener('resize', function () { clearTimeout(rt); rt = setTimeout(function () { if (window.__FS && (innerWidth <= MOB) !== mobileNow) mount(window.__FS_LAST_KEEP ? window.__FS_LAST_KEEP() : {}); }, 200); });
   // live data: refresh balances every 60 seconds while the tab is visible
   setInterval(function () { if (document.visibilityState === 'visible' && !document.querySelector('.drw, .pal, input:focus, textarea:focus')) window.__FSrefresh(window.__FS_LAST_KEEP && window.__FS_LAST_KEEP()); }, 60000);
 })();
@@ -86,6 +86,8 @@ ${js}
 const DCP = { 'Main.dc.html': 'checkout.html', 'Payment.dc.html': 'payment.html', 'PaymentLoggedIn.dc.html': 'payment-member.html', 'Confirmed.dc.html': 'confirmed.html', 'Credits.dc.html': 'credits.html', 'AdminPacks.dc.html': 'admin/packs.html', 'Login.dc.html': 'login.html', 'SignUp.dc.html': 'signup.html', 'ForgotPassword.dc.html': 'forgot.html', 'ResetPassword.dc.html': 'reset-password.html', 'VerifyEmail.dc.html': 'verify.html' };
 // Checkout pages also get a light version that matches the trader's dashboard theme (chosen by the fs_theme cookie on the server).
 const LIGHTP = { 'Credits.dc.html': 1, 'Main.dc.html': 1, 'Payment.dc.html': 1, 'PaymentLoggedIn.dc.html': 1, 'Confirmed.dc.html': 1, 'Login.dc.html': 1, 'SignUp.dc.html': 1, 'ForgotPassword.dc.html': 1, 'ResetPassword.dc.html': 1, 'VerifyEmail.dc.html': 1 };
+// Back office Packs board (its page source is generated): the description under a name may wrap, so wide tables such as Cards show every column at 1440.
+const ADMIN_PACKS_CSS = '.ap .card>table td:first-child .hint{white-space:normal;min-width:220px;max-width:340px}';
 for (const [src0, dst0] of Object.entries(DCP).concat(Object.keys(LIGHTP).map((k) => [k + ':light', DCP[k].replace('.html', '-light.html')]))) {
   const lightV = src0.endsWith(':light'); const src = src0.replace(':light', ''); const dst = dst0;
   const s0 = fs.readFileSync(path.join(PAGES, src), 'utf8'); const s = lightV ? lighten(s0) : s0;
@@ -95,7 +97,7 @@ for (const [src0, dst0] of Object.entries(DCP).concat(Object.keys(LIGHTP).map((k
   const tpl = body.replace(/<helmet>[\s\S]*?<\/helmet>/, '');
   const jsStart = s.indexOf('class Component'); const js = s.slice(jsStart, s.indexOf('</script>', jsStart));
   const helmNoFont = helm.replace(/<link[^>]+fonts\.googleapis[^>]+>/g, '');
-  out(dst, `${HEAD(title.replace(/^Funded Sky( mobile)?( checkout)?:\s*/i, 'Funded Sky: '), (LIGHTP[src] ? THEME_JS(lightV ? 'light' : 'dark') : '') + helmNoFont + `<style>${SELECT_CSS(lightV ? '5E636C' : '9C9693')}</style>`)}<body><div id="dc-root"></div>${src.startsWith('Admin') ? `<script type="text/x-dc-tpl" id="dc-tpl">${tpl}</script>` : `<template id="dc-tpl">${tpl}</template>`}
+  out(dst, `${HEAD(title.replace(/^Funded Sky( mobile)?( checkout)?:\s*/i, 'Funded Sky: '), (LIGHTP[src] ? THEME_JS(lightV ? 'light' : 'dark') : '') + helmNoFont + `<style>${SELECT_CSS(lightV ? '5E636C' : '9C9693')}${src === 'AdminPacks.dc.html' ? ADMIN_PACKS_CSS : ''}</style>`)}<body><div id="dc-root"></div>${src.startsWith('Admin') ? `<script type="text/x-dc-tpl" id="dc-tpl">${tpl}</script>` : `<template id="dc-tpl">${tpl}</template>`}
 <script src="/static/morphdom.js"></script><script src="/static/dc.js"></script>${src.startsWith('Admin') ? '' : '<script src="/static/site.js"></script><script src="/static/pay.js"></script>'}${/dc-import/.test(tpl) ? '<script src="/static/packart.js"></script>' : ''}
 <script>
 ${js}
@@ -107,7 +109,8 @@ DC.mount(Component, { mobileLinks: false });
 { const PO = require('../server/policy'); for (const slug of Object.keys(PO.POL)) { const p = PO.builtIn(slug, 'support@fundedsky.com'); out(slug + '.html', PO.page(p)); } }
 
 // ---------- 404 ----------
-out('404.html', `${HEAD('Funded Sky: page not found', '<style>body{margin:0;background:#08080A;color:#F4F2F1;font-family:"Mona Sans",system-ui;display:grid;place-items:center;min-height:100vh;text-align:center}a{color:#7CC4FF}</style>')}<body><div><p style="color:#9C9693;margin:0 0 8px">404</p><h1 style="margin:0 0 12px;font-size:28px">This page doesn't exist.</h1><p><a href="/app">Go to your dashboard</a> · <a href="/checkout">Buy an account</a></p></div></body></html>`);
+// one file for both themes: the class is set from the trader's saved theme before the page paints
+out('404.html', `${HEAD('Funded Sky: page not found', `<script>(function(){var t='';try{t=localStorage.getItem('fs_theme')||''}catch(e){}if(!t)t=(document.cookie.match(/(?:^|; )fs_theme=([^;]*)/)||[])[1]||(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark');if(t==='light')document.documentElement.className='lt'})();</script><style>${require('../server/policy').VARS}body{margin:0;background:var(--bg);color:var(--hd);font-family:"Mona Sans",system-ui;display:grid;place-items:center;min-height:100vh;text-align:center}a{color:var(--lk)}</style>`)}<body><div><p style="color:var(--mu);margin:0 0 8px">404</p><h1 style="margin:0 0 12px;font-size:28px">This page doesn't exist.</h1><p><a href="/app">Go to your dashboard</a> · <a href="/checkout">Buy an account</a></p></div></body></html>`);
 
 // ---------- back office ----------
 if (fs.existsSync(path.join(__dirname, 'build-admin.js'))) require('./build-admin.js')({ SRC, DIST, HEAD, out, rd });

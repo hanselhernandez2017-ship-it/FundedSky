@@ -7,7 +7,7 @@ function startInsights(root) {
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const money = (v, sign) => (v < 0 ? '−' : sign && v > 0 ? '+' : '') + '$' + Math.abs(Math.round(v)).toLocaleString('en-US');
   const kmoney = (v) => { const a = Math.abs(v); const s = v < 0 ? '−' : ''; return a >= 1e6 ? s + '$' + (a / 1e6).toFixed(2) + 'M' : a >= 1e4 ? s + '$' + (a / 1e3).toFixed(1) + 'K' : money(v); };
-  const pct = (v, d = 0) => (v * 100).toFixed(d) + '%';
+  const pct = (v, d = 0) => (Number.isFinite(v) ? (v * 100).toFixed(d) + '%' : '—');
   const K = (n) => '$' + n / 1000 + 'K';
 
   const F = window.FSG; const BO = F.BO;

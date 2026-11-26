@@ -15,3 +15,4 @@
 body:has(.fsbo.light){background:#F4F5F7}
 .fsbo.light .vzchips button.on{color:#fff}
 .fsbo.light .steps>div.ok i{color:#fff}
+.fsbo.light .vzfun .bar{background:var(--ln)}

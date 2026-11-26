@@ -87,7 +87,7 @@ function startEmails(root) {
   const TRACK = LOGS.some((l) => l.ev.length);
   const EO = (x) => E[x.e] || { id: x.e, n: x.raw === 'notify' ? 'Message from Staff' : x.raw ? x.raw : 'Message from Staff', s: x.subj, p: '', fr: 'support', h: x.subj, a: '', b: [], other: true };
   const ME = (F.me && F.me()) || 'You';
-  const XL = (board, hash, label, cls) => `<a class="${cls || 'lnk'}" href="Admin${board}.dc.html${hash ? '#' + hash : ''}">${label}</a>`;
+  const XL = (board, hash, label, cls) => `<a class="${cls || 'lnk'}" href="/admin/${board.toLowerCase()}${hash ? '#' + hash : ''}">${label}</a>`;
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const fill = (t) => String(t == null ? '' : t).replace(/\{(\w+)\}/g, (m, k) => SAMPLE[k] != null ? SAMPLE[k] : m);
   const fe = (t) => esc(fill(t));
@@ -110,7 +110,7 @@ function startEmails(root) {
   const flowOf = (id) => FLOWS.find((f) => f.lanes.some((l) => l.includes('E:' + id)));
   const emailsIn = (f) => f.lanes.flat().filter((x) => x.startsWith('E:')).map((x) => E[x.slice(2)]);
   const isOn = (e) => e.req || (e.on && !(flowOf(e.id) || {}).paused);
-  const totals = () => { const all = Object.values(E); const sent = all.reduce((a, e) => a + e.sent, 0); const w = (k) => Math.round(all.reduce((a, e) => a + e.sent * e[k], 0) / Math.max(1, sent)); const d = (n) => EMD.byDay.filter((r) => dayN(r.d) < n && SENT.includes(r.status)).reduce((a, r) => a + r.n, 0); return { sent, today: d(1), week: d(7), open: w('open'), click: w('click'), failed: EMD.byDay.filter((r) => dayN(r.d) < 30 && ['failed', 'bounced'].includes(r.status)).reduce((a, r) => a + r.n, 0) }; };
+  const totals = () => { const all = Object.values(E); const sent = all.reduce((a, e) => a + e.sent, 0); const w = (k) => Math.round(all.reduce((a, e) => a + e.sent * e[k], 0) / Math.max(1, sent)); const d = (n) => EMD.byDay.filter((r) => dayN(r.d) < n && SENT.includes(r.status)).reduce((a, r) => a + r.n, 0); const lg = (n) => EMD.byDay.filter((r) => dayN(r.d) < n && r.status === 'logged').reduce((a, r) => a + r.n, 0); return { sent, logToday: lg(1), log7: lg(7), today: d(1), week: d(7), open: w('open'), click: w('click'), failed: EMD.byDay.filter((r) => dayN(r.d) < 30 && ['failed', 'bounced'].includes(r.status)).reduce((a, r) => a + r.n, 0) }; };
   const flowStats = (f) => { const es = emailsIn(f); const sent = es.reduce((a, e) => a + e.sent, 0); const w = (k) => sent ? Math.round(es.reduce((a, e) => a + e.sent * e[k], 0) / sent) : 0; return { sent, open: w('open'), click: w('click') }; };
 
   const S = {
@@ -129,7 +129,7 @@ function startEmails(root) {
   const STB = { Sent: 'plain', 'Not Sent': 'ret', 'Test Mode': 'ret', Delivered: 'plain', Opened: 'sched', Clicked: 'live', Bounced: 'err', Failed: 'err', Complaint: 'draft', Suppressed: 'ret' };
 
   // ---------- email preview ----------
-  const GROUP_LABEL = { signup: 'Welcome', orders: 'Orders', abandon: 'Checkout', progress: 'Evaluation', breach: 'Evaluation', funded: 'Funded', payouts: 'Payouts', billing: 'Billing', security: 'Security', rules: 'Rules', platforms: 'Platforms', affiliates: 'Affiliates', support: 'Support', marketing: 'News' };
+  const GROUP_LABEL = { competitions: 'Competitions', signup: 'Welcome', orders: 'Orders', abandon: 'Checkout', progress: 'Evaluation', breach: 'Evaluation', funded: 'Funded', payouts: 'Payouts', billing: 'Billing', security: 'Security', rules: 'Rules', platforms: 'Platforms', affiliates: 'Affiliates', support: 'Support', marketing: 'News' };
   function emailHtml(e, dev) { CUR = e.id;
     const f = flowOf(e.id) || {}; const paras = [].concat(e.b || []).filter(Boolean);
     const money = (v) => '$' + Number(v).toLocaleString('en-US');
@@ -263,7 +263,7 @@ function startEmails(root) {
       <div class="tiles t6">${[['Delivered', 'Delivered'], ['Opened', 'Opened'], ['Clicked', 'Clicked'], ['Bounced', 'Bounced'], ['Failed', 'Failed'], ['Complaint', 'Spam Reports']].map(([k, l]) => `<button class="tile lk ${L.status === k ? 'sel' : ''}" data-act="logF" data-k="${k}"><span>${l}</span><b>${num(tot[k] || 0)}</b><small>${L.status === k ? 'Filtering below' : 'Last 30 days'}</small></button>`).join('')}</div>
       <div class="card"><div class="ch lgf"><input type="search" placeholder="Search Email, Trader or Message ID" value="${esc(L.q)}" data-live="logs.q" data-key="logq" aria-label="Search logs"><select data-bind="logs.em" aria-label="Email">${'<option value="all">All Emails</option>' + Object.values(E).filter((e) => LOGS.some((l) => l.e === e.id)).sort((a, b) => a.n.localeCompare(b.n)).map((e) => `<option value="${e.id}" ${L.em === e.id ? 'selected' : ''}>${esc(e.n)}</option>`).join('')}</select><div class="r"><div class="seg">${['all', 'Failed', 'Bounced'].map((k) => `<button class="${L.status === k ? 'on' : ''}" data-act="logF" data-k="${k}">${k === 'all' ? 'All' : k}</button>`).join('')}</div></div></div>
         <div class="tsc"><table class="t"><thead><tr><th>When</th><th>Trader</th><th>Email</th><th>Status</th><th>Details</th><th></th></tr></thead><tbody>${list.length ? list.map((x) => `<tr class="lk" data-act="logRow" data-id="${x.id}"><td class="nw">${esc(x.when)}</td><td class="nw"><b>${esc(x.t)}</b><div class="hint mono">${esc(x.to)}</div></td><td class="nw">${esc(EO(x).n)}</td><td><span class="b ${STB[x.st]}">${x.st === 'Complaint' ? 'Spam Report' : x.st}</span></td><td class="hint">${esc(x.why || '—')}</td><td class="num nw">${['Failed', 'Bounced'].includes(x.st) ? `<button class="lnk" data-act="resend" data-id="${x.id}">Send Again</button>` : ''}</td></tr>`).join('') : '<tr><td colspan="6" class="empty">No emails match.</td></tr>'}</tbody></table></div></div>
-      <p class="hint">Logs are kept for 30 days. Message IDs match the ones in Resend. ${TRACK ? '' : 'Delivered, opened and clicked need the Resend webhook: add it in ' + XL('Settings', 'integrations', 'Integrations') + '.'}</p>`;
+      <p class="hint">Logs are kept for 30 days. Message IDs match the ones in Resend. ${TRACK ? '' : 'Delivered, opened and clicked need the Resend webhook: add it in ' + XL('Settings', 'int', 'Integrations') + '.'}</p>`;
   }
   function logDrawer() {
     const x = LOGS.find((l) => l.id === S.logs.row); if (!x) return ''; const e = EO(x);
@@ -338,7 +338,7 @@ function startEmails(root) {
       <div class="igs hm"><button class="ig" data-act="go" data-v="domain" title="Resend: ${F.on('resend') ? 'connected' : 'not connected'}" aria-label="Email provider"><span>EM</span><i style="background:var(${F.on('resend') ? '--ok' : '--fa'})"></i></button><button class="sendw" data-act="go" data-v="domain">${F.on('resend') ? 'Sending with Resend' : 'Resend Not Connected'}</button></div>
       ${S.rules.test ? '<span class="envchip">Test Mode</span>' : S.rules.pauseMk ? '<span class="envchip">Marketing Paused</span>' : ''}
       <button class="pill ${S.view === 'logs' ? 'act' : ''}" data-act="go" data-v="logs">Email Logs</button></div>
-    <div class="body ${isFlow ? '' : 'wide'}"><div class="mnav"><select id="mnavsel" aria-label="Go to section">${mnavHtml()}</select></div><nav class="nav" aria-label="Email flows">${navHtml()}</nav><main class="main ${isFlow ? 'flowv' : ''}">${(views[S.view] || views[(S.view = 'flow')])()}${S.view === 'logs' ? logDrawer() : ''}</main>${isFlow ? `<div class="ep-bg ${S.panel ? 'open' : ''}" data-act="closePanel"></div><aside class="ep ${S.panel ? 'open' : ''}" aria-label="Email details">${panel()}</aside>` : ''}</div>
+    <div class="body ${isFlow ? '' : 'wide'}"><div class="mnav"><select id="mnavsel" aria-label="Go to section">${mnavHtml()}</select></div><nav class="nav" aria-label="Email flows">${navHtml()}</nav><main class="main ${isFlow ? 'flowv' : ''}">${!F.on('resend') || T.logToday ? `<div class="capnote" role="note"><span><b>${F.on('resend') ? 'Some emails were only logged.' : 'Emails are being logged, not sent.'}</b> ${F.on('resend') ? '' : 'No email provider is connected, so nothing reaches an inbox and the Sent numbers stay at zero. '}${num(T.logToday)} logged today, ${num(T.log7)} in the last 7 days. Each one is in Email Logs with the status Logged.</span>${F.on('resend') ? '' : XL('Settings', 'int', 'Connect Resend in Settings', 'pill sm')}</div>` : ''}${(views[S.view] || views[(S.view = 'flow')])()}${S.view === 'logs' ? logDrawer() : ''}</main>${isFlow ? `<div class="ep-bg ${S.panel ? 'open' : ''}" data-act="closePanel"></div><aside class="ep ${S.panel ? 'open' : ''}" aria-label="Email details">${panel()}</aside>` : ''}</div>
     ${fullModal()}${S.toast ? `<div class="toast" role="status">${esc(S.toast)}</div>` : ''}`;
     const m2 = root.querySelector('.main'); if (m2) m2.scrollTop = st; const pb2 = root.querySelector('.ep-b'); if (pb2) pb2.scrollTop = pst;
     if (S.focus) { const el = root.querySelector(`[data-key="${S.focus.k}"]`); if (el) { el.focus(); try { el.setSelectionRange(S.focus.s, S.focus.s); } catch (x) { /* not a text field */ } } S.focus = null; }
@@ -379,7 +379,7 @@ function startEmails(root) {
       case 'closeLog': S.logs.row = null; break;
       case 'resend': { const x = LOGS.find((l) => l.id === id); if (S.supp.some((s2) => s2.a.toLowerCase() === x.full.toLowerCase() && s2.k !== 'Unsubscribed')) { toast(`${x.to} is on the Suppression List. Remove it first.`); return; } F.api('/emails/resend/' + x.oid, {}).then(() => { x.why = 'Sent again by ' + ME; toast('Sent again'); }).catch((y) => toast(y.message)); return; }
       case 'viewEmail': S.view = 'flow'; S.flow = flowOf(id).id; S.open = { [S.flow]: true }; S.sel = id; S.panel = true; S.tab = 'preview'; S.logs.row = null; break;
-      case 'goIntg': location.href = '/admin/settings#integrations'; return;
+      case 'goIntg': location.href = '/admin/settings#int'; return;
       case 'checkDns': loadDom(); break;
       case 'copy': try { navigator.clipboard.writeText(k); } catch (x) { /* clipboard blocked */ } toast('Copied'); return;
       case 'rule': S.rules[k] = !S.rules[k]; break;

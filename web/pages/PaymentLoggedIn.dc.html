@@ -52,11 +52,11 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 <div class="fs-hdr" style="max-width: 1200px; width: 100%; box-sizing: border-box; margin: 0 auto; padding: 18px 32px; display: flex; align-items: center; justify-content: space-between; gap: 24px;">
 <a href="/" style="display: flex; align-items: center; gap: 6px; text-decoration: none;"><span style="font-weight: 700; font-size: 22px; letter-spacing: -0.045em; color: #F4F2F1; line-height: 1;">fundedsky</span><span style="background: #7CC4FF; color: #08080A; font-weight: 600; font-size: 15px; letter-spacing: -0.01em; padding: 2px 6px 3px; border-radius: 4px; line-height: 1;">futures</span></a>
 <ol class="fs-steps" style="display: flex; gap: 14px; align-items: center; list-style: none; margin: 0; padding: 0; font-size: 13px; color: #9C9693;" aria-label="Checkout steps">
-<li style="display: flex; align-items: center; gap: 8px; color: #D4CFCD;"><span style="width: 22px; height: 22px; border-radius: 11px; background: #26262A; color: #7CC4FF; display: flex; align-items: center; justify-content: center;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"></path></svg></span>Choose Account</li>
+<li style="display: flex; align-items: center; gap: 8px; color: #D4CFCD;"><span style="width: 22px; height: 22px; border-radius: 11px; background: #26262A; color: #7CC4FF; display: flex; align-items: center; justify-content: center;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"></path></svg></span>{{ step1 }}</li>
 <li class="fs-sep" aria-hidden="true" style="width: 64px; height: 3px; border-radius: 2px; background: #26262A; overflow: hidden; align-self: center;"><i style="display: block; height: 100%; width: 100%; background: #7CC4FF; border-radius: 2px;"></i></li>
-<li style="display: flex; align-items: center; gap: 8px; color: #F4F2F1;" aria-current="step"><span style="width: 22px; height: 22px; border-radius: 11px; background: #7CC4FF; color: #08080A; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center;">2</span>Payment</li>
+<li style="display: flex; align-items: center; gap: 8px; color: #F4F2F1;" aria-current="step"><span style="width: 22px; height: 22px; border-radius: 11px; background: #7CC4FF; color: #08080A; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center;">2</span>{{ step2 }}</li>
 <li class="fs-sep" aria-hidden="true" style="width: 64px; height: 3px; border-radius: 2px; background: #26262A; overflow: hidden; align-self: center;"><i style="display: block; height: 100%; width: 34%; background: #7CC4FF; border-radius: 2px;"></i></li>
-<li style="display: flex; align-items: center; gap: 8px;"><span style="width: 22px; height: 22px; border-radius: 11px; border: 1px solid #3A3A40; font-size: 12px; display: flex; align-items: center; justify-content: center;">3</span>Start Trading</li>
+<li style="display: flex; align-items: center; gap: 8px;"><span style="width: 22px; height: 22px; border-radius: 11px; border: 1px solid #3A3A40; font-size: 12px; display: flex; align-items: center; justify-content: center;">3</span>{{ step3 }}</li>
 </ol>
 <div style="display: flex; align-items: center; gap: 20px;">
 <span style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #D4CFCD;"><span style="width: 32px; height: 32px; border-radius: 16px; background: #26262A; color: #F4F2F1; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center;">{{ ini }}</span><span class="fs-secure">{{ firstName }}</span></span>
@@ -75,8 +75,8 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 <form class="fs-col" style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 32px;">
 <div style="display: flex; flex-direction: column; gap: 10px;">
 <p class="fs-steps" style="margin: 0; font-stretch: 125%; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: #9C9693; font-weight: 500;">Step 2 of 3</p>
-<h1 class="fs-h1" style="margin: 0; font-size: 44px; line-height: 48px; font-weight: 600; letter-spacing: -0.03em;">Welcome Back.</h1>
-<p class="fs-lead" style="margin: 0; font-size: 17px; line-height: 26px; color: #D4CFCD;">Your details are saved. Confirm how you want to pay and the new account is added to your dashboard.</p>
+<h1 class="fs-h1" style="margin: 0; font-size: 44px; line-height: 48px; font-weight: 600; letter-spacing: -0.03em;">{{ heading }}</h1>
+<p class="fs-lead" style="margin: 0; font-size: 17px; line-height: 26px; color: #D4CFCD;">{{ lead }}</p>
 </div>
 
 <fieldset style="border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; min-width: 0;">
@@ -86,7 +86,7 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px;"><span style="font-size: 15px; line-height: 20px; font-weight: 600;">{{ fullName }}</span><span style="font-size: 13px; line-height: 18px; color: #9C9693;">{{ emailLine }}</span></span>
 <a href="{{ guestHref }}" style="flex: none; min-height: 44px; display: flex; align-items: center; font-size: 13px; font-weight: 500;">Not You?</a>
 </div>
-<p style="margin: 0; font-size: 13px; line-height: 18px; color: #9C9693;">You have <span style="color: #F4F2F1;">{{ activeLabel }}</span>. This one will appear alongside them in your dashboard.</p>
+<p style="margin: 0; font-size: 13px; line-height: 18px; color: #9C9693;">{{ activeNote }}</p>
 </fieldset>
 
 <fieldset style="border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; min-width: 0;">
@@ -116,7 +116,7 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 <p style="margin: 0; font-size: 20px; line-height: 26px; font-weight: 600; letter-spacing: -0.01em;">{{ sumTitle }}</p>
 <p style="margin: 0; font-size: 13px; color: #9C9693;">{{ sumSub }}</p>
 </div>
-<a href="{{ backHref }}" style="font-size: 13px;">Edit</a>
+<a href="{{ backHref }}" style="font-size: 13px;">{{ editLabel }}</a>
 </div>
 <div style="display: flex; flex-direction: column; gap: 8px; font-size: 14px; border-top: 1px solid #26262A; padding-top: 16px;">
 <sc-for list="{{ lines }}" as="l"><div style="display: flex; justify-content: space-between; gap: 12px; color: {{ l.color }};"><span>{{ l.label }}</span><span style="font-family: 'Geist Mono', monospace; white-space: nowrap;">{{ l.amount }}</span></div></sc-for>
@@ -127,7 +127,7 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 <sc-if value="{{ notAgreed }}" hint-placeholder-val="{{ false }}"><button type="button" disabled style="width: 100%; background: #26262A; color: #9C9693; border: 0; border-radius: 4px; padding: 14px; font: inherit; font-size: 15px; font-weight: 600; font-stretch: 112%;">{{ payLabel0 }}</button><p style="margin: 0; font-size: 12px; color: #9C9693; text-align: center;">Tick the box to agree to the rules and terms first.</p></sc-if>
 <sc-if value="{{ err }}"><p role="alert" style="margin: 10px 0 0; font-size: 13.5px; line-height: 19px; color: #F2777F;">{{ err }}</p></sc-if><sc-if value="{{ fallback }}"><button type="button" onClick="{{ payBackup }}" style="width: 100%; margin-top: 10px; background: transparent; color: #F4F2F1; border: 1px solid #3A3A40; border-radius: 4px; padding: 13px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;">Pay With Backup Processor</button></sc-if></div>
 <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; font-size: 13px; color: #9C9693; border-top: 1px solid #26262A; padding-top: 16px;">
-<li style="display: flex; gap: 10px; align-items: flex-start; line-height: 18px;"><svg style="flex: none; margin-top: 1px;" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7CC4FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"></path></svg>{{ trust1 }}</li>
+<li style="display: flex; gap: 10px; align-items: flex-start; line-height: 18px;"><svg style="flex: none; margin-top: 1px;" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7CC4FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"></path></svg>{{ kindTrust }}</li>
 <li style="display: flex; gap: 10px; align-items: flex-start; line-height: 18px;"><svg style="flex: none; margin-top: 1px;" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7CC4FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"></path></svg>{{ trust2 }}</li>
 <li style="display: flex; gap: 10px; align-items: flex-start; line-height: 18px;"><svg style="flex: none; margin-top: 1px;" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7CC4FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"></path></svg>Questions? Send a ticket from your dashboard</li>
 </ul>
@@ -135,13 +135,14 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 </main>
 
 <div class="fs-bar" style="position: sticky; bottom: 0; background: #111113; border-top: 1px solid #26262A; padding: 12px 20px 28px; flex-direction: column; gap: 12px;">
-<div style="display: flex; justify-content: space-between; font-size: 13px; line-height: 16px; color: #9C9693;"><span>{{ sumTitle }}</span><a href="{{ backHref }}" style="font-weight: 500;">Edit</a></div>
+<div style="display: flex; justify-content: space-between; font-size: 13px; line-height: 16px; color: #9C9693;"><span>{{ sumTitle }}</span><a href="{{ backHref }}" style="font-weight: 500;">{{ editLabel }}</a></div>
 <div style="display: flex; align-items: center; gap: 16px;">
 <div style="flex: 1; display: flex; flex-direction: column; gap: 2px;"><span style="font-size: 11px; line-height: 14px; color: #9C9693;">Total Today</span><span style="font-family: 'Geist Mono', monospace; font-size: 22px; line-height: 26px; font-weight: 500;">{{ total }}</span></div>
 <sc-if value="{{ agreed }}" hint-placeholder-val="{{ true }}"><button type="button" onClick="{{ submit }}" disabled="{{ busy }}" style="border: 0; cursor: pointer; font: inherit; height: 48px; padding: 0 28px; display: flex; align-items: center; background: #FFFFFF; color: #111113; border-radius: 4px; font-size: 15px; font-weight: 600; font-stretch: 112%; text-decoration: none;">{{ payShort }}</button></sc-if>
 <sc-if value="{{ notAgreed }}" hint-placeholder-val="{{ false }}"><button type="button" disabled style="height: 48px; padding: 0 28px; background: #26262A; color: #9C9693; border: 0; border-radius: 4px; font: inherit; font-size: 15px; font-weight: 600; font-stretch: 112%;">Pay</button></sc-if>
 </div>
 <sc-if value="{{ notAgreed }}" hint-placeholder-val="{{ false }}"><p style="margin: 0; font-size: 12px; line-height: 16px; color: #9C9693;">Agree to the rules and terms to pay.</p></sc-if>
+<sc-if value="{{ err }}"><p role="alert" style="margin: 0; font-size: 13px; line-height: 18px; color: #F2777F;">{{ err }}</p></sc-if>
 </div>
 </div>
 </x-dc>
@@ -158,13 +159,13 @@ class Component extends DCLogic {
       const [sum, boot] = await Promise.all([FSX.checkout.load(true), DC.api('/api/trader/boot').catch(() => null)]);
       if (sum.empty) { location.replace('/checkout'); return; }
       if (sum.status === 'paid') { location.replace('/checkout/confirmed?order=' + sum.code); return; }
-      this.setState({ sum, me, n: boot ? boot.ACC.filter((a) => a.kind !== 'breached').length : 0 });
+      this.setState({ sum, me, err: sum.note || '', n: boot ? boot.ACC.filter((a) => a.kind !== 'breached').length : 0 });
     } catch (e) { this.setState({ me, err: e.message }); }
     if (DC.qs('canceled')) this.setState({ err: 'Payment was canceled. You can try again.' });
   }
   async submit(backup) {
     const st = this.state; if (st.busy || !st.sum) return;
-    if (st.method === 'crypto') return this.setState({ err: '{{ cryptoNote }}' });
+    if (st.method === 'crypto' && !(st.cfg && st.cfg.crypto)) return this.setState({ err: 'Crypto checkout is not available yet. Use a card.' });
     if (st.method === 'apple' && st.sum.cat.payments === 'test') return this.setState({ err: 'Apple Pay is not available in test mode. Use the test card.' });
     this.setState({ busy: true, err: '', fallback: false }); st.backup = !!backup;
     try { location.href = await FSX.checkout.pay(st.sum, st); } catch (e) { this.setState({ busy: false, err: e.message, fallback: !!e.fallback }); }
@@ -178,20 +179,31 @@ class Component extends DCLogic {
     ];
     const methods = defs.map((d) => { const sel = st.method === d.id; return Object.assign({}, d, { on: sel, bg: sel ? '#13202E' : '#111113', bd: sel ? '#7CC4FF' : '#26262A', pick: () => this.setState({ method: d.id, err: '' }) }); });
     const set = (k) => (e) => this.setState({ [k]: e.target.value, err: '' });
-    const total = sum ? FSX.money(sum.total) : '…';
+    const total = sum ? FSX.money(sum.total) : '…'; const act = !!sum && sum.kind === 'activation';
     return {
       methods, isNew: st.method === 'card' && (test || sx), testMode: test, sx,
       cardNote: sx ? 'Card details go straight to Stripe. Funded Sky never sees your card number.' : 'Test mode: use 4242 4242 4242 4242, any future date and any CVC. No real charge.',
       agreed: st.agreed, notAgreed: !st.agreed, toggleAgree: () => this.setState({ agreed: !st.agreed }),
       card: st.card, exp: st.exp, cvc: st.cvc, set_card: set('card'), set_exp: set('exp'), set_cvc: set('cvc'),
       ini: ((me.first || '')[0] || '') + ((me.last || '')[0] || ''), firstName: me.first || '', fullName: `${me.first || ''} ${me.last || ''}`, emailLine: `${me.email || ''}${me.country ? ' · ' + me.country : ''}`,
-      activeLabel: st.n + (st.n === 1 ? ' Active Account' : ' Active Accounts'),
-      sumTitle: sum ? sum.title : 'Loading…', sumSub: sum ? sum.sub : '', lines: sum ? sum.lines : [], total,
-      payLabel: st.busy ? 'Working…' : 'Pay ' + total, payLabel0: 'Pay ' + total, payShort: st.busy ? '…' : 'Pay', busy: st.busy, err: st.err, submit: () => this.submit(), fallback: !!st.fallback, payBackup: () => this.submit(true),
+      sumTitle: sum ? sum.title : st.err ? 'Order Not Available' : 'Loading…', sumSub: sum ? sum.sub : '', lines: sum ? sum.lines : [], total,
+      payLabel: st.busy ? 'Working…' : !sum && st.err ? 'Pay' : 'Pay ' + total, payLabel0: !sum && st.err ? 'Pay' : 'Pay ' + total, payShort: st.busy ? '…' : 'Pay', busy: st.busy, err: st.err, submit: () => this.submit(), fallback: !!st.fallback, payBackup: () => this.submit(true),
       secureNote: tp ? 'Press Pay and enter your card in the secure payment window. Funded Sky never sees your card number.' : 'You enter your card on our payment processor\'s secure page after you press Pay.',
       cryptoNote: cfg.crypto ? 'Pay with USDC, USDT or other coins on Confirmo\'s secure page. Crypto payments are final.' : 'Crypto checkout is not available yet. Use a card.',
-      trust1: 'Your accounts appear in your dashboard as soon as payment clears', trust2: test ? 'Test mode: no real charge' : tp ? 'Cards processed securely by TailoredPay' : 'Cards processed securely by Stripe',
-      backHref: sum && sum.source === 'order' ? '/app/billing' : '/checkout', guestHref: '/logout?next=' + encodeURIComponent('/checkout/payment' + location.search)
+      // An activation fee is not a new purchase: it opens the funded account for an evaluation the trader already passed, so it has its own copy
+      step1: act ? 'Evaluation Passed' : 'Choose Account', step2: act ? 'Activation Fee' : 'Payment', step3: act ? 'Funded Account' : 'Start Trading',
+      heading: act ? 'One Step From Funded.' : 'Welcome Back.',
+      lead: act ? `You passed ${sum.account || 'your evaluation'} and signed the funded agreement. Pay the one-time activation fee and your funded account opens right away.` : 'Your details are saved. Confirm how you want to pay and the new account is added to your dashboard.',
+      activeTail: act ? 'Your funded account takes the place of the passed evaluation in your dashboard.' : 'This one will appear alongside them in your dashboard.',
+      editLabel: act ? 'Back to Account' : 'Edit',
+      trust1: act ? 'Your funded account opens as soon as payment clears' : 'Your accounts appear in your dashboard as soon as payment clears', trust2: test ? 'Test mode: no real charge' : tp ? 'Cards processed securely by TailoredPay' : 'Cards processed securely by Stripe',
+      backHref: act && sum.account ? '/app#account?acct=' + encodeURIComponent(sum.account) : sum && sum.source === 'order' ? '/app/billing' : '/checkout', guestHref: '/logout?next=' + encodeURIComponent('/checkout/payment' + location.search),
+      // copy that fits what is being paid for (new accounts, credits, a reset); the activation fee keeps its own copy above
+      ...(() => { const k = sum && sum.source === 'order' ? sum.kind : 'cart'; const nNew = sum && sum.items ? sum.items.reduce((s, i) => s + i.qty, 0) : 1; const have = st.n ? `You have ${st.n} active ${st.n === 1 ? 'account' : 'accounts'}. ` : '';
+        if (k === 'activation') return { kindTrust: 'Your funded account opens as soon as payment clears', activeNote: have + 'Your funded account takes the place of the passed evaluation in your dashboard.' };
+        const what = k === 'credits' ? 'the credits are added to your balance' : k === 'reset' ? 'your account is reset' : nNew > 1 ? 'the new accounts are added to your dashboard' : 'the new account is added to your dashboard';
+        return { lead: `Your details are saved. Confirm how you want to pay and ${what}.`, kindTrust: k === 'credits' ? 'Your credits are added as soon as payment clears' : k === 'reset' ? 'Your account is reset as soon as payment clears' : 'Your accounts appear in your dashboard as soon as payment clears',
+          activeNote: k === 'credits' ? 'Credits never expire.' : k === 'reset' ? `${have}The reset keeps the same plan, rules and login.` : st.n ? `${have}${nNew > 1 ? 'The new ones' : 'This one'} will appear alongside ${st.n === 1 ? 'it' : 'them'} in your dashboard.` : (nNew > 1 ? 'Your new accounts' : 'Your new account') + ' will appear in your dashboard.' }; })()
     };
   }
 }

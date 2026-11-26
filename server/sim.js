@@ -10,8 +10,10 @@ const INSTR = [['MNQ', 2], ['MES', 5], ['NQ', 20], ['ES', 50], ['CL', 1000], ['G
 const TAGS = ['Opening Drive', 'VWAP Reclaim', 'Breakout', 'Fade', 'Trend Pullback', 'Range Break', 'News Fade'];
 const gauss = () => { let u = 0, v = 0; while (!u) u = Math.random(); while (!v) v = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
 
+// Open Sunday 6:00 PM to Friday 5:00 PM ET with a daily halt from 5:00 to 6:00 PM, minus the holiday calendar (server/calendar.js)
 function marketOpen(d = new Date()) {
-  const { wd, h } = etParts(d);
+  const { wd, h, m } = etParts(d);
+  if (require('./calendar').holidayShut(d.toLocaleDateString('en-CA', { timeZone: 'America/New_York' }), h, m)) return false;
   if (wd === 'Sat') return false;
   if (wd === 'Sun') return h >= 18;
   if (wd === 'Fri') return h < 17;
@@ -32,14 +34,20 @@ function makeTrade(cat, a, when) {
 // Apply one trade to an account inside a transaction (the entry point a real connector would use)
 async function ingestTrade(c, a, t, day) {
   const cat = await core.catalog();
-  const { a: na, events } = R.applyTrade(cat, a, t);
+  // Money held for a payout that is not paid yet still counts as in the account for the max loss floor
+  const held = (await c.one('SELECT COALESCE(sum(gross),0)::float n FROM payouts WHERE account_id=$1 AND status = ANY($2)', [a.id, core.OPEN_PAY])).n;
+  const { a: na, events } = R.applyTrade(cat, { ...a, held }, t);
+  const over = events.find((e) => e.type === 'position');
   const swf = ((await c.one("SELECT v FROM kv WHERE k='store.risk.switches'")) || {}).v || {}; if (swf.freeze && na.phase === 'breached' && a.phase !== 'breached') { na.phase = a.phase; na.breached_at = null; na.breach_reason = null; na.halted_today = true; for (let i = events.length - 1; i >= 0; i--) if (events[i].type === 'breach') events.splice(i, 1); }
-  await c.q('INSERT INTO trades(account_id,ts,day,instrument,side,qty,pnl,hold_min,tag) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)', [a.id, t.ts, day, t.instrument, t.side, t.qty, t.pnl, t.hold_min, t.tag]);
+  await c.q('INSERT INTO trades(account_id,ts,day,instrument,side,qty,pnl,hold_min,tag,over_limit) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)', [a.id, t.ts, day, t.instrument, t.side, t.qty, t.pnl, t.hold_min, t.tag, over ? over.limit : null]);
   await c.q('UPDATE accounts SET balance=$2, today_pnl=$3, halted_today=$4, phase=$5, breached_at=$6, breach_reason=$7, floor=$8, peak_eod=$9, scalp_profit=$10, cycle_scalp=$11, last_trade_at=$12 WHERE id=$1', [a.id, na.balance, na.today_pnl, na.halted_today, na.phase, na.breached_at || null, na.breach_reason || null, na.floor, na.peak_eod, na.scalp_profit || 0, na.cycle_scalp || 0, na.last_trade_at || new Date()]);
   for (const e of events) {
     if (e.type === 'breach') { { const wu = await c.one('SELECT tid, email FROM users WHERE id=$1', [a.user_id]); require('./integrations').outHooks('breach', `${a.id} broke a rule`, { account: a.id, kind: a.kind, plan: a.plan, size: a.size, rule: String(e.msg || '').split(/[:.(]/)[0].trim() || 'Account rule', reason: String(e.msg || ''), balance: Number(na.balance), floor: Number(na.floor || a.floor), breachedAt: na.breached_at || new Date().toISOString(), user: wu ? { id: wu.tid, email: wu.email } : null }); }
-      require('./mail').t(a.kind === 'funded' ? 'fbreach' : 'breach', a.user_id, { account: a.id, size: core.kLabel(a.size), platform: a.platform, rule: String(e.msg || '').split(/[:.(]/)[0].trim() || 'Account rule', floor: '$' + Math.round(na.floor || a.floor).toLocaleString('en-US'), balance: '$' + Math.round(na.balance).toLocaleString('en-US'), time: new Date().toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) + ' ET', url: require('./auth').BASE() + '/app#account?acct=' + a.id }); await core.notify(c, a.user_id, `${a.id} breached`, e.msg + '. You can reset it from the account page.', 'account?acct=' + a.id); if (a.kind === 'funded') require('./integrations').alert('breach', `:red_circle: Funded account ${a.id} breached`); }
+      require('./mail').t(a.kind === 'funded' ? 'fbreach' : 'breach', a.user_id, { account: a.id, size: core.kLabel(a.size), platform: a.platform, rule: String(e.msg || '').split(/[:.(]/)[0].trim() || 'Account rule', floor: '$' + Math.round(na.floor || a.floor).toLocaleString('en-US'), balance: '$' + Math.round(na.balance).toLocaleString('en-US'), time: new Date().toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) + ' ET', url: require('./auth').BASE() + '/app#account?acct=' + a.id }); await core.notify(c, a.user_id, `${a.id} breached`, e.msg + (a.kind === 'funded' ? '. Funded accounts cannot be reset. The account is closed.' : a.comp ? '. The account is closed.' : '. You can reset it from the account page.'), 'account?acct=' + a.id); if (a.kind === 'funded') require('./integrations').alert('breach', `:red_circle: Funded account ${a.id} breached`); }
     if (e.type === 'dll') await core.notify(c, a.user_id, `Daily loss limit reached on ${a.id}`, e.msg, 'account?acct=' + a.id);
+    // A trade above the max position size: kept on the trade (trades.over_limit), in the audit log for Risk, and the trader is told once a day
+    if (e.type === 'position') { await c.q('INSERT INTO audit(actor_id,action,target,meta) VALUES(NULL,$1,$2,$3)', ['rule.position', a.id, { qty: e.qty, limit: e.limit, day, instrument: t.instrument }]);
+      if (await c.one('INSERT INTO auto_sent(key) VALUES($1) ON CONFLICT DO NOTHING RETURNING key', ['posviol:' + a.id + ':' + day])) await core.notify(c, a.user_id, `Position size rule broken on ${a.id}`, `A trade of ${e.qty} contracts is above your limit of ${e.limit} ${e.limit === 1 ? 'contract' : 'contracts'}. This is a rule violation and is on the account's record. Keep every position at or under the limit.`, 'account?acct=' + a.id); }
   }
   // Early warnings, at most once per account per day: 80% of the daily loss limit, and within 20% of the drawdown floor
   if (!['breached', 'closed'].includes(na.phase)) {
@@ -47,8 +55,8 @@ async function ingestTrade(c, a, t, day) {
     const once = async (k) => !!(await c.one('INSERT INTO auto_sent(key) VALUES($1) ON CONFLICT DO NOTHING RETURNING key', [k]));
     const lost = -Number(na.today_pnl); if (r.dll && !na.halted_today && lost >= 0.8 * r.dll && lost < r.dll && await once('dailywarn:' + a.id + ':' + day)) {
       M.t('dailywarn', a.user_id, { account: a.id, lost: m(lost), limit: m(r.dll), left: m(r.dll - lost), url });
-      await core.notify(c, a.user_id, `${a.id} is at ${Math.round(lost / r.dll * 100)}% of today's loss limit`, `Another ${m(r.dll - lost)} loss pauses trading until 5:00 PM ET.`, 'account?acct=' + a.id); }
-    const room = Number(na.balance) - Number(a.floor); if (r.maxLoss && room > 0 && room <= 0.2 * r.maxLoss && await once('ddwarn:' + a.id + ':' + day)) {
+      await core.notify(c, a.user_id, `${a.id} is at ${Math.round(lost / r.dll * 100)}% of today's loss limit`, `Another ${m(r.dll - lost)} loss ${r.dllMode === 'breach' ? 'fails the account.' : 'pauses trading until the day resets at 6:00 PM ET.'}`, 'account?acct=' + a.id); }
+    const room = Number(na.balance) + held - Number(a.floor); if (r.maxLoss && room > 0 && room <= 0.2 * r.maxLoss && await once('ddwarn:' + a.id + ':' + day)) {
       M.t('ddwarn', a.user_id, { account: a.id, left: m(room), floor: m(a.floor), balance: m(na.balance), url }); }
   }
   return na;
@@ -57,7 +65,8 @@ async function ingestTrade(c, a, t, day) {
 async function closeAccountDay(c, a, dayIso) {
   const cat = await core.catalog();
   const n = (await c.one('SELECT count(*)::int n FROM trades WHERE account_id=$1 AND day=$2', [a.id, dayIso])).n;
-  const { a: na, day, events } = R.closeDay(cat, a, dayIso, n);
+  const held = (await c.one('SELECT COALESCE(sum(gross),0)::float n FROM payouts WHERE account_id=$1 AND status = ANY($2)', [a.id, core.OPEN_PAY])).n;
+  const { a: na, day, events } = R.closeDay(cat, { ...a, held }, dayIso, n);
   if (n > 0) await c.q(`INSERT INTO days(account_id,day,pnl,n_trades,eod_balance,floor,closed) VALUES($1,$2,$3,$4,$5,$6,true)
     ON CONFLICT (account_id,day) DO UPDATE SET pnl=$3,n_trades=$4,eod_balance=$5,floor=$6,closed=true`, [a.id, dayIso, day.pnl, n, day.eod_balance, day.floor]);
   await c.q(`UPDATE accounts SET days_traded=$2,best_day=$3,peak_eod=$4,floor=$5,cycle_win_days=$6,cycle_best=$7,phase=$8,passed_at=$9,steps=$10,today_pnl=0,halted_today=false WHERE id=$1`,

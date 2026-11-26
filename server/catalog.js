@@ -66,7 +66,7 @@ const DEFAULT_CATALOG = {
     50000: { goal: 3000, maxLoss: 1750, dll: 875, contracts: 4 },
     100000: { goal: 4500, maxLoss: 2500, dll: 1250, contracts: 8 }
   },
-  instantCommon: { consistency: 20, splitFirst: 80, splitLater: 90, splitFirstCount: 3, winDays: 5, winDayMin: 100, payoutMin: 250, reviewAfter: 6, cushion: 100 },
+  instantCommon: { consistency: 20, splitFirst: 90, splitLater: 90, splitFirstCount: 3, winDays: 5, winDayMin: 100, payoutMin: 250, reviewAfter: 6, cushion: 100 },
   instantCaps: {
     25000: { first: 500, later: 750, lifetime: 3750 },
     50000: { first: 1000, later: 1500, lifetime: 7500 },

@@ -269,6 +269,7 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS rise_status TEXT NOT NULL DEFAULT 'no
 ALTER TABLE payouts ADD COLUMN IF NOT EXISTS provider_ref TEXT;
 ALTER TABLE payouts ADD COLUMN IF NOT EXISTS tx_hash TEXT;
 ALTER TABLE ticket_msgs ADD COLUMN IF NOT EXISTS internal BOOLEAN NOT NULL DEFAULT FALSE;
+CREATE TABLE IF NOT EXISTS article_votes (user_id INT NOT NULL, title TEXT NOT NULL, vote TEXT NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT now(), PRIMARY KEY (user_id, title));
 CREATE TABLE IF NOT EXISTS error_log (id BIGSERIAL PRIMARY KEY, path TEXT NOT NULL DEFAULT '', msg TEXT NOT NULL DEFAULT '', created_at TIMESTAMPTZ NOT NULL DEFAULT now());
 CREATE TABLE IF NOT EXISTS jobs_log (id BIGSERIAL PRIMARY KEY, job TEXT NOT NULL, ok BOOLEAN NOT NULL DEFAULT TRUE, detail TEXT NOT NULL DEFAULT '', created_at TIMESTAMPTZ NOT NULL DEFAULT now());
 ALTER TABLE outbox ADD COLUMN IF NOT EXISTS ext_id TEXT;
@@ -302,6 +303,15 @@ ALTER TABLE points_log ADD COLUMN IF NOT EXISTS actor_id INTEGER;
 ALTER TABLE accounts ADD COLUMN IF NOT EXISTS perks JSONB NOT NULL DEFAULT '{}';
 ALTER TABLE coupons ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT '';
 ALTER TABLE coupons ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ;
+-- Reward and card codes: a one-use code is held by one order at a time (order_id) and used up when that order is paid.
+ALTER TABLE coupons ADD COLUMN IF NOT EXISTS order_id INTEGER;
+ALTER TABLE coupons ADD COLUMN IF NOT EXISTS meta JSONB NOT NULL DEFAULT '{}';   -- size (free account), resets (discount also works on resets), reward (catalog id)
+-- Redemptions get their own ledger kind so the back office counts only real redemptions.
+UPDATE points_log SET kind='redeem' WHERE kind='' AND delta < 0 AND label LIKE 'Redeemed %';
+UPDATE points_log SET kind='chargeback' WHERE kind='refund' AND delta < 0 AND label LIKE 'Chargeback %';
+-- A balance can never be below zero: bring old negative balances back to zero with a ledger line.
+INSERT INTO points_log(user_id,label,delta,kind) SELECT id, 'Balance corrected to zero', -points, 'staff' FROM users WHERE points < 0;
+UPDATE users SET points=0 WHERE points < 0;
 CREATE TABLE IF NOT EXISTS user_packs (
   id SERIAL PRIMARY KEY,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -330,6 +340,7 @@ CREATE TABLE IF NOT EXISTS user_cards (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS user_cards_user ON user_cards(user_id);
+ALTER TABLE user_cards ADD COLUMN IF NOT EXISTS coupon TEXT;                      -- the discount code of a card saved for checkout
 
 -- Competitions: each registered trader gets a practice account for a live competition
 ALTER TABLE accounts ADD COLUMN IF NOT EXISTS comp TEXT;
@@ -344,3 +355,10 @@ ALTER TABLE payouts ADD COLUMN IF NOT EXISTS dest TEXT;
 ALTER TABLE payouts ADD COLUMN IF NOT EXISTS tries INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE payouts ADD COLUMN IF NOT EXISTS failed_at TIMESTAMPTZ;
 ALTER TABLE payouts ADD COLUMN IF NOT EXISTS approvers JSONB NOT NULL DEFAULT '[]';
+
+-- Course credits: one ledger row per trader per course, ever (ref = 'course:<id>')
+CREATE UNIQUE INDEX IF NOT EXISTS points_log_course_once ON points_log(user_id, ref) WHERE ref LIKE 'course:%';
+-- Free evaluation codes carry the account size they are for (NULL = $25K, the size of the rewards-store code)
+ALTER TABLE coupons ADD COLUMN IF NOT EXISTS size INTEGER;
+-- A trade above the max position size keeps the limit it broke (NULL: within the limit)
+ALTER TABLE trades ADD COLUMN IF NOT EXISTS over_limit INTEGER;

@@ -165,7 +165,7 @@ body{margin:0}
 </div>
 </sc-if>
 <sc-if value="{{ vTraders }}">
-<h1 style="margin: 0 0 4px; font-size: 24px; font-weight: 600; letter-spacing: -0.02em;">Traders</h1><p class="hint" style="margin: 0 0 16px;">Look up a trader's credits, packs and cards. Grants need a reason and are logged in Activity. Grants over 100,000 credits need an admin.</p>
+<h1 style="margin: 0 0 4px; font-size: 24px; font-weight: 600; letter-spacing: -0.02em;">Traders</h1><p class="hint" style="margin: 0 0 16px;">Look up a trader's credits, packs and cards. Grants need a reason and are logged in Activity. Grants worth over 100,000 credits to one trader in a day need an admin. Unopened packs and unused cards granted by mistake can be taken back.</p>
 <form onSubmit="{{ search }}" style="display: flex; gap: 8px; max-width: 520px; margin-bottom: 14px;"><div class="fl" style="flex: 1;"><label for="tq">Find a Trader</label><input id="tq" type="search" value="{{ tq }}" onChange="{{ setTq }}" placeholder="Name, email or trader ID"></div><button type="submit" class="pill" style="align-self: flex-end; height: 36px;">Search</button></form>
 <sc-if value="{{ hasResults }}"><div class="card" style="margin-bottom: 16px; overflow-x: auto;"><table><tbody><sc-for list="{{ results }}" as="r"><tr class="lk" onClick="{{ r.pick }}"><td><b style="font-weight: 500;">{{ r.name }}</b> <span class="hint mono">{{ r.tid }}</span></td><td class="hint">{{ r.email }}</td><td class="mono">{{ r.bal }} credits</td></tr></sc-for></tbody></table></div></sc-if>
 <sc-if value="{{ noResults }}"><p class="hint">No trader matches that search.</p></sc-if>
@@ -178,8 +178,9 @@ body{margin:0}
 <sc-if value="{{ granting }}">
 <div style="display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--ln); padding-top: 12px;">
 <sc-if value="{{ gCredits }}"><div class="fl"><label for="gc">Credits</label><input id="gc" type="number" value="{{ g.credits }}" onChange="{{ setGCredits }}"><span class="hint">{{ gCreditsHint }}</span></div></sc-if>
-<sc-if value="{{ gPack }}"><div style="display: grid; grid-template-columns: 1fr 90px; gap: 10px;"><div class="fl"><label for="gp">Pack</label><select id="gp" onChange="{{ setGPack }}"><sc-for list="{{ packOpts }}" as="o"><option value="{{ o.id }}" selected="{{ o.sel }}">{{ o.name }}</option></sc-for></select></div><div class="fl"><label for="gq">How Many</label><input id="gq" type="number" min="1" max="10" value="{{ g.qty }}" onChange="{{ setGQty }}"></div></div></sc-if>
+<sc-if value="{{ gPack }}"><div style="display: grid; grid-template-columns: 1fr 90px; gap: 10px;"><div class="fl"><label for="gp">Pack</label><select id="gp" onChange="{{ setGPack }}"><sc-for list="{{ packOpts }}" as="o"><option value="{{ o.id }}" selected="{{ o.sel }}">{{ o.name }}</option></sc-for></select></div><div class="fl"><label for="gq">How Many</label><input id="gq" type="number" min="1" max="10" step="1" value="{{ g.qty }}" onChange="{{ setGQty }}"></div></div></sc-if>
 <sc-if value="{{ gCard }}"><div class="fl"><label for="gk">Card</label><select id="gk" onChange="{{ setGCard }}"><sc-for list="{{ cardOpts }}" as="o"><option value="{{ o.id }}" selected="{{ o.sel }}">{{ o.name }}</option></sc-for></select></div></sc-if>
+<sc-if value="{{ gWorth }}"><p class="hint" style="margin: 0;">{{ gWorth }}</p></sc-if>
 <div class="fl"><label for="gr">Reason</label><input id="gr" type="text" value="{{ g.reason }}" onChange="{{ setGReason }}" placeholder="Shown to the trader and logged"></div>
 <button type="button" class="pill pri" onClick="{{ doGrant }}" disabled="{{ busy }}">Grant</button>
 </div>
@@ -191,6 +192,10 @@ body{margin:0}
 <table><thead><tr><th scope="col">Card</th><th scope="col">Rarity</th><th scope="col">Got It</th><th scope="col">Status</th><th scope="col"></th></tr></thead>
 <tbody><sc-for list="{{ trCards }}" as="c"><tr><td><b style="font-weight: 500;">{{ c.name }}</b></td><td style="color: {{ c.color }}; font-weight: 600; font-size: 12.5px;">{{ c.r }}</td><td class="hint">{{ c.at }}</td><td class="hint">{{ c.st }}</td><td><sc-if value="{{ c.can }}"><button type="button" class="pill sm" onClick="{{ c.revoke }}">Take Back</button></sc-if></td></tr></sc-for></tbody></table>
 <sc-if value="{{ noCards }}"><p class="hint" style="padding: 14px; margin: 0;">No cards yet.</p></sc-if>
+<sc-if value="{{ hasTrPacks }}">
+<table style="margin-top: 8px;"><thead><tr><th scope="col">Pack</th><th scope="col">From</th><th scope="col">Got It</th><th scope="col">Status</th><th scope="col"></th></tr></thead>
+<tbody><sc-for list="{{ trPacks }}" as="p"><tr><td><b style="font-weight: 500;">{{ p.name }}</b></td><td class="hint">{{ p.src }}</td><td class="hint">{{ p.at }}</td><td class="hint">{{ p.st }}</td><td><sc-if value="{{ p.can }}"><button type="button" class="pill sm" onClick="{{ p.revoke }}">Take Back</button></sc-if></td></tr></sc-for></tbody></table>
+</sc-if>
 </div>
 </div>
 </sc-if>
@@ -217,7 +222,7 @@ body{margin:0}
 <div class="fl"><label for="ps">Short Name</label><input id="ps" type="text" value="{{ ep.short }}" onChange="{{ ep.setShort }}"><span class="hint">On the cover and in checkout.</span></div>
 <div class="fl"><label for="pp">Price (Credits)</label><input id="pp" type="number" min="1" value="{{ ep.price }}" onChange="{{ ep.setPrice }}"><span class="hint">{{ ep.usd }}</span></div>
 <div class="fl"><label for="pl">Most per Trader per Day</label><input id="pl" type="number" min="0" value="{{ ep.limit }}" onChange="{{ ep.setLimit }}"><span class="hint">0 means no limit.</span></div>
-<div class="fl" style="grid-column: 1 / -1;"><label for="pg">Guarantee Shown to Traders</label><input id="pg" type="text" value="{{ ep.g }}" onChange="{{ ep.setG }}"></div>
+<div class="fl" style="grid-column: 1 / -1;"><label for="pg">Guarantee</label><select id="pg" onChange="{{ ep.setGmin }}"><sc-for list="{{ ep.gOpts }}" as="o"><option value="{{ o.v }}" selected="{{ o.sel }}">{{ o.l }}</option></sc-for></select><span class="hint">{{ ep.gHint }}</span></div>
 <div class="fl" style="grid-column: 1 / -1;"><label for="pt">What Traders Read</label><textarea id="pt" onChange="{{ ep.setTag }}">{{ ep.tag }}</textarea></div>
 <label class="tog" style="grid-column: 1 / -1;"><input type="checkbox" checked="{{ ep.on }}" onChange="{{ ep.toggle }}">On Sale</label>
 </div>
@@ -228,6 +233,7 @@ body{margin:0}
 <sc-for list="{{ ep.odds }}" as="o"><div style="display: grid; grid-template-columns: 110px minmax(0, 1fr) 96px; gap: 12px; align-items: center;"><span style="display: flex; align-items: center; gap: 8px; font-size: 13.5px;"><i style="width: 8px; height: 8px; border-radius: 50%; background: {{ o.c }};"></i>{{ o.r }}</span><div class="bar"><div style="height: 100%; width: {{ o.w }}; background: {{ o.c }};"></div></div><input type="number" step="0.01" min="0" value="{{ o.v }}" onChange="{{ o.set }}" aria-label="{{ o.r }} odds"></div></sc-for>
 </div>
 <p style="margin: 10px 0 0; font-weight: 600; color: {{ sumColor }};">{{ sumTxt }}</p>
+<sc-if value="{{ gBreak }}"><p role="alert" class="err" style="margin: 8px 0 0;">{{ gBreak }}</p></sc-if>
 </div>
 <div style="border: 1px solid var(--ln); border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; font-size: 13px;">
 <div style="display: flex; justify-content: space-between;"><span class="hint">Expected cost of three cards</span><b class="mono" style="font-weight: 500;">{{ ep.ev }}</b></div>
@@ -283,12 +289,19 @@ class Component extends DCLogic {
   async pickTrader(id) { try { const tr = await DC.api('/api/admin/packs/traders/' + id); this.setState({ tr, results: null, grant: null, trMsg: '', trErr: '' }); } catch (x) { this.setState({ trErr: x.message }); } }
   async doGrant() {
     const st = this.state; if (st.busy) return; const g = st.g; const cfg = st.cfg;
-    const body = { type: st.grant, reason: g.reason, credits: Number(g.credits), pack: g.pack || cfg.packs[0].id, qty: Number(g.qty) || 1, card: g.card || cfg.cards[0].id };
+    const whole = (v) => /^-?\d+$/.test(String(v).trim()) ? Number(v) : NaN;
+    const body = { type: st.grant, reason: g.reason, credits: whole(g.credits), pack: g.pack || cfg.packs[0].id, qty: whole(g.qty), card: g.card || cfg.cards[0].id };
+    // the same checks the server makes, so nothing is quietly changed on the way
+    if (!String(g.reason || '').trim()) return this.setState({ trErr: 'Add a reason', trMsg: '' });
+    if (st.grant === 'credits' && !(Number.isInteger(body.credits) && body.credits !== 0)) return this.setState({ trErr: 'Enter a whole number of credits, like 500 or -200', trMsg: '' });
+    if (st.grant === 'pack' && !(Number.isInteger(body.qty) && body.qty >= 1 && body.qty <= 10)) return this.setState({ trErr: 'Enter how many packs, from 1 to 10', trMsg: '' });
+    if (st.grant !== 'credits') delete body.credits; if (st.grant !== 'pack') { delete body.pack; delete body.qty; } if (st.grant !== 'card') delete body.card;
     this.setState({ busy: true, trErr: '', trMsg: '' });
-    try { await DC.api('/api/admin/packs/traders/' + st.tr.u.id + '/grant', body); const what = st.grant === 'credits' ? `${Number(g.credits).toLocaleString('en-US')} credits` : st.grant === 'pack' ? `${body.qty} × ${(cfg.packs.find((p) => p.id === body.pack) || {}).name}` : (cfg.cards.find((c) => c.id === body.card) || {}).name;
-      await this.pickTrader(st.tr.u.id); this.setState({ busy: false, grant: null, trMsg: `${what} granted to ${st.tr.u.first}. Logged in Activity.`, g: Object.assign({}, g, { reason: '' }) }); this.load(); }
+    try { await DC.api('/api/admin/packs/traders/' + st.tr.u.id + '/grant', body); const what = st.grant === 'credits' ? `${Math.abs(body.credits).toLocaleString('en-US')} credits` : st.grant === 'pack' ? `${body.qty} × ${(cfg.packs.find((p) => p.id === body.pack) || {}).name}` : (cfg.cards.find((c) => c.id === body.card) || {}).name;
+      await this.pickTrader(st.tr.u.id); this.setState({ busy: false, grant: null, trMsg: st.grant === 'credits' && body.credits < 0 ? `${what} taken back from ${st.tr.u.first}. Logged in Activity.` : `${what} granted to ${st.tr.u.first}. Logged in Activity.`, g: Object.assign({}, g, { reason: '' }) }); this.load(); }
     catch (x) { this.setState({ busy: false, trErr: x.message }); }
   }
+  async revokePack(packId) { if (!confirm('Take this pack back? The trader can no longer open it.')) return; try { await DC.api('/api/admin/packs/owned/' + packId + '/revoke', { reason: 'Taken back by support' }); await this.pickTrader(this.state.tr.u.id); this.setState({ trMsg: 'Pack taken back. Logged in Activity.', trErr: '' }); } catch (x) { this.setState({ trErr: x.message, trMsg: '' }); } }
   async revoke(cardId) { if (!confirm('Take this card back? The trader can no longer use it.')) return; try { await DC.api('/api/admin/packs/cards/' + cardId + '/revoke', { reason: 'Taken back by support' }); await this.pickTrader(this.state.tr.u.id); this.setState({ trMsg: 'Card taken back. Logged in Activity.' }); } catch (x) { this.setState({ trErr: x.message }); } }
   renderVals() {
     const st = this.state; const light = (() => { try { return (localStorage.getItem('fs_admin_theme') || 'dark') === 'light'; } catch (e) { return false; } })(); const mob = window.innerWidth <= 860;
@@ -313,12 +326,12 @@ class Component extends DCLogic {
     const ep0 = st.edit && st.edit.t === 'pack' ? st.draft : null; const ec0 = st.edit && st.edit.t === 'card' ? st.draft : null;
     const upd = (fn) => { const dr = JSON.parse(JSON.stringify(st.draft)); fn(dr); this.setState({ draft: dr, edErr: '' }); };
     const sum = ep0 ? Math.round(ep0.odds.reduce((s, x) => s + Number(x), 0) * 100) / 100 : 100;
-    const FX = [['coupon', 'Discount on next purchase (%)', 'checkout', 'Checkout', 'pct'], ['resetCoupon', 'Discount on next reset (%)', 'checkout', 'Checkout', 'pct'], ['minDays', 'Fewer minimum trading days', 'eval', 'Evaluation', 'n'], ['evalCons', 'Remove consistency (evaluation)', 'eval', 'Evaluation', ''], ['payCons', 'Skip consistency on next payout', 'funded', 'Funded', ''], ['reset', 'Free reset on a failed evaluation', 'failed', 'Evaluation', ''], ['splitAdd', 'Profit split boost (points)', 'funded', 'Funded', 'add'], ['splitTo', 'Profit split set to (%)', 'funded', 'Funded', 'to'], ['account', 'Free account (plan and size)', 'new', 'New Account', ''], ['balance', 'Balance credit ($)', 'funded', 'Funded', 'amt'], ['news', 'News pass (days)', 'funded', 'Funded', 'days'], ['idle', 'Inactivity shield (days)', 'any', 'Any Account', 'days']];
+    const FX = [['coupon', 'Discount on next purchase (%)', 'checkout', 'Checkout', 'pct'], ['resetCoupon', 'Discount on next reset (%)', 'checkout', 'Checkout', 'pct'], ['minDays', 'Fewer minimum trading days', 'eval', 'Evaluation', 'n'], ['evalCons', 'Remove consistency (evaluation)', 'eval', 'Evaluation', ''], ['payCons', 'Skip consistency on next payout', 'funded', 'Funded', ''], ['reset', 'Free reset on a failed evaluation', 'failed', 'Evaluation', ''], ['splitAdd', 'Profit split boost (%)', 'funded', 'Funded', 'add'], ['splitTo', 'Profit split set to (%)', 'funded', 'Funded', 'to'], ['account', 'Free account (plan and size)', 'new', 'New Account', ''], ['balance', 'Balance credit ($)', 'funded', 'Funded', 'amt'], ['news', 'News pass (days)', 'funded', 'Funded', 'days'], ['idle', 'Inactivity shield (days)', 'any', 'Any Account', 'days']];
     const fxKey = (fx) => (fx.t === 'split' ? (fx.to ? 'splitTo' : 'splitAdd') : fx.t);
-    const VALL = { pct: 'Percent Off', n: 'Days Removed', add: 'Points Added', to: 'Split (%)', amt: 'Dollars Added', days: 'Days' };
+    const VALL = { pct: 'Percent Off', n: 'Days Removed', add: 'Percent Added', to: 'Split (%)', amt: 'Dollars Added', days: 'Days' };
     const PLANS = (d.plans || [{ id: 'essential', name: 'Essential', sizes: [25000, 50000, 100000, 150000] }, { id: 'prime', name: 'Prime', sizes: [25000, 50000, 100000, 150000] }]);
     const ENGINE = { coupon: 'Saved as a discount code that comes off the trader\'s next checkout automatically.', resetCoupon: 'Saved as a discount that comes off the trader\'s next reset automatically.', minDays: 'Lowers the minimum trading days on the evaluation it is used on.', evalCons: 'Turns off the consistency rule on the evaluation it is used on.', payCons: 'Skips the consistency check on the next payout of the funded account, then turns itself off.', reset: 'Resets a failed evaluation to its starting balance, like a paid reset.', splitAdd: 'Raises the profit split on one funded account for good.', splitTo: 'Sets the profit split on one funded account for good.', account: 'Opens a new evaluation on the trader\'s dashboard right away.', balance: 'Adds money to a funded account balance. It counts as profit.', news: 'Lifts the news rule on one funded account for the days set.', idle: 'Adds days before an idle account closes.' };
-    const editPack = (p) => this.setState({ edit: { t: 'pack', id: p ? p.id : 'new' }, draft: p ? JSON.parse(JSON.stringify(p)) : { id: '', name: 'New Pack', short: 'New', price: 5000, tag: '', odds: [50, 30, 14, 4.5, 1.2, 0.3], g: 'Any rarity', on: false, limit: 0 }, edErr: '' });
+    const editPack = (p) => this.setState({ edit: { t: 'pack', id: p ? p.id : 'new' }, draft: p ? JSON.parse(JSON.stringify(p)) : { id: '', name: 'New Pack', short: 'New', price: 5000, tag: '', odds: [50, 30, 14, 4.5, 1.2, 0.3], g: 'Any rarity', gmin: 0, on: false, limit: 0 }, edErr: '' });
     const editCard = (c) => this.setState({ edit: { t: 'card', id: c ? c.id : 'new' }, draft: c ? JSON.parse(JSON.stringify(c)) : { id: '', r: 'Common', kind: 'Checkout', big: '5%', name: 'New Card', desc: '', uses: '1 use', on: 'checkout', fx: { t: 'coupon', pct: 5 }, active: false, cost: 0 }, edErr: '' });
     const saveEd = async () => {
       const dr = st.draft; const next = JSON.parse(JSON.stringify(cfg));
@@ -341,8 +354,11 @@ class Component extends DCLogic {
       });
     }
     const odds = ep0 ? ep0.odds : [0, 0, 0, 0, 0, 0]; const evv = ep0 ? evPack(odds) : 0; const priceUsd = ep0 ? Number(ep0.price) / per : 0; const marg = priceUsd ? Math.round((1 - evv / priceUsd) * 100) : 0;
+    // the guarantee: a floor the odds must keep. The line traders read is written from the odds themselves.
+    const gText = (i) => (i > 0 ? RN[i] + ' or better on all three' : 'Any rarity'); const lowOdds = Math.max(0, odds.findIndex((x) => Number(x) > 0)); const gmin = ep0 ? (Number.isInteger(ep0.gmin) ? ep0.gmin : lowOdds) : 0;
+    const gBad = ep0 ? odds.findIndex((x, i) => i < gmin && Number(x) > 0) : -1; const gBreak = gBad >= 0 ? `This pack promises "${gText(gmin)}", but ${RN[gBad]} is at ${odds[gBad]}%. Set it to 0% or lower the guarantee.` : '';
     const ep = ep0 ? Object.assign({}, ep0, { usd: usd(priceUsd), ev: usd(evv.toFixed(2)), margin: marg + '%', mc: marg > 30 ? 'var(--ok)' : marg > 0 ? 'var(--wa)' : 'var(--no)',
-      setName: (e) => upd((x) => { x.name = e.target.value; }), setShort: (e) => upd((x) => { x.short = e.target.value; }), setPrice: (e) => upd((x) => { x.price = Number(e.target.value) || 0; }), setLimit: (e) => upd((x) => { x.limit = Number(e.target.value) || 0; }), setG: (e) => upd((x) => { x.g = e.target.value; }), setTag: (e) => upd((x) => { x.tag = e.target.value; }), toggle: () => upd((x) => { x.on = !x.on; }),
+      setName: (e) => upd((x) => { x.name = e.target.value; }), setShort: (e) => upd((x) => { x.short = e.target.value; }), setPrice: (e) => upd((x) => { x.price = Number(e.target.value) || 0; }), setLimit: (e) => upd((x) => { x.limit = Number(e.target.value) || 0; }), setGmin: (e) => upd((x) => { x.gmin = Number(e.target.value) || 0; }), gOpts: RN.map((r, i) => ({ v: i, l: gText(i), sel: gmin === i })), gHint: gBreak ? 'Traders are promised this. The odds below must keep it.' : `Traders will read: "${gText(lowOdds)}". The line is written from the odds, so it is always true.`, setTag: (e) => upd((x) => { x.tag = e.target.value; }), toggle: () => upd((x) => { x.on = !x.on; }),
       odds: RN.map((r, i) => ({ r, c: RC[r], v: odds[i], w: Math.min(100, Number(odds[i])) + '%', set: (e) => upd((x) => { x.odds[i] = Number(e.target.value) || 0; }) })).reverse() }) : { odds: [] };
     // ladder
     const L = cfg.ladder; const ordersBy = Object.fromEntries((d.ladderOrders || []).map((r) => [r.label, r.n]));
@@ -396,12 +412,14 @@ class Component extends DCLogic {
       gCreditsHint: `${usd(Number(st.g.credits || 0) / per)} of credits. Use a minus number to remove credits.`,
       setGCredits: (e) => this.setState({ g: Object.assign({}, st.g, { credits: e.target.value }) }), setGPack: (e) => this.setState({ g: Object.assign({}, st.g, { pack: e.target.value }) }), setGQty: (e) => this.setState({ g: Object.assign({}, st.g, { qty: e.target.value }) }), setGCard: (e) => this.setState({ g: Object.assign({}, st.g, { card: e.target.value }) }), setGReason: (e) => this.setState({ g: Object.assign({}, st.g, { reason: e.target.value }) }),
       doGrant: () => this.doGrant(), trMsg: st.trMsg, trErr: st.trErr,
+      gWorth: (() => { if (st.grant === 'pack') { const p = cfg.packs.find((x) => x.id === (st.g.pack || cfg.packs[0].id)); const q = Number(st.g.qty) || 0; return p && q > 0 ? `Worth ${n(p.price * q)} credits. Grants worth over 100,000 credits to one trader in a day need an admin.` : ''; } return st.grant ? 'Grants worth over 100,000 credits to one trader in a day need an admin.' : ''; })(),
+      trPacks: tr ? tr.packs.filter((p) => p.status === 'unopened' || p.source === 'grant').slice(0, 30).map((p) => ({ name: p.name, src: { grant: 'Granted by staff', checkout: 'Free with an order', bought: 'Bought with credits' }[p.source] || p.source, at: fmtD(p.created_at), st: p.status === 'unopened' ? 'Unopened' : p.status === 'opened' ? 'Opened ' + fmtD(p.opened_at) : deEmpty(p.note) || 'Taken back', can: p.status === 'unopened' && p.source === 'grant', revoke: () => this.revokePack(p.id) })) : [], hasTrPacks: !!tr && tr.packs.some((p) => p.status === 'unopened' || p.source === 'grant'),
       trCards: tr ? tr.cards.map((c) => ({ name: c.name, r: c.r, color: RC[c.r], at: fmtD(c.at), st: c.status === 'ready' ? 'Ready' : c.status === 'used' ? 'Used on ' + deEmpty(c.usedOn) : deEmpty(c.usedOn) || 'Taken back', can: c.status === 'ready', revoke: () => this.revoke(c.id) })) : [], noCards: !!tr && !tr.cards.length,
       act: d.act.map((a) => { const [what, ...rest] = a.what.split(': '); return { w: ago(a.at), t: a.who, tid: a.tid, what: rest.length ? what : (kindLbl[a.kind] || what), det: rest.length ? rest.join(': ') : a.what, cr: a.delta ? (a.delta > 0 ? '+' : '−') + n(Math.abs(a.delta)) : '—', c: a.delta > 0 ? 'var(--ok)' : a.delta < 0 ? 'var(--t2)' : 'var(--mu)', by: a.by || (a.kind === 'reward' || a.kind === 'refund' ? 'System' : 'Trader') }; }), noAct: !d.act.length, reload: () => this.load(),
       dirty: st.dirty && !st.edit, dirtyTxt: 'You have unsaved changes.', saveErr: st.saveErr, saveCfg: () => this.saveCfg(), discard: () => this.setState({ cfg: JSON.parse(JSON.stringify(d.cfg)), dirty: false, saveErr: '' }),
       editing: !!st.edit, edPack: !!ep0, edCard: !!ec0, ed: { title: ep0 ? (st.edit.id === 'new' ? 'New Pack' : 'Edit ' + ep0.name) : ec0 ? (st.edit.id === 'new' ? 'New Card' : 'Edit ' + ec0.name) : '' }, ep, ec,
-      sumTxt: sum === 100 ? 'Adds up to 100%. Ready to save.' : `Adds up to ${sum}%. Change the odds so they total 100%.`, sumColor: sum === 100 ? 'var(--ok)' : 'var(--no)',
-      cantSave: (!!ep0 && sum !== 100) || st.busy, saveTxt: st.busy ? 'Saving…' : 'Save', saveEd, edErr: st.edErr, closeEd: () => this.setState({ edit: null, draft: null, edErr: '' })
+      sumTxt: sum === 100 ? (gBreak ? 'Adds up to 100%.' : 'Adds up to 100%. Ready to save.') : `Adds up to ${sum}%. Change the odds so they total 100%.`, sumColor: sum === 100 ? 'var(--ok)' : 'var(--no)',
+      gBreak, cantSave: (!!ep0 && (sum !== 100 || !!gBreak)) || st.busy, saveTxt: st.busy ? 'Saving…' : 'Save', saveEd, edErr: st.edErr, closeEd: () => this.setState({ edit: null, draft: null, edErr: '' })
     });
   }
 }

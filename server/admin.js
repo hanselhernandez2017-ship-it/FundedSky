@@ -89,7 +89,7 @@ async function priceApproval(user, cat) {
   const authors = (cur && d.authors) || []; const appr = await priceApprovers(live);
   const ok = ap && ap.sig && ap.sig === sig && !authors.includes(ap.by) && appr.some((u) => u.id === ap.by) ? ap : null;
   return { needs: !!(on && sig !== liveSig), on, matches: cur && !!d.sig && d.sig === sig, approved: ok ? { by: ok.by, name: ok.name, at: ok.at } : null, authors,
-    canApprove: canApprovePrice(user, live) && !authors.includes(user.id), approvers: appr.filter((u) => !authors.includes(u.id)).map((u) => `${u.first} ${u.last || ''}`.trim()) };
+    canApprove: canApprovePrice(user, live) && !authors.includes(user.id), approvers: (() => { const names = [...new Set(appr.filter((u) => !authors.includes(u.id)).map((u) => `${u.first} ${u.last || ''}`.trim()))]; return names; })() };
 }
 // Saving the Back Office draft: the server records who made each change and whose saves changed prices or rules (authors)
 async function stampDraft(user, v) {
@@ -119,16 +119,22 @@ function router(h) {
   r.get('/boot', h(async (req) => {
     const cat = await core.catalog();
     await require('./comps').sync().catch((e) => console.error('comps sync', e.message));
-    const [users, accounts, orders, payouts, tickets, msgs, outbox, auditRows, methods, daily, notes] = await Promise.all([
-      db.all('SELECT id,tid,email,first,last,country,phone,role,verified,status,kyc_status,kyc,tax_status,rise_status,points,ref_code,referred_by,settings,agreements,created_at,last_login FROM users ORDER BY created_at DESC LIMIT 2000'),
-      db.all('SELECT a.*, u.email, u.first, u.last, u.tid FROM accounts a JOIN users u ON u.id=a.user_id ORDER BY a.created_at DESC LIMIT 5000'),
-      db.all('SELECT o.*, u.email, u.first, u.last, u.tid FROM orders o JOIN users u ON u.id=o.user_id ORDER BY o.created_at DESC LIMIT 3000'),
-      db.all('SELECT p.*, u.email, u.first, u.last, u.tid, u.kyc_status, u.tax_status, u.rise_status, u.country FROM payouts p JOIN users u ON u.id=p.user_id ORDER BY p.requested_at DESC LIMIT 2000'),
+    // The lists hold the newest rows of each kind, plus every row that still needs a person and anything asked for by id
+    // (a deep link or a search result: wu = users, wa = accounts, wp = payouts, wo = orders). Load More raises a size (lu, la, lo, lp).
+    const capN = (k, env, def, max) => Math.max(1, Math.min(max, parseInt(req.query[k], 10) || parseInt(process.env[env], 10) || def));
+    const CAP = { users: capN('lu', 'BO_CAP_USERS', 2000, 20000), accounts: capN('la', 'BO_CAP_ACCOUNTS', 5000, 50000), orders: capN('lo', 'BO_CAP_ORDERS', 3000, 30000), payouts: capN('lp', 'BO_CAP_PAYOUTS', 2000, 20000) };
+    const wl = (k) => String(req.query[k] || '').split(',').map((x) => clean(x, 40)).filter(Boolean).slice(0, 25);
+    const wuRaw = wl('wu'); const wantA = wl('wa'); const wantP = wl('wp'); const wantO = wl('wo');
+    const wantU = wuRaw.length ? (await db.all('SELECT id FROM users WHERE id = ANY($1::int[]) OR upper(tid) = ANY($2::text[])', [wuRaw.filter((x) => /^\d{1,9}$/.test(x)).map(Number), wuRaw.map((x) => x.toUpperCase())])).map((x) => x.id) : [];
+    const [accounts, orders, payouts, tickets, msgs, outbox, auditRows, daily, notes] = await Promise.all([
+      db.all(`SELECT a.*, u.email, u.first, u.last, u.tid FROM accounts a JOIN users u ON u.id=a.user_id WHERE a.id IN (SELECT id FROM accounts ORDER BY created_at DESC LIMIT $1) OR a.phase IN ('passed','review') OR a.id = ANY($2::text[]) OR a.user_id = ANY($3::int[])
+        OR a.id IN (SELECT account_id FROM payouts WHERE status = ANY($4::text[]) OR code = ANY($5::text[])) ORDER BY a.created_at DESC`, [CAP.accounts, wantA, wantU, core.OPEN_PAY, wantP]),
+      db.all(`SELECT o.*, u.email, u.first, u.last, u.tid FROM orders o JOIN users u ON u.id=o.user_id WHERE o.id IN (SELECT id FROM orders ORDER BY created_at DESC LIMIT $1) OR o.code = ANY($2::text[]) OR o.user_id = ANY($3::int[]) OR o.meta ? 'chargeback' ORDER BY o.created_at DESC`, [CAP.orders, wantO, wantU]),
+      db.all(`SELECT p.*, u.email, u.first, u.last, u.tid, u.kyc_status, u.tax_status, u.rise_status, u.country FROM payouts p JOIN users u ON u.id=p.user_id WHERE p.id IN (SELECT id FROM payouts ORDER BY requested_at DESC LIMIT $1) OR p.status = ANY($2::text[]) OR p.code = ANY($3::text[]) OR p.user_id = ANY($4::int[]) ORDER BY p.requested_at DESC`, [CAP.payouts, core.OPEN_PAY, wantP, wantU]),
       db.all('SELECT t.*, u.email, u.first, u.last, u.tid FROM tickets t JOIN users u ON u.id=t.user_id ORDER BY t.updated_at DESC LIMIT 1000'),
       db.all('SELECT m.*, u.first AS afirst FROM ticket_msgs m LEFT JOIN users u ON u.id=m.author_id WHERE m.ticket_id IN (SELECT id FROM tickets ORDER BY updated_at DESC LIMIT 1000) ORDER BY m.created_at'),
       db.all('SELECT id,to_email,subject,template,status,created_at FROM outbox ORDER BY created_at DESC LIMIT 300'),
       db.all('SELECT a.*, u.first, u.last, u.email FROM audit a LEFT JOIN users u ON u.id=a.actor_id ORDER BY a.created_at DESC LIMIT 300'),
-      db.all('SELECT * FROM payout_methods ORDER BY created_at DESC LIMIT 2000'),
       db.all("SELECT day, sum(pnl)::float pnl, sum(n_trades)::int n, count(*)::int accts FROM days WHERE day > (now() - interval '90 days')::date GROUP BY day ORDER BY day"),
       db.all("SELECT k, v FROM kv WHERE k LIKE 'content.%'")
     ]);
@@ -138,11 +144,17 @@ function router(h) {
     const acctOut = accounts.map((a) => {
       const stop = R.payoutStop(a, R.cbFor(a, cbBy[a.user_id])); const q = a.kind === 'funded' ? R.payoutQuote(cat, a, Object.assign({ stop }, openBy[a.id] || {})) : null; const rr = R.rulesFor(cat, a); const daily = (a.addons || []).includes('daily');
       const cyc = q ? { profit: q.cycleProfit, best: Number(a.cycle_best), win: a.cycle_win_days, needWin: daily ? 1 : rr.winDays, cons: rr.consOff || daily ? null : rr.consistency, checks: q.checks, owed: q.max, owedAll: Math.max(0, Math.floor(Math.min(q.withdrawable * q.split / 100, q.lifetimeLeft))), withdrawable: q.withdrawable } : null;
-      return { id: a.id, comp: a.comp || null, user: a.user_id, tid: a.tid, name: `${a.first} ${a.last}`, email: a.email, plan: a.plan, size: a.size, platform: a.platform, kind: a.kind, phase: a.phase, start: Number(a.start_bal), bal: Number(a.balance), floor: Number(a.floor), peak: Number(a.peak_eod), today: a.today_date === tradeDate() ? Number(a.today_pnl) : 0, halted: a.halted_today, days: a.days_traded, best: Number(a.best_day), payouts: a.payout_count, paid: Number(a.paid_total), resets: a.reset_count, freeResets: a.free_resets, addons: a.addons, breach: a.breach_reason, created: a.created_at, passed: a.passed_at, funded: a.funded_at, breached: a.breached_at, closed: a.closed_at, parent: a.parent_id, maxLoss: rr.maxLoss, dll: rr.dll, target: rr.target || rr.goal || 0, avail: q ? q.max : 0, ready: q ? q.ok : false, winDays: a.cycle_win_days, stop, cycle: cyc, sim: a.sim, steps: a.steps || {}, demo: /@demo\.fundedsky\.test$/.test(a.email) };
+      return { id: a.id, comp: a.comp || null, user: a.user_id, tid: a.tid, name: `${a.first} ${a.last}`, email: a.email, plan: a.plan, size: a.size, platform: a.platform, kind: a.kind, phase: a.phase, start: Number(a.start_bal), bal: Number(a.balance), floor: Number(a.floor), peak: Number(a.peak_eod), today: a.today_date === tradeDate() ? Number(a.today_pnl) : 0, halted: a.halted_today, days: a.days_traded, best: Number(a.best_day), payouts: a.payout_count, paid: Number(a.paid_total), resets: a.reset_count, freeResets: a.free_resets, addons: a.addons, breach: a.breach_reason, created: a.created_at, passed: a.passed_at, funded: a.funded_at, breached: a.breached_at, closed: a.closed_at, parent: a.parent_id, maxLoss: rr.maxLoss, dll: rr.dll, newsWin: rr.news ? rr.news.win : 0, target: rr.target || rr.goal || 0, avail: q ? q.max : 0, ready: q ? q.ok : false, winDays: a.cycle_win_days, stop, cycle: cyc, sim: a.sim, steps: a.steps || {}, demo: /@demo\.fundedsky\.test$/.test(a.email) };
     });
+    const affB = await require('./affiliates').board().catch((e) => { console.error('affiliate board', e.message); return { sum: {}, ord: {}, self: [], owed: [] }; });
     const kvs = await db.all("SELECT k, v FROM kv WHERE k LIKE 'settings.%' OR k LIKE 'dispute.%' OR k LIKE 'list.%' OR k LIKE 'store.%' OR k LIKE 'refclicks.%'");
     const settings = {}; const disputes = [];
     const lists = {}; const storeV = {}; const clicks = {}; kvs.forEach((r) => { if (r.k.startsWith('settings.')) settings[r.k.slice(9)] = r.v; else if (r.k.startsWith('list.')) lists[r.k.slice(5)] = r.v; else if (r.k.startsWith('store.')) storeV[r.k.slice(6)] = r.k === 'store.apikeys' ? (r.v || []).map((x) => ({ ...x, hash: undefined })) : r.v; else if (r.k.startsWith('refclicks.')) clicks[r.k.slice(10)] = r.v; else disputes.push(r.v); });
+    // People: the newest users, all staff, everyone waiting for an identity review, and the owner of every row loaded above, so no board shows a row without its person
+    const own = new Set(wantU); [accounts, orders, payouts, tickets].forEach((l) => l.forEach((x) => own.add(x.user_id))); (lists.affiliates || []).forEach((x) => { if (Number.isInteger(+x.user)) own.add(+x.user); }); disputes.forEach((d) => { if (d && Number.isInteger(+d.user)) own.add(+d.user); });
+    const users = await db.all(`SELECT id,tid,email,first,last,country,phone,role,verified,status,kyc_status,kyc,tax_status,rise_status,points,ref_code,referred_by,settings,agreements,created_at,last_login FROM users
+      WHERE id IN (SELECT id FROM users ORDER BY created_at DESC LIMIT $1) OR role<>'trader' OR kyc_status='submitted' OR id = ANY($2::int[]) ORDER BY created_at DESC`, [CAP.users, [...own]]);
+    const methods = await db.all('SELECT * FROM payout_methods WHERE id IN (SELECT id FROM payout_methods ORDER BY created_at DESC LIMIT 2000) OR user_id = ANY($1::int[]) ORDER BY created_at DESC', [[...new Set(wantU.concat(payouts.filter((p) => core.OPEN_PAY.includes(p.status)).map((p) => p.user_id)))]]);
     const integrations = (await I.list()).map((x) => ({ id: x.id, name: x.name, cat: x.cat, enabled: x.enabled, status: x.status, lastError: x.lastError, lastCheck: x.lastCheck }));
     const hooks = await db.all("SELECT provider, event, ok, created_at, CASE WHEN provider LIKE 'out:%' THEN detail ELSE '' END detail FROM webhook_log ORDER BY id DESC LIMIT 200");
     const live = await db.one(`SELECT
@@ -163,7 +175,7 @@ function router(h) {
     ) z WHERE c IS NOT NULL AND c <> '' GROUP BY c ORDER BY 1`);
     live.pulse = Array.from({ length: 60 }, (_, i) => { const r = pulseRows.find((x) => x.m === 59 - i); return r ? r.n : 0; });
     // Totals from SQL: the lists above are capped, so boards show these counts instead of counting rows
-    const counts = await db.one(`SELECT (SELECT count(*) FROM users WHERE role='trader')::int traders, (SELECT count(*) FROM users)::int users, (SELECT count(*) FROM outbox)::int emails,
+    const counts = await db.one(`SELECT (SELECT count(*) FROM users WHERE role='trader')::int traders, (SELECT count(*) FROM users)::int users, (SELECT count(*) FROM users WHERE role<>'trader')::int staff, (SELECT count(*) FROM outbox)::int emails,
       (SELECT count(DISTINCT referred_by) FROM users WHERE referred_by IS NOT NULL)::int referrers, (SELECT count(*) FROM users WHERE role='trader' AND points > 0)::int "withCredits",
       (SELECT count(*) FROM orders)::int orders, (SELECT count(*) FROM accounts)::int accounts, (SELECT count(*) FROM payouts)::int payouts, (SELECT count(*) FROM tickets)::int tickets,
       (SELECT count(*) FROM orders WHERE status='paid' AND paid_at >= ${T0})::int "paidToday", (SELECT COALESCE(sum(total),0)::float FROM orders WHERE status='paid' AND paid_at >= ${T0}) "revToday",
@@ -172,16 +184,18 @@ function router(h) {
       (SELECT count(*) FROM accounts WHERE kind='evaluation' AND phase='active')::int "evalLive", (SELECT count(*) FROM accounts WHERE phase='passed')::int "passedWaiting",
       (SELECT count(*) FROM users WHERE kyc_status='submitted')::int "kycQueue", (SELECT count(*) FROM tickets WHERE status='open')::int "openTickets",
       (SELECT count(*) FROM payouts WHERE status='requested')::int "toReview", (SELECT count(*) FROM payouts WHERE status='approved')::int "toSend"`);
+    counts.loaded = { users: users.length, orders: orders.length, accounts: accounts.length, payouts: payouts.length }; counts.cap = CAP;
     counts.capped = { users: counts.users > users.length, orders: counts.orders > orders.length, accounts: counts.accounts > accounts.length, payouts: counts.payouts > payouts.length, emails: counts.emails > outbox.length };
     return {
-      settings, disputes, lists, store: storeV, clicks, integrations, hooks, live, counts, approvals: Object.values(((await db.one("SELECT v FROM kv WHERE k='approvals.pending'")) || { v: {} }).v).map((p) => ({ ...p, canApprove: canApprove(req.user, p) })), payFirst: ((await db.one("SELECT v FROM kv WHERE k='payout.firstok'")) || { v: {} }).v, staffMfa: await db.all("SELECT id, mfa_on FROM users WHERE role<>'trader'"), staffSessions: await db.all("SELECT s.user_id, s.ua, s.ip, s.created_at, s.seen_at FROM sessions s JOIN users u ON u.id=s.user_id WHERE u.role<>'trader' ORDER BY s.seen_at DESC LIMIT 100"), taxOn: await I.on('track1099'), contentDefault: require('./content-seed.json'),
+      settings, disputes, lists, store: storeV, clicks, integrations, hooks, live, counts, approvals: Object.values(((await db.one("SELECT v FROM kv WHERE k='approvals.pending'")) || { v: {} }).v).map((p) => ({ ...p, canApprove: canApprove(req.user, p) })), payFirst: ((await db.one("SELECT v FROM kv WHERE k='payout.firstok'")) || { v: {} }).v, staffMfa: await db.all("SELECT id, mfa_on FROM users WHERE role<>'trader'"), staffSessions: await db.all("SELECT s.user_id, s.ua, s.ip, s.created_at, s.seen_at FROM sessions s JOIN users u ON u.id=s.user_id WHERE u.role<>'trader' ORDER BY s.seen_at DESC LIMIT 100"), taxOn: await I.on('track1099'), contentDefault: require('./content-seed.json'), newsWeek: content.newsWeek((await content.all()).news), newsRule: require('./ruletable').summary(cat).news,
       me: { id: req.user.id, first: req.user.first, last: req.user.last, email: req.user.email, role: req.user.role },
       now: new Date().toISOString(), today: tradeDate(), payments: pay.mode(), catalog: cat,
       users: users.map((u) => ({ ...u, demo: /@demo\.fundedsky\.test$/.test(u.email), kyc: u.kyc && u.kyc.name ? { name: u.kyc.name, dob: u.kyc.dob, country: u.kyc.country, idType: u.kyc.idType, idLast4: u.kyc.idLast4, at: u.kyc.at } : null })),
       accounts: acctOut,
-      orders: orders.map((o) => ({ id: o.id, code: o.code, user: o.user_id, tid: o.tid, name: `${o.first} ${o.last}`, email: o.email, kind: o.kind, lines: o.lines, items: o.items, subtotal: Number(o.subtotal), discount: Number(o.discount), total: Number(o.total), promo: o.promo, status: o.status, method: o.pay_method, provider: o.provider, created: o.created_at, paid: o.paid_at, refunded: o.refunded_at, accounts: (o.meta && o.meta.accounts) || [], account: o.meta && o.meta.account, chargeback: (o.meta && o.meta.chargeback) || null })),
+      orders: orders.map((o) => ({ id: o.id, code: o.code, user: o.user_id, tid: o.tid, name: `${o.first} ${o.last}`, email: o.email, kind: o.kind, lines: o.lines, items: o.items, subtotal: Number(o.subtotal), discount: Number(o.discount), total: Number(o.total), refundAmt: o.status === 'refunded' && o.meta && o.meta.refundAmount != null ? Number(o.meta.refundAmount) : undefined, refundPart: (o.meta && o.meta.refundCredits && o.meta.refundCredits.note) || undefined, promo: o.promo, status: o.status, method: o.pay_method, provider: o.provider, created: o.created_at, paid: o.paid_at, refunded: o.refunded_at, accounts: (o.meta && o.meta.accounts) || [], account: o.meta && o.meta.account, chargeback: (o.meta && o.meta.chargeback) || null, dispute: (o.meta && o.meta.dispute) || null, refundNote: (o.meta && o.meta.refundNote) || '', refundReason: (o.meta && o.meta.refundReason) || '', refundTook: (o.meta && o.meta.refundTook) || '', aff: (affB.ord[o.code] || {}).aff || null, com: (affB.ord[o.code] || {}).com || 0 })),
+      aff: { sum: affB.sum, self: affB.self, owed: affB.owed },
       payouts: payouts.map((p) => ({ code: p.code, account: p.account_id, user: p.user_id, tid: p.tid, name: `${p.first} ${p.last}`, email: p.email, country: p.country, kyc: p.kyc_status, tax: p.tax_status, rise: p.rise_status, tx: p.tx_hash, ref: p.provider_ref, hasDest: !!p.dest, tries: p.tries || 0, failedAt: p.failed_at, approvers: (p.approvers || []).map((x) => ({ id: x.id, name: x.name, note: x.note })), number: p.number, gross: Number(p.gross), split: p.split, amount: Number(p.amount), method: p.method, rail: p.rail, status: p.status, batch: p.batch, note: p.note, reviewer: p.reviewed_by, requested: p.requested_at, approved: p.approved_at, paid: p.paid_at, denied: p.denied_at })),
-      tickets: tickets.map((t) => ({ id: t.id, user: t.user_id, tid: t.tid, name: `${t.first} ${t.last}`, email: t.email, subject: t.subject, category: t.category, channel: t.channel, status: t.status, priority: t.priority, created: t.created_at, updated: t.updated_at, assignee: t.assignee, review: t.review, rating: t.rating, rated: t.rated_at, msgs: msgs.filter((m) => m.ticket_id === t.id).map((m) => ({ staff: m.staff, internal: m.internal, by: m.afirst, body: m.body, at: m.created_at })) })),
+      tickets: tickets.map((t) => ({ id: t.id, user: t.user_id, tid: t.tid, name: `${t.first} ${t.last}`, email: t.email, subject: t.subject, category: t.category, channel: t.channel, status: t.status, priority: t.priority, created: t.created_at, updated: t.updated_at, assignee: t.assignee, review: t.review, rating: t.rating, rated: t.rated_at, msgs: msgs.filter((m) => m.ticket_id === t.id).map((m) => ({ staff: m.staff, internal: m.internal, auto: !!(m.staff && !m.internal && m.author_id == null) || undefined, by: m.afirst, body: m.body, at: m.created_at })) })),
       outbox, audit: auditRows.map((a) => ({ at: a.created_at, by: a.first ? `${a.first} ${a.last}` : 'System', action: a.action, target: a.target, meta: a.meta })),
       methods: methods.map((m) => ({ user: m.user_id, rail: m.rail, label: m.label, def: m.is_default, unlock: m.unlock_at, created: m.created_at })),
       daily, content: Object.fromEntries(notes.map((n) => [n.k.slice(8), n.v]))
@@ -217,9 +231,11 @@ function router(h) {
     // The staff note for a lock or ban is written when it actually happens (after any second approval), never while it waits
     const staffNote = async (body) => db.q("INSERT INTO kv(k,v) VALUES($1, jsonb_build_array($2::jsonb)) ON CONFLICT (k) DO UPDATE SET v = kv.v || $2::jsonb", ['note.user.' + u.id, JSON.stringify({ by: req.user.first + ' ' + req.user.last, at: new Date().toISOString(), body })]);
     if (b.status === 'banned' && u.status !== 'banned') await staffNote('Banned: ' + (clean(b.reason, 200) || 'No reason given') + (req.approvedFrom ? ` (asked by ${req.approvedFrom.byName}, approved by ${req.user.first} ${req.user.last})` : ''));
+    if (b.status === 'active' && u.status === 'banned') await staffNote('Ban lifted' + (clean(b.reason, 200) ? ': ' + clean(b.reason, 200) : '') + (req.approvedFrom ? ` (asked by ${req.approvedFrom.byName}, approved by ${req.user.first} ${req.user.last})` : ''));
+    if (b.status === 'active' && u.status === 'suspended') await staffNote('Unlocked' + (clean(b.reason, 200) ? ': ' + clean(b.reason, 200) : ''));
     if (b.status === 'suspended' && u.status !== 'suspended') await staffNote('Locked: ' + (clean(b.reason, 200) || 'No reason given'));
     if (b.kyc_status === 'rejected' && kycNew) await core.notify(null, u.id, 'We could not verify your identity', clean(b.reason, 200) || 'Check your details and submit again, or contact support.', 'settings?tab=identity');
-    await core.audit(req.user.id, 'user.update', u.tid, b);
+    await core.audit(req.user.id, 'user.update', u.tid, Object.assign({}, b, { was: { status: u.status, kyc_status: u.kyc_status } }));
   }));
 
   // Balance Adjustments (Risk): one person asks, a different risk reviewer or admin applies it. Registered before /accounts/:id/:action.
@@ -283,6 +299,8 @@ function router(h) {
     if (action === 'pay') { tx = clean(req.body.tx, 120); if (po.status !== 'approved') bad(po.status === 'paid' ? 'This payout was already sent' : 'Approve the payout first');
       if (/usdc/i.test(po.rail) && !/^0x[a-fA-F0-9]{64}$/.test(tx)) bad('Paste the transaction hash from the wallet (0x and 64 characters)');
       if (/rise/i.test(po.rail) && tx.length < 4) bad('Add the Rise payment reference'); }
+    // A denied payout always carries a reason: it is kept on record and shown to the trader
+    if (action === 'deny' && !clean(req.body.note, 300).trim()) bad('Add a note that says why this payout is denied');
     return core.reviewPayout(req.user.id, code, action, clean(req.body.note, 300), null, { tx: tx || null });
   }));
   // ---- Payout batches: approved payouts sent together. Over the limit, a second person must approve. ----
@@ -354,12 +372,19 @@ function router(h) {
     return { sent: out.length, ok: out.filter((x) => x.ok).length, code: out[0].code, ms: out[0].ms, err: out[0].err || '' }; }));
   r.post('/risk/scan', h(async (req) => { need(req.user, 'risk'); const out = await require('./riskscan').scan(); await core.audit(req.user.id, 'risk.scan', '', {}); return out; }));
   r.get('/risk/trades', h(async (req) => { const since = req.query.days ? +req.query.days : 1; return db.all(`SELECT t.account_id, t.ts, t.instrument, t.side, t.qty, t.pnl::float pnl, t.hold_min, a.user_id FROM trades t JOIN accounts a ON a.id=t.account_id WHERE t.ts > now() - ($1 || ' days')::interval ORDER BY t.ts DESC LIMIT 3000`, [String(Math.min(30, since))]); }));
-  r.post('/tickets', h(async (req) => { need(req.user, 'support', 'risk', 'finance'); const b = req.body; const u = await db.one('SELECT id, email, first FROM users WHERE id=$1', [+b.user]); if (!u) bad('Pick a trader');
-    const subj = clean(b.subject, 200); if (!subj) bad('Add a subject'); const t = await db.one("INSERT INTO tickets(user_id,subject,category,channel,status,priority,assignee) VALUES($1,$2,$3,'Email',$4,$5,$6) RETURNING id", [u.id, subj, clean(b.category, 60) || 'General', b.body ? 'pending' : 'open', ['low', 'normal', 'high', 'urgent'].includes(b.priority) ? b.priority : 'normal', req.user.id]);
-    if (b.body) { await db.q('INSERT INTO ticket_msgs(ticket_id,author_id,staff,body) VALUES($1,$2,true,$3)', [t.id, req.user.id, clean(b.body, 5000)]); await core.notify(null, u.id, 'Support: ' + subj, clean(b.body, 140), 'support?tkt=' + t.id); await require('./mail').send(u.email, `${subj} [#${t.id}]`, `Hi ${u.first},\n\n${clean(b.body, 5000)}\n\nReply from your dashboard: ${require('./auth').BASE()}/app#support?tkt=${t.id}`, 'ticket'); }
+  r.use('/tickets/:id', (req, res, next) => (req.params.id === 'sig' || /^\d{1,9}$/.test(req.params.id) ? next() : res.status(404).json({ error: 'Ticket not found' })));
+  // Trader search for the Support board's New Ticket drawer: every trader, by name, email or ID
+  r.get('/ticket-traders', h(async (req) => { need(req.user, 'support', 'risk', 'finance'); const q = clean(req.query.q, 80).replace(/^#/, '').toLowerCase(); if (q.length < 2) return { rows: [] }; const like = '%' + q.replace(/[\\%_]/g, '\\$&') + '%';
+    const rows = await db.all("SELECT id, tid, first, last, email FROM users WHERE role='trader' AND (lower(first || ' ' || last) LIKE $1 OR lower(email) LIKE $1 OR lower(COALESCE(tid::text,'')) LIKE $1 OR id::text = $2) ORDER BY (id::text = $2) DESC, first, last LIMIT 20", [like, q]);
+    return { rows: rows.map((u) => ({ id: u.id, tid: u.tid || String(u.id), name: `${u.first} ${u.last || ''}`.trim(), email: u.email })) }; }));
+  r.post('/tickets', h(async (req) => { need(req.user, 'support', 'risk', 'finance'); const b = req.body; const uid = /^\d{1,9}$/.test(String(b.user)) ? +b.user : 0; const u = uid ? await db.one('SELECT id, email, first FROM users WHERE id=$1', [uid]) : null; if (!u) bad('Pick a trader');
+    const subj = typeof b.subject === 'string' ? clean(b.subject, 160) : ''; if (!subj) bad('Add a subject'); const body = typeof b.body === 'string' ? clean(b.body, 5000) : ''; if (!body || new RegExp('^(hi|hello|hey|dear)(\\s+' + String(u.first || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')?\\s*[,!.:]?$', 'i').test(body)) bad('Write a message for the trader');
+    const cat = await require('./support').topic(b.category); if (!cat) bad('Pick a topic from the list');
+    const t = await db.tx(async (c) => { const x = await c.one("INSERT INTO tickets(user_id,subject,category,channel,status,priority,assignee) VALUES($1,$2,$3,'Email','pending',$4,$5) RETURNING id", [u.id, subj, cat, ['low', 'normal', 'high', 'urgent'].includes(b.priority) ? b.priority : 'normal', req.user.id]); await c.q('INSERT INTO ticket_msgs(ticket_id,author_id,staff,body) VALUES($1,$2,true,$3)', [x.id, req.user.id, body]); return x; });
+    await core.notify(null, u.id, 'Support: ' + subj, body.slice(0, 140), 'support?tkt=' + t.id); await require('./mail').send(u.email, `${subj} [#${t.id}]`, `${/^(hi|hello|hey|dear)\b/i.test(body) ? '' : `Hi ${u.first},\n\n`}${body}\n\nReply from your dashboard: ${require('./auth').BASE()}/app#support?tkt=${t.id}`, 'ticket');
     await core.audit(req.user.id, 'ticket.create', String(t.id), {}); return { id: t.id }; }));
   // ---- Store: board settings and lists kept for each board ----
-  r.put('/store/:key', h(async (req) => { const k = clean(req.params.key, 60); if (!/^[a-z0-9_.-]+$/i.test(k)) bad('Bad key'); need(req.user, ...storeRoles(k)); const A = require('./auth');
+  r.put('/store/:key', h(async (req) => { const k = clean(req.params.key, 60); if (!/^[a-z0-9_.-]+$/i.test(k)) bad('Bad key'); if (k === 'competitions.winners' || k === 'competitions.dq') bad('Winners and disqualifications are changed from the Competitions board'); need(req.user, ...storeRoles(k)); const A = require('./auth');
     if (k === 'team.security' && req.body.value && req.body.value.ipOnly) { const nets = ((await db.one("SELECT v FROM kv WHERE k='store.team.networks'")) || {}).v || []; if (!nets.some((x) => A.netRule(x))) bad('Add at least one network first'); if (!nets.some((x) => A.ipIn(req.ip, x))) bad('Your current network is not on the list. Add it first so you are not locked out.'); }
     // Allowed networks: only real addresses or ranges, and while the allowlist is on the list must keep the network you are on now
     if (k === 'team.networks') { if (!Array.isArray(req.body.value)) bad('Send a list of networks'); const list = [...new Set(req.body.value.map((x) => String(x == null ? '' : x).trim()).filter(Boolean))].slice(0, 100);
@@ -372,10 +397,10 @@ function router(h) {
       const nv = Array.isArray(req.body.value) ? req.body.value : []; const add = nv.filter((x) => x && typeof x === 'object' && !seen.has(JSON.stringify(x)) && !cur.some((y) => y && y.order === x.order)).slice(0, 5);
       if (!add.length) { if (JSON.stringify(nv) === JSON.stringify(cur)) return { ok: true }; bad('You can add refund requests here. Finance handles the rest of the list.', 403); }
       req.body.value = cur.concat(add.map((x) => ({ order: clean(x.order, 30), reason: clean(x.reason, 300), ticket: x.ticket ? +x.ticket || undefined : undefined, by: `${req.user.first} ${req.user.last || ''}`.trim(), byId: req.user.id, at: new Date().toISOString() }))); }
-    if (k === 'catalog.versions' && Array.isArray(req.body.value)) req.body.value = req.body.value.slice(0, 15); const before = k === 'affiliate.payments' ? ((await db.one('SELECT v FROM kv WHERE k=$1', ['store.' + k])) || {}).v || [] : null; const holdsBefore = k === 'risk.payhold' ? ((await db.one('SELECT v FROM kv WHERE k=$1', ['store.' + k])) || {}).v || {} : null; if (k === 'catalog.draft') req.body.value = await stampDraft(req.user, req.body.value); await putStore(k, req.body.value);
+    if (k === 'catalog.versions' && Array.isArray(req.body.value)) req.body.value = req.body.value.slice(0, 15); if (k === 'affiliate.payments') bad('Affiliate payouts are recorded with Pay All Due in Affiliates, Payouts. The list cannot be edited by hand.', 403); const holdsBefore = k === 'risk.payhold' ? ((await db.one('SELECT v FROM kv WHERE k=$1', ['store.' + k])) || {}).v || {} : null; if (k === 'catalog.draft') req.body.value = await stampDraft(req.user, req.body.value); await putStore(k, req.body.value);
     // A payout newly put on hold in Risk: the trader gets the Payout On Hold email
     if (holdsBefore) { const added = Object.keys(req.body.value || {}).filter((c2) => !holdsBefore[c2]); if (added.length) for (const p of await db.all("SELECT code, user_id FROM payouts WHERE code = ANY($1) AND status='requested'", [added])) require('./mail').t('payhold', p.user_id, { url: require('./auth').BASE() + '/app#payouts' }); }
-    if (before) { const seen = new Set(before.map((x) => JSON.stringify(x))); for (const x of (req.body.value || []).filter((y) => !seen.has(JSON.stringify(y)))) if (x && x.user && Number(x.amount) > 0) require('./mail').t('affpaid', +x.user, { amount: '$' + Number(x.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), method: x.method || 'Bank or wallet transfer', url: require('./auth').BASE() + '/app#affiliates' }); } await core.audit(req.user.id, 'store.' + k, k, {}); if (k === 'catalog.draft') return { ok: true, draft: req.body.value && { changes: ((req.body.value.s || {}).changes || []).map((c) => ({ id: c.id, who: c.who, whoId: c.whoId, approved: c.approved, by2: c.by2 })) }, approval: await priceApproval(req.user) }; }));
+    await core.audit(req.user.id, 'store.' + k, k, {}); if (k === 'catalog.draft') return { ok: true, draft: req.body.value && { changes: ((req.body.value.s || {}).changes || []).map((c) => ({ id: c.id, who: c.who, whoId: c.whoId, approved: c.approved, by2: c.by2 })) }, approval: await priceApproval(req.user) }; }));
   // ---- Packs and credits ----
   const PK = require('./packs');
   r.get('/packs', h(async (req) => { need(req.user, 'support', 'finance', 'risk'); return PK.adminData(); }));
@@ -385,6 +410,12 @@ function router(h) {
   r.get('/packs/traders/:id', h(async (req) => { need(req.user, 'support', 'finance', 'risk'); return PK.traderAdmin(req.params.id); }));
   r.post('/packs/traders/:id/grant', h(async (req) => { need(req.user, 'support'); return PK.grant(req.user, req.params.id, req.body || {}); }));
   r.post('/packs/cards/:id/revoke', h(async (req) => { need(req.user, 'support'); return PK.revokeCard(req.user, req.params.id, (req.body || {}).reason); }));
+  r.post('/packs/owned/:id/revoke', h(async (req) => { need(req.user, 'support'); return PK.revokePack(req.user, req.params.id, (req.body || {}).reason); }));
+  // Refunding a credits order: what was spent and what can go back, and the refund with the choice to take back what the credits bought
+  r.get('/packs/orders/:code/refund-info', h(async (req) => { need(req.user, 'finance', 'support'); const o = await db.one('SELECT * FROM orders WHERE code=$1', [clean(req.params.code, 30)]); if (!o) bad('Order not found', 404); if (o.kind !== 'credits') bad('This is not a credits order'); if (o.status !== 'paid') bad('Only paid orders can be refunded'); return PK.refundInfo(o); }));
+  r.post('/packs/orders/:code/refund', h(async (req) => { need(req.user, 'finance', 'support'); const b = req.body || {}; const o = await db.one('SELECT kind, total FROM orders WHERE code=$1', [clean(req.params.code, 30)]); if (!o) bad('Order not found', 404); if (o.kind !== 'credits') bad('This is not a credits order');
+    if (['support', 'risk'].includes(req.user.role)) { const lim = await require('./support').refundLimit(req.user); if (Number(o.total) > lim) bad(`This refund is over your limit of $${lim}. Send it for approval instead.`, 403); }
+    return pay.refund(req.user.id, req.params.code, clean(b.note, 300), { takeBack: b.takeBack === true, confirm: true }); }));
   // Integrations (admin only)
   r.get('/integrations', h(async (req) => { need(req.user); const hooks = await db.all('SELECT * FROM webhook_log ORDER BY id DESC LIMIT 100'); const alerts = await db.one("SELECT v FROM kv WHERE k='settings.alerts'"); return { list: await I.list(), hooks, alerts: alerts ? alerts.v : {}, base: require('./auth').BASE() }; }));
   r.put('/integrations/:id', h(async (req) => { need(req.user); await I.save(req.params.id, req.body, req.user.id); await require('./payments').refreshMode(); await core.audit(req.user.id, 'integration.update', req.params.id, { enabled: req.body.enabled }); return { list: await I.list() }; }));
@@ -401,7 +432,8 @@ function router(h) {
     if (st === 'requested') { const on = await I.on('track1099'); await core.notify(null, +req.params.id, 'Please send your tax form', 'We need a tax form on file before we can send payouts. Open Settings, Tax Form to fill it in.', 'settings?tab=tax'); require('./mail').t('taxform', +req.params.id, { url: require('./auth').BASE() + '/app#settings?tab=tax' }); return { sent: on, emailed: true }; } }));
   r.post('/orders/:code/refund', h(async (req) => { need(req.user, 'finance', 'support');
     if (['support', 'risk'].includes(req.user.role)) { const o = await db.one('SELECT total FROM orders WHERE code=$1', [clean(req.params.code, 30)]); const lim = await require('./support').refundLimit(req.user); if (o && Number(o.total) > lim) bad(`This refund is over your limit of $${lim}. Send it for approval instead.`, 403); }
-    return pay.refund(req.user.id, req.params.code, clean(req.body.note, 300)); }));
+    return pay.refund(req.user.id, req.params.code, clean(req.body.note, 300), { confirm: req.body.confirm === true }); }));
+  r.get('/orders/:code/refund-preview', h(async (req) => { need(req.user, 'finance', 'support'); return pay.refundPreview(req.params.code); }));
   r.get('/tickets/sig', h(async () => { const r = await db.one('SELECT (SELECT count(*)::int FROM tickets) n, (SELECT COALESCE(max(id),0) FROM ticket_msgs) m, (SELECT max(updated_at) FROM tickets) u'); return { sig: `${r.n}.${r.m}.${r.u ? new Date(r.u).getTime() : 0}` }; }));
   r.post('/tickets/:id/reply', h(async (req) => {
     need(req.user, 'support', 'risk', 'finance');
@@ -409,7 +441,7 @@ function router(h) {
     const body = clean(req.body.body, 5000); if (!body) bad('Write a reply first');
     await db.q('INSERT INTO ticket_msgs(ticket_id,author_id,staff,body) VALUES($1,$2,true,$3)', [t.id, req.user.id, body]);
     await db.q('UPDATE tickets SET status=$2, updated_at=now(), assignee=COALESCE(assignee,$3) WHERE id=$1', [t.id, req.body.solve ? 'solved' : 'pending', req.user.id]);
-    await core.notify(null, t.user_id, 'Support replied: ' + t.subject, body.slice(0, 140), 'support?tkt=' + t.id);
+    await core.notify(null, t.user_id, 'Support replied: ' + t.subject, body.length > 140 ? body.slice(0, 139).replace(/\s+\S*$/, '') + '…' : body, 'support?tkt=' + t.id);
     const u = await db.one('SELECT email, first FROM users WHERE id=$1', [t.user_id]);
     await require('./mail').sendT('reply', u.email, { first_name: u.first, ticket: t.id, subject: t.subject, agent: req.user.first, snippet: body.slice(0, 90), message: body, url: `${require('./auth').BASE()}/app#support?tkt=${t.id}` }, { uid: t.user_id });
     if (req.body.solve && t.status !== 'solved') await require('./support').onSolved(t);
@@ -454,7 +486,16 @@ function router(h) {
     return { ok: true, approval: await priceApproval(req.user, cat) };
   });
   r.post('/catalog/approve', approveDraft); r.post('/catalog/changes/:id/approve', approveDraft);
-  r.put('/content/:key', h(async (req) => { need(req.user, 'support'); if (!content.keys.includes(req.params.key)) bad('Unknown content section', 400); await content.set(req.params.key, req.body.value); await core.audit(req.user.id, 'content.update', req.params.key, {}); if (req.params.key === 'competitions') await require('./comps').sync(); }));
+  r.put('/content/:key', h(async (req) => { need(req.user, 'support'); if (!content.keys.includes(req.params.key)) bad('Unknown content section', 400); if (req.params.key === 'competitions') await require('./comps').save(req.body.value, req.user.id); else await content.set(req.params.key, req.body.value); await core.audit(req.user.id, 'content.update', req.params.key, {}); }));
+  // Competitions: the ranking, winners and every status change are worked out here on the server (server/comps.js)
+  { const CP = require('./comps'); const cid = (req) => clean(req.params.id, 30);
+    r.get('/competitions', h(async (req) => { need(req.user, 'support', 'risk'); await CP.sync().catch(() => {}); return CP.forAdmin(); }));
+    r.post('/competitions', h(async (req) => { need(req.user, 'support'); return CP.create(req.body, req.user.id); }));
+    r.post('/competitions/:id/start', h(async (req) => { need(req.user, 'support'); return CP.start(cid(req), req.user.id); }));
+    r.post('/competitions/:id/end', h(async (req) => { need(req.user, 'support'); return CP.end(cid(req), req.user.id); }));
+    r.post('/competitions/:id/disqualify', h(async (req) => { need(req.user, 'support', 'risk'); return CP.disqualify(cid(req), req.body.user, req.body.undo !== true, req.user.id); }));
+    r.post('/competitions/:id/prizes/:pos/send', h(async (req) => { need(req.user, 'support'); return CP.sendPrize(cid(req), req.params.pos, req.user.id); })); }
+
   r.post('/sim/tick', h(async (req) => { need(req.user); return { trades: await sim.tick() }; }));
   r.post('/automations/run', h(async (req) => { need(req.user); return require('./automations').run(); }));
   r.post('/demo/purge', h(async (req) => {
@@ -475,6 +516,8 @@ function router(h) {
   // ---- Users ----
   r.put('/users/:id/details', h(async (req) => { need(req.user, 'support'); const b = req.body; const u = await db.one('SELECT * FROM users WHERE id=$1', [+req.params.id]); if (!u) bad('User not found', 404);
     if (u.role !== 'trader') need(req.user);
+    // Names go into emails and documents as typed, so markup characters are refused here
+    if (/[<>]/.test(String(b.first || '') + String(b.last || ''))) bad('Names cannot contain < or >');
     const email = clean(b.email || u.email, 200).toLowerCase(); if (!require('./util').emailOk(email)) bad('Enter a valid email address'); if (email !== u.email && (await db.one('SELECT 1 FROM users WHERE email=$1', [email]))) bad('Another user has that email');
     // Checked before any second-approval request is queued, so a request that could never be applied is refused now
     // Country from the same list as sign-up; phone checked and stored the way Settings stores it
@@ -485,7 +528,7 @@ function router(h) {
       const w = await secondPerson(req, 'email', String(u.id), { first: b.first, last: b.last, email, phone: b.phone, country: b.country }, `Change the email for ${u.first} ${u.last} (${u.tid}) to ${email}`); if (w) return w; }
     if (email !== u.email) { const mask = (e) => e.replace(/^(.)[^@]*(@.*)$/, '$1***$2'); require('./mail').sendT('emailchg', u.email, { first_name: u.first, old_email: mask(u.email), new_email: mask(email), url: require('./auth').BASE() + '/app#support' }, { uid: u.id, force: true }).catch(() => {}); await db.q('DELETE FROM sessions WHERE user_id=$1', [u.id]); }
     await db.q('UPDATE users SET first=$2,last=$3,email=$4,phone=$5,country=$6 WHERE id=$1', [u.id, clean(b.first || u.first, 60), clean(b.last || u.last, 60), email, phone, crow ? crow[0] : country]);
-    await core.audit(req.user.id, 'user.details', u.tid, { from: { first: u.first, last: u.last, email: u.email } }); }));
+    await core.audit(req.user.id, 'user.details', u.tid, { from: { first: u.first, last: u.last, email: u.email }, to: { first: clean(b.first || u.first, 60), last: clean(b.last || u.last, 60), email } }); }));
   r.post('/users/:id/signout', h(async (req) => { need(req.user, 'support', 'risk'); { const tu = await db.one('SELECT role FROM users WHERE id=$1', [+req.params.id]); if (tu && tu.role !== 'trader' && tu && +req.params.id !== req.user.id) need(req.user); } await db.q('DELETE FROM sessions WHERE user_id=$1', [+req.params.id]); await core.audit(req.user.id, 'user.signout', String(req.params.id), {}); }));
   // End one session (Sign-Ins table); the same people who can sign a user out everywhere can do this
   r.post('/users/:id/sessions/:sid/end', h(async (req) => { need(req.user, 'support', 'risk'); { const tu = await db.one('SELECT role FROM users WHERE id=$1', [+req.params.id]); if (tu && tu.role !== 'trader' && +req.params.id !== req.user.id) need(req.user); } const r0 = await db.one('DELETE FROM sessions WHERE user_id=$1 AND substr(md5(token),1,16)=$2 RETURNING user_id', [+req.params.id, clean(req.params.sid, 20)]); if (!r0) bad('That session already ended', 404); await core.audit(req.user.id, 'user.signout.one', String(req.params.id), {}); }));
@@ -493,13 +536,65 @@ function router(h) {
   r.post('/users/:id/note', h(async (req) => { need(req.user, 'support', 'risk', 'finance'); const body = clean(req.body.body, 2000); if (!body) bad('Write a note first');
     await db.q("INSERT INTO kv(k,v) VALUES($1, jsonb_build_array($2::jsonb)) ON CONFLICT (k) DO UPDATE SET v = kv.v || $2::jsonb", ['note.user.' + (+req.params.id), JSON.stringify({ by: req.user.first + ' ' + req.user.last, at: new Date().toISOString(), body })]); await core.audit(req.user.id, 'user.note', String(+req.params.id), { len: body.length }); }));
   r.post('/users/:id/notify', h(async (req) => { need(req.user, 'support', 'risk', 'finance'); const t = clean(req.body.title, 120); const body = clean(req.body.body, 1000); if (!t) bad('Add a title'); await core.notify(null, +req.params.id, t, body, clean(req.body.link, 60) || 'dashboard'); const uu = await db.one('SELECT email, first FROM users WHERE id=$1', [+req.params.id]); if (uu) await require('./mail').send(uu.email, t, `Hi ${uu.first},\n\n${body}\n\nFunded Sky`, 'notice').catch(() => {}); await core.audit(req.user.id, 'user.notify', String(req.params.id), { t }); }));
+  // ---- Lists that work at any size: search, filter, sort and paging run in SQL over every trader, not over the rows the boards have loaded
+  const likeQ = (q) => '%' + String(q).toLowerCase().replace(/[\\%_]/g, (c) => '\\' + c) + '%';
+  const U_RISK = `LEAST(100, 8 + 4 * (SELECT count(*) FROM accounts a WHERE a.user_id=u.id AND a.phase='breached') + 8 * (SELECT count(*) FROM orders o WHERE o.user_id=u.id AND o.status='refunded')
+    + 25 * (SELECT count(*) FROM kv WHERE k LIKE 'dispute.%' AND v->>'user' = u.id::text) + CASE WHEN u.status <> 'active' THEN 20 ELSE 0 END + CASE WHEN u.kyc_status='submitted' AND COALESCE(u.kyc->>'country','') NOT IN ('', u.country) THEN 20 ELSE 0 END)`;
+  r.get('/users/search', h(async (req) => {
+    const q = clean(req.query.q, 80).trim(); const f = String(req.query.f || 'all'); const lim = Math.max(1, Math.min(200, parseInt(req.query.limit, 10) || 50)); const off = Math.max(0, parseInt(req.query.offset, 10) || 0);
+    const w = ["u.role='trader'"]; const v = [];
+    if (q) { v.push(likeQ(q)); w.push(`(lower(u.first || ' ' || u.last) LIKE $${v.length} OR lower(u.email) LIKE $${v.length} OR lower(u.tid) LIKE $${v.length} OR u.id::text = ${'$' + (v.length + 1)} OR lower(u.country) LIKE $${v.length} OR u.phone LIKE $${v.length} OR EXISTS (SELECT 1 FROM accounts a WHERE a.user_id=u.id AND lower(a.id) LIKE $${v.length}))`); v.push(q.replace(/^#/, '')); }
+    const DEL = "u.email LIKE '%@deleted.fundedsky.invalid'";
+    if (f === 'Active') w.push(`u.status='active' AND NOT ${DEL}`); else if (f === 'Locked') w.push(`u.status='suspended' AND NOT ${DEL}`); else if (f === 'Banned') w.push(`u.status='banned' AND NOT ${DEL}`); else if (f === 'funded') w.push("EXISTS (SELECT 1 FROM accounts a WHERE a.user_id=u.id AND a.kind='funded')"); else if (f === 'kyc') w.push("u.kyc_status IN ('none','submitted')");
+    else if (f === 'kycpending') w.push("u.kyc_status='submitted'");
+    const SORT = { recent: 'COALESCE(u.last_login, u.created_at) DESC', joined: 'u.created_at DESC', spent: "(SELECT COALESCE(sum(total),0) FROM orders o WHERE o.user_id=u.id AND o.status='paid') DESC", paid: "(SELECT COALESCE(sum(amount),0) FROM payouts p WHERE p.user_id=u.id AND p.status='paid') DESC", risk: U_RISK + ' DESC', kycwait: "(u.kyc->>'at') ASC NULLS LAST" };
+    const total = (await db.one(`SELECT count(*)::int n FROM users u WHERE ${w.join(' AND ')}`, v)).n;
+    // An exact ID, trader ID or email match comes first, whatever the sort
+    const exact = q ? `(u.id::text = $2 OR lower(u.tid) = $${v.length + 1}::text OR lower(u.email) = $${v.length + 1}::text) DESC, ` : '';
+    const ids = (await db.all(`SELECT u.id FROM users u WHERE ${w.join(' AND ')} ORDER BY ${exact}${SORT[req.query.sort] || SORT.recent}, u.id DESC LIMIT ${lim} OFFSET ${off}`, q ? v.concat([q.toLowerCase()]) : v)).map((x) => x.id);
+    const rows = ids.length ? await db.all(`SELECT u.id, u.tid, u.email, u.first, u.last, u.country, u.phone, u.status, u.kyc_status, u.kyc, u.created_at, u.last_login,
+      (SELECT count(*) FROM accounts a WHERE a.user_id=u.id)::int n_acc, (SELECT count(*) FROM accounts a WHERE a.user_id=u.id AND a.kind='funded')::int funded,
+      (SELECT COALESCE(sum(total),0) FROM orders o WHERE o.user_id=u.id AND o.status='paid')::float spent, (SELECT COALESCE(sum(amount),0) FROM payouts p WHERE p.user_id=u.id AND p.status='paid')::float paid, (${U_RISK})::int risk
+      FROM users u WHERE u.id = ANY($1::int[])`, [ids]) : [];
+    const by = new Map(rows.map((x) => [x.id, x]));
+    return { total, offset: off, rows: ids.map((id) => by.get(id)).filter(Boolean).map((x) => ({ ...x, kyc: x.kyc && x.kyc.name ? { country: x.kyc.country, dob: x.kyc.dob, at: x.kyc.at } : null })) };
+  }));
+  // Users > Overview numbers, all counted in SQL
+  r.get('/users/stats', h(async () => {
+    const T0 = "(date_trunc('day', now() AT TIME ZONE 'America/New_York') AT TIME ZONE 'America/New_York')"; const TR = "role='trader'";
+    const one = await db.one(`SELECT (SELECT count(*) FROM users WHERE ${TR})::int total, (SELECT count(*) FROM users WHERE ${TR} AND kyc_status='verified')::int verified, (SELECT count(*) FROM users WHERE ${TR} AND kyc_status<>'none')::int "kycStarted",
+      (SELECT count(*) FROM users WHERE ${TR} AND kyc_status='submitted')::int "kycQueue", (SELECT min(kyc->>'at') FROM users WHERE ${TR} AND kyc_status='submitted') "kycOldest", (SELECT count(*) FROM users WHERE ${TR} AND status IN ('suspended','banned'))::int locked,
+      (SELECT count(*) FROM users WHERE ${TR} AND created_at >= ${T0})::int today, (SELECT count(DISTINCT user_id) FROM orders WHERE status='paid')::int buyers, (SELECT count(DISTINCT user_id) FROM accounts WHERE passed_at IS NOT NULL)::int passers,
+      (SELECT count(DISTINCT user_id) FROM payouts WHERE status='paid')::int "paidOut",
+      (SELECT count(*) FROM users WHERE kyc->>'at' > (now() - interval '30 days')::text)::int k30, (SELECT count(*) FROM users WHERE kyc->>'at' > (now() - interval '30 days')::text AND kyc_status='verified')::int "k30ok",
+      (SELECT count(*) FROM users WHERE kyc->>'at' > (now() - interval '30 days')::text AND kyc_status='rejected')::int "k30no", (SELECT count(*) FROM users WHERE kyc->>'at' > (now() - interval '30 days')::text AND kyc_status='submitted')::int "k30wait"`);
+    one.signups = await db.all(`SELECT ((created_at AT TIME ZONE 'America/New_York')::date)::text d, count(*)::int n FROM users WHERE ${TR} AND created_at > now() - interval '15 days' GROUP BY 1 ORDER BY 1`);
+    one.countries = await db.all(`SELECT CASE WHEN country='' THEN '—' ELSE country END c, count(*)::int n FROM users WHERE ${TR} GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 6`);
+    return one;
+  }));
+  // Search Everything: people, accounts, payouts, orders and tickets found in SQL, whatever their age
+  r.get('/find', h(async (req) => {
+    const q = clean(req.query.q, 80).trim(); if (q.length < 2) return { users: [], accounts: [], payouts: [], orders: [], tickets: [] }; const l = likeQ(q); const idq = q.replace(/^#/, '');
+    const [users, accounts, payouts, orders, tickets] = await Promise.all([
+      db.all(`SELECT id, tid, first, last, email, country, role FROM users u WHERE lower(first || ' ' || last) LIKE $1 OR lower(email) LIKE $1 OR lower(tid) LIKE $1 OR id::text = $2 ORDER BY (lower(email) = $3 OR lower(tid) = $3) DESC, COALESCE(last_login, created_at) DESC LIMIT 8`, [l, idq, q.toLowerCase()]),
+      db.all('SELECT a.id, a.user_id "user", u.first, u.last FROM accounts a JOIN users u ON u.id=a.user_id WHERE lower(a.id) LIKE $1 ORDER BY a.created_at DESC LIMIT 6', [l]),
+      db.all('SELECT p.code, p.status, p.user_id "user", u.first, u.last FROM payouts p JOIN users u ON u.id=p.user_id WHERE lower(p.code) LIKE $1 ORDER BY p.requested_at DESC LIMIT 6', [l]),
+      db.all('SELECT o.code, o.status, o.total::float total, o.user_id "user", u.first, u.last FROM orders o JOIN users u ON u.id=o.user_id WHERE lower(o.code) LIKE $1 ORDER BY o.created_at DESC LIMIT 6', [l]),
+      db.all('SELECT t.id, t.subject FROM tickets t WHERE t.id::text = $2 OR lower(t.subject) LIKE $1 ORDER BY t.updated_at DESC LIMIT 6', [l, idq])
+    ]);
+    return { users, accounts, payouts, orders, tickets };
+  }));
   r.get('/users/:id/extra', h(async (req) => { const id = +req.params.id; const u = await db.one('SELECT email FROM users WHERE id=$1', [id]); if (!u) bad('User not found', 404);
     const [notes, sess, trades, mails, pts] = await Promise.all([db.one('SELECT v FROM kv WHERE k=$1', ['note.user.' + id]), db.all('SELECT substr(md5(token),1,16) sid, ua, ip, created_at, seen_at, expires_at FROM sessions WHERE user_id=$1 ORDER BY seen_at DESC LIMIT 40', [id]),
       db.all('SELECT t.account_id, t.ts, t.instrument, t.side, t.qty, t.pnl::float pnl, t.hold_min FROM trades t JOIN accounts a ON a.id=t.account_id WHERE a.user_id=$1 ORDER BY t.ts DESC LIMIT 3000', [id]),
       db.all('SELECT subject, template, status, created_at FROM outbox WHERE to_email=$1 ORDER BY id DESC LIMIT 60', [u.email]), db.all('SELECT label, delta, created_at FROM points_log WHERE user_id=$1 ORDER BY id DESC LIMIT 60', [id])]);
     // One view entry per person and profile every 30 minutes, so real actions are not pushed out of the log
     if (!(await db.one("SELECT 1 FROM audit WHERE actor_id=$1 AND action='user.view' AND target=$2 AND created_at > now() - interval '30 minutes' LIMIT 1", [req.user.id, String(id)]))) await core.audit(req.user.id, 'user.view', String(id), {});
-    return { notes: notes ? notes.v : [], sessions: sess, trades, emails: mails, points: pts }; }));
+    // What staff did on this user, with what changed (profile Staff Views; also real events for the Journey tab)
+    const tid = (await db.one('SELECT tid, verified FROM users WHERE id=$1', [id])) || {};
+    const acts = await db.all(`SELECT a.created_at at, a.action, a.target, a.meta, s.first, s.last FROM audit a LEFT JOIN users s ON s.id=a.actor_id
+      WHERE a.target=$1 OR (a.target=$2 AND (a.action LIKE 'user.%' OR a.action LIKE 'ui.user.%' OR a.action LIKE 'staff.%')) OR (a.target LIKE '%:' || $2 AND a.action LIKE 'approval.%') ORDER BY a.id DESC LIMIT 200`, [tid.tid || '', String(id)]);
+    return { notes: notes ? notes.v : [], sessions: sess, trades, emails: mails, points: pts, verified: !!tid.verified, audit: acts.map((a) => ({ at: a.at, by: a.first ? `${a.first} ${a.last || ''}`.trim() : 'System', action: a.action, target: a.target, meta: a.meta || {} })) }; }));
   // Events only the browser knows about (revealing hidden details, notes on the Risk board). They are stored as ui.<event>, always under the
   // signed-in person, so they can never look like an action the server did.
   const UI_EVENTS = /^(user\.(documents|details)\.view|risk\.[a-z_]{1,54})$/;
@@ -523,13 +618,14 @@ function router(h) {
     const [visits, users, orders, accts, pays, disp, styles, pages, tickets] = await Promise.all([
       db.all(`SELECT (day - '${start}'::date) d, src, camp, country, dev, n FROM visits WHERE day >= '${start}'::date`),
       db.all(`SELECT id, ${D('created_at')} d, country, settings->'src' src, settings->'lsrc' lsrc, email LIKE '%@demo.fundedsky.test' demo, referred_by FROM users WHERE role='trader'`),
-      db.all(`SELECT o.user_id u, ${D('o.created_at')} c, CASE WHEN o.paid_at IS NULL THEN NULL ELSE ${D('o.paid_at')} END p, CASE WHEN o.refunded_at IS NULL THEN NULL ELSE ${D('o.refunded_at')} END rf, o.kind, o.status, o.items, o.lines, o.discount::float disc, o.total::float tot, o.promo, o.pay_method m, o.provider pv, EXTRACT(HOUR FROM o.paid_at AT TIME ZONE 'America/New_York')::int hr, EXTRACT(ISODOW FROM o.paid_at AT TIME ZONE 'America/New_York')::int dw, o.meta->>'refundNote' rn FROM orders o WHERE o.created_at > now() - interval '731 days'`),
+      db.all(`SELECT o.code, o.user_id u, ${D('o.created_at')} c, CASE WHEN o.paid_at IS NULL THEN NULL ELSE ${D('o.paid_at')} END p, CASE WHEN o.refunded_at IS NULL THEN NULL ELSE ${D('o.refunded_at')} END rf, o.kind, o.status, o.items, o.lines, o.discount::float disc, o.total::float tot, o.promo, o.pay_method m, o.provider pv, EXTRACT(HOUR FROM o.paid_at AT TIME ZONE 'America/New_York')::int hr, EXTRACT(ISODOW FROM o.paid_at AT TIME ZONE 'America/New_York')::int dw, o.meta->>'refundNote' rn FROM orders o WHERE o.created_at > now() - interval '731 days'`),
       db.all(`SELECT a.id, a.user_id u, a.plan, a.size, a.platform, a.kind, a.phase, ${D('a.created_at')} c, CASE WHEN a.passed_at IS NULL THEN NULL ELSE ${D('a.passed_at')} END pa, CASE WHEN a.breached_at IS NULL THEN NULL ELSE ${D('a.breached_at')} END br, a.breach_reason why, a.payout_count pc, a.parent_id par FROM accounts a WHERE a.created_at > now() - interval '731 days'`),
       db.all(`SELECT user_id u, ${D('paid_at')} d, amount::float a, account_id ac FROM payouts WHERE status='paid' AND paid_at > now() - interval '731 days'`),
       db.all("SELECT v FROM kv WHERE k LIKE 'dispute.%'"),
       db.all("SELECT account_id ac, count(*)::int n, avg(hold_min)::float hold, avg(CASE WHEN tag ILIKE '%news%' THEN 1 ELSE 0 END)::float news FROM trades WHERE ts > now() - interval '180 days' GROUP BY account_id"),
       db.all(`SELECT (day - '${start}'::date) d, path, n FROM pageviews WHERE day >= '${start}'::date`),
       db.all("SELECT u.id, a.platform FROM tickets t JOIN users u ON u.id=t.user_id LEFT JOIN LATERAL (SELECT platform FROM accounts WHERE user_id=u.id ORDER BY created_at DESC LIMIT 1) a ON true WHERE t.created_at > now() - interval '90 days'")]);
+    { const ab = await require('./affiliates').board().catch(() => ({ ord: {} })); orders.forEach((o) => { const x = ab.ord[o.code]; if (x) { o.af = x.aff; o.com = x.com; } delete o.code; }); }
     const v = { at: new Date().toISOString(), start, visits, users, orders, accts, pays, disputes: disp.map((x) => x.v).filter((x) => x && x.opened).map((x) => ({ d: Math.floor((new Date(x.opened) - new Date(start + 'T05:00:00Z')) / 864e5), a: Number(x.amount) || 0, st: x.status })), styles, pages, tickets };
     anCache = { t: Date.now(), v }; return v; }));
   // Reports go to staff addresses only; admins can also send them outside the team. Every send is in the audit log.
@@ -556,7 +652,7 @@ function router(h) {
     const doms = l.data || []; const want = (((c && c.from) || '').match(/@([^>\s]+)/) || [])[1]; const d0 = doms.find((d) => d.name === want) || doms[0];
     const det = d0 ? await fetch('https://api.resend.com/domains/' + d0.id, { headers: H }).then((r2) => r2.json()).catch(() => null) : null;
     return { connected: true, from: (c && c.from) || '', domains: doms.map((d) => ({ name: d.name, status: d.status, created: d.created_at, region: d.region })), domain: det && { name: det.name, status: det.status, created: det.created_at, region: det.region, records: (det.records || []).map((x) => ({ rec: x.record, type: x.type, name: x.name, value: x.value, status: x.status })) } }; }));
-  r.post('/tickets/:id/category', h(async (req) => { const t = await ticketOf(req); const cat = clean(req.body.category, 60) || 'General'; await db.q('UPDATE tickets SET category=$2, updated_at=now() WHERE id=$1', [t.id, cat]); await core.audit(req.user.id, 'ticket.category', String(t.id), { category: cat }); }));
+  r.post('/tickets/:id/category', h(async (req) => { const t = await ticketOf(req); const cat = await require('./support').topic(req.body.category); if (!cat) bad('Pick a topic from the list'); await db.q('UPDATE tickets SET category=$2, updated_at=now() WHERE id=$1', [t.id, cat]); await core.audit(req.user.id, 'ticket.category', String(t.id), { category: cat }); }));
   r.post('/tickets/:id/note', h(async (req) => { const t = await ticketOf(req); const body = clean(req.body.body, 5000); if (!body) bad('Write a note first'); await db.q('INSERT INTO ticket_msgs(ticket_id,author_id,staff,internal,body) VALUES($1,$2,true,true,$3)', [t.id, req.user.id, body]); await core.audit(req.user.id, 'ticket.note', String(t.id), {}); }));
   r.post('/tickets/:id/priority', h(async (req) => { const t = await ticketOf(req); const pr = ['low', 'normal', 'high', 'urgent'].includes(req.body.priority) ? req.body.priority : 'normal'; await db.q('UPDATE tickets SET priority=$2 WHERE id=$1', [t.id, pr]); await core.audit(req.user.id, 'ticket.priority', String(t.id), { priority: pr }); }));
   // Breach reviews: one person proposes, a different person confirms; the trader hears the outcome
@@ -589,9 +685,22 @@ function router(h) {
   const KV = ['announcements', 'macros', 'blocklist', 'countries', 'incidents', 'affiliates', 'docs', 'complaints'];
   // Announcements: check dates, link, audience and type before the list is saved
   r.put('/list/announcements', async (req, res, next) => { try { req.body.value = require('./announce').validate((req.body || {}).value || [], ((await db.one("SELECT v FROM kv WHERE k='list.announcements'")) || {}).v || []); next(); } catch (e) { res.status(e.status || 500).json({ error: e.status ? e.message : 'Something went wrong on our side. Try again.' }); } });
-  r.put('/list/:key', h(async (req) => { if (!KV.includes(req.params.key)) bad('Unknown list'); need(req.user, ...(LIST_ROLES[req.params.key] || [])); const prevList = req.params.key === 'affiliates' ? ((await db.one("SELECT v FROM kv WHERE k='list.affiliates'")) || {}).v || [] : null; await db.q('INSERT INTO kv(k,v) VALUES($1,$2) ON CONFLICT (k) DO UPDATE SET v=$2, updated_at=now()', ['list.' + req.params.key, JSON.stringify(req.body.value || [])]); await core.audit(req.user.id, 'list.' + req.params.key, '', {});
-    if (prevList) for (const x of req.body.value || []) { if (!x || !x.user || x.status !== 'active' || prevList.some((y) => y.user === x.user && y.status === 'active')) continue; const sm = await require('./affiliates').summary(+x.user).catch(() => null);
-      require('./mail').t('affok', +x.user, { aff_code: String(x.code || (sm && sm.code) || '').toUpperCase(), discount: sm ? sm.disc + '%' : '', commission: sm ? sm.rate + '%' : '', url: require('./auth').BASE() + '/app#affiliates' }); } }));
+  r.put('/list/:key', h(async (req) => { if (!KV.includes(req.params.key)) bad('Unknown list'); need(req.user, ...(LIST_ROLES[req.params.key] || [])); if (req.params.key === 'affiliates') { await require('./affiliates').saveList(req.body.value, core); await core.audit(req.user.id, 'list.affiliates', '', {}); return; } await db.q('INSERT INTO kv(k,v) VALUES($1,$2) ON CONFLICT (k) DO UPDATE SET v=$2, updated_at=now()', ['list.' + req.params.key, JSON.stringify(req.body.value || [])]); await core.audit(req.user.id, 'list.' + req.params.key, '', {});
+  }));
+  // Affiliates board actions. Each one changes a single affiliate on the list as it is now, so a page left open cannot undo someone else's change.
+  r.post('/affiliates/act', h(async (req) => { need(req.user, ...(LIST_ROLES.affiliates || [])); const A = require('./affiliates'); const b = req.body || {}; const uid = +b.user; const op = String(b.op || '');
+    const cur = ((await db.one("SELECT v FROM kv WHERE k='list.affiliates'")) || {}).v || []; const mine = cur.find((x) => x && x.user === uid); const rest = cur.filter((x) => x && x.user !== uid);
+    if (!uid) bad('Pick a trader'); let next;
+    if (op === 'add') { if (mine && mine.status !== 'declined') bad('This trader is already an affiliate'); next = rest.concat([{ user: uid, code: A.up(b.code), status: 'active', tier: clean(b.tier, 40) || 'Bronze', since: new Date().toISOString(), where: clean(b.where, 200) }]); }
+    else if (op === 'decline') { if (mine && mine.status !== 'declined') bad('This trader is already an affiliate. Pause them instead.'); if (mine) bad('This application was already declined'); next = rest.concat([{ user: uid, status: 'declined', reason: clean(b.reason, 300) }]); }
+    else if (op === 'patch') { if (!mine || mine.status === 'declined') bad('Affiliate not found', 404); const p = {}; if (b.status) p.status = b.status === 'paused' ? 'paused' : 'active'; if (b.tier) p.tier = clean(b.tier, 40); if (b.code != null) p.code = A.up(b.code); next = cur.map((x) => (x && x.user === uid ? Object.assign({}, x, p) : x)); }
+    else bad('Unknown action');
+    await A.saveList(next, core); await core.audit(req.user.id, 'affiliate.' + op, String(uid), { code: b.code ? A.up(b.code) : undefined, status: b.status, tier: b.tier, reason: op === 'decline' ? clean(b.reason, 300) : undefined }); return { ok: true }; }));
+  // A code nobody else uses, for the approve and invite forms
+  r.get('/affiliates/code', h(async (req) => { const A = require('./affiliates'); const uid = +req.query.user || 0; const code = A.up(req.query.code); const who = await A.codeTaken(code, uid); return { code, taken: who || '', free: who ? await A.freeCode(code, uid) : code }; }));
+  // Pay All Due: the amounts are worked out and checked on the server. Affiliates with no payout method, a missing tax form or less than the minimum are skipped and listed.
+  let PAYING = false;
+  r.post('/affiliates/pay-all', h(async (req) => { need(req.user, 'finance'); if (PAYING) bad('A payout run is already going. Try again in a moment.'); PAYING = true; try { return await require('./affiliates').payAll(req.user, core, !!(req.body && req.body.dry)); } finally { PAYING = false; } }));
   // ---- Disputes ----
   r.post('/disputes', h(async (req) => { need(req.user, 'finance', 'support'); const o = await db.one('SELECT * FROM orders WHERE code=$1', [clean(req.body.order, 30)]); if (!o) bad('Order not found'); const id = 'CB-' + Date.now().toString(36).toUpperCase();
     if (o.meta && o.meta.dispute) { const prev = await db.one('SELECT v FROM kv WHERE k=$1', ['dispute.' + o.meta.dispute]); if (prev && prev.v.status !== 'won') bad(`Order ${o.code} already has dispute ${o.meta.dispute}${['lost', 'accepted'].includes(prev.v.status) ? ', which was lost' : ''}. Update that one instead.`); }
@@ -622,7 +731,9 @@ function router(h) {
           const closed = (await db.all("UPDATE accounts SET phase='closed', closed_at=now(), breach_reason='Chargeback' WHERE id = ANY($1) AND phase IN ('active','passed','review') RETURNING id", [all])).map((x) => x.id);
           for (const p of await db.all('SELECT code FROM payouts WHERE account_id = ANY($1) AND status = ANY($2)', [all, core.OPEN_PAY])) await core.reviewPayout(req.user.id, p.code, 'deny', `Not paid: the payment for order ${o.code} was charged back`).catch(() => {});
           if (closed.length) await core.notify(null, o.user_id, closed.length > 1 ? 'Accounts closed after a chargeback' : 'Account closed after a chargeback', `The payment for order ${o.code} was charged back, so ${closed.join(', ')} ${closed.length > 1 ? 'are' : 'is'} closed. Contact support if you think this is a mistake.`, 'accounts');
-          const earned = Math.floor(Number(o.total)); if (earned > 0 && o.status === 'paid') await core.points(null, o.user_id, -earned, 'Chargeback ' + o.code);
+          // a charged-back credits order: the credits come out, and packs opened with them are undone where every card is still unused
+          if (o.kind === 'credits' && o.status === 'paid') await PK.onRefund(o, { external: true, chargeback: true }).catch((e) => console.error('packs chargeback', e));
+          const earned = o.kind === 'credits' ? 0 : Math.floor(Number(o.total)); if (earned > 0 && o.status === 'paid') { const u0 = await db.one('SELECT points FROM users WHERE id=$1', [o.user_id]); const take = Math.min(earned, Math.max(0, u0 ? u0.points : 0)); if (take > 0) await core.points(null, o.user_id, -take, 'Chargeback ' + o.code, 'chargeback'); }
         } else if ((v.paused || []).length) await core.notify(null, o.user_id, 'Your accounts are open again', `The dispute on order ${o.code} is closed. Trading and payouts are back on.`, 'accounts'); } }
     await db.q('UPDATE kv SET v=$2, updated_at=now() WHERE k=$1', [k, JSON.stringify(v)]); await core.audit(req.user.id, 'dispute.update', v.id, { status: v.status }); }));
   // ---- Health and fraud data ----
@@ -630,9 +741,24 @@ function router(h) {
     const RS = global.FS_REQSTAT || { hours: {}, routes: {} }; const all = [].concat(...Object.values(RS.hours).map((x) => x.ms)).sort((a, c) => a - c); const tot = Object.values(RS.hours).reduce((s2, x) => s2 + x.n, 0); const fail = Object.values(RS.hours).reduce((s2, x) => s2 + x.fail, 0);
     const hd = ((await db.one("SELECT v FROM kv WHERE k='store.health.days'")) || {}).v || {};
     return { errors, jobs, hooks, db: db1, uptime: process.uptime(), memory: process.memoryUsage().rss, node: process.version, market: require('./sim').marketOpen(), p95: all.length ? all[Math.floor(all.length * 0.95)] : 0, failPct: tot ? fail / tot * 100 : 0, reqs: tot, hours: Object.fromEntries(Object.entries(RS.hours).map(([k, v]) => [k, { n: v.n, fail: v.fail, p50: v.ms.slice().sort((a, c) => a - c)[Math.floor(v.ms.length / 2)] || 0 }])), routes: RS.routes, days: hd }; }));
-  r.get('/rewards', h(async () => { const [points, coupons] = await Promise.all([db.all('SELECT p.*, u.first, u.last FROM points_log p JOIN users u ON u.id=p.user_id ORDER BY p.id DESC LIMIT 500'), db.all('SELECT c.*, u.first, u.last FROM coupons c LEFT JOIN users u ON u.id=c.user_id ORDER BY c.created_at DESC LIMIT 500')]); return { points, coupons }; }));
-  r.post('/coupons', h(async (req) => { need(req.user, 'support'); const b = req.body; const kind = ['discount', 'free_reset', 'free_eval'].includes(b.kind) ? b.kind : 'discount'; const pctv = Math.min(100, Math.max(0, Number(b.pct) || 0)); const code = (clean(b.code, 24) || ('FS-' + Math.random().toString(36).slice(2, 8))).toUpperCase(); const uid = b.user ? +b.user : null;
-    await db.q('INSERT INTO coupons(code,user_id,pct,label,kind) VALUES($1,$2,$3,$4,$5)', [code, uid, pctv, clean(b.label, 80) || 'Issued by staff', kind]); if (uid) await core.notify(null, uid, 'You have a new reward', clean(b.label, 80) || 'A coupon was added to your account.', 'rewards'); await core.audit(req.user.id, 'coupon.issue', code, b); return { code }; }));
+  // Rewards board numbers come from the whole ledger. A redemption is a ledger line of kind 'redeem' (ref: reward id | code, ticket or account).
+  r.get('/rewards', h(async () => {
+    const [red, byRw, month, refs, cv] = await Promise.all([
+      db.all("SELECT p.id, p.user_id, p.label, p.delta, p.ref, p.created_at, u.first, u.last, c.used, c.order_id, o.code AS order_code, o.status AS order_status FROM points_log p JOIN users u ON u.id=p.user_id LEFT JOIN coupons c ON c.code = split_part(p.ref, '|', 2) LEFT JOIN orders o ON o.id=c.order_id WHERE p.kind='redeem' ORDER BY p.id DESC LIMIT 500"),
+      db.all("SELECT split_part(ref, '|', 1) AS rid, label, count(*)::int n FROM points_log WHERE kind='redeem' GROUP BY 1, 2"),
+      db.one("SELECT count(*)::int n FROM points_log WHERE kind='redeem' AND (created_at AT TIME ZONE 'America/New_York') >= date_trunc('month', now() AT TIME ZONE 'America/New_York')"),
+      db.all("SELECT user_id, COALESCE(sum(delta),0)::int n FROM points_log WHERE label LIKE 'Friend%' GROUP BY user_id"),
+      db.one("SELECT v FROM kv WHERE k='certviews'")]);
+    return { redemptions: red.map((x) => { const what = String(x.ref || '').split('|')[1] || ''; return { when: x.created_at, user: x.user_id, name: `${x.first} ${(x.last || '').charAt(0)}.`, reward: x.label.replace(/^Redeemed:?\s*/i, ''), cost: -x.delta, what,
+      status: what.startsWith('ticket:') ? 'Support Ticket #' + what.slice(7) : what.startsWith('acct:') ? 'On ' + what.slice(5) : x.used ? 'Used' + (x.order_code ? ' on ' + x.order_code : '') : x.used === false ? (x.order_code && x.order_status === 'pending' ? 'Held for ' + x.order_code : 'Code Not Used Yet') : 'Done' }; }),
+      counts: byRw, month: month.n, refEarned: Object.fromEntries(refs.map((x) => [x.user_id, x.n])), views: (cv && cv.v) || {}, refSet: await core.referralSettings(), types: require('./content').RW_TYPES, life: require('./trader').LIFE };
+  }));
+  // A code issued by staff always belongs to one trader (only its owner can use it) and must be new
+  r.post('/coupons', h(async (req) => { need(req.user, 'support'); const b = req.body; const kind = ['discount', 'free_reset', 'free_eval'].includes(b.kind) ? b.kind : 'discount'; const pctv = Math.min(100, Math.max(0, Number(b.pct) || 0)); const code = (clean(b.code, 24) || ('FS-' + require('crypto').randomBytes(4).toString('hex'))).toUpperCase(); const uid = b.user ? +b.user : null;
+    if (!uid || !(await db.one('SELECT 1 FROM users WHERE id=$1', [uid]))) bad('Pick the trader this code is for'); if (!/^[A-Z0-9-]{4,24}$/.test(code)) bad('Use 4 to 24 letters, numbers and dashes for the code'); if (kind === 'discount' && !(pctv >= 1)) bad('Set the discount from 1 to 100 percent');
+    if (await db.one('SELECT 1 FROM coupons WHERE code=$1', [code])) bad('That code already exists. Pick another one.');
+    const lab = clean(b.label, 80) || 'Issued by staff'; const size = kind === 'free_eval' ? ((Number.isInteger(+b.size) && +b.size >= 5000 && +b.size <= 1000000 ? +b.size : 0) || (Number((lab.match(/\$(\d+)K/i) || [])[1]) * 1000) || 25000) : null;
+    await db.q("INSERT INTO coupons(code,user_id,pct,label,kind,source,size) VALUES($1,$2,$3,$4,$5,'staff',$6)", [code, uid, kind === 'discount' ? pctv : 0, lab, kind, size]); await core.notify(null, uid, 'You have a new reward', lab === 'Issued by staff' ? 'A code was added to your account.' : lab, 'rewards'); await core.audit(req.user.id, 'coupon.issue', code, b); return { code }; }));
   r.post('/staff/:id/role', h(async (req) => { need(req.user); const role = req.body.role; if (!['trader', 'admin', 'support', 'risk', 'finance'].includes(role)) bad('Unknown role'); if (+req.params.id === req.user.id) bad('You cannot change your own role'); await db.q('UPDATE users SET role=$2 WHERE id=$1', [+req.params.id, role]); if (role === 'trader') await db.q('DELETE FROM sessions WHERE user_id=$1', [+req.params.id]); await core.audit(req.user.id, 'staff.role', String(req.params.id), { role }); }));
   r.post('/approvals/:key/:act', h(async (req) => { const all = await pendingAll(); const key = decodeURIComponent(req.params.key); const p = all[key]; if (!p) bad('This request was already handled', 404);
     if (req.params.act === 'reject') { if (p.by !== req.user.id) need(req.user); delete all[key]; await pendingSave(all); await core.audit(req.user.id, 'approval.reject', key, { desc: p.desc, first: p.byName }); return { ok: true }; }
@@ -647,7 +773,16 @@ function router(h) {
     if (p.kind === 'adjust') return run(`/accounts/${encodeURIComponent(p.target)}/adjust`);
     bad('Unknown request'); }));
   r.post('/staff/:id/mfa-reset', h(async (req) => { need(req.user); const id = +req.params.id; if (id === req.user.id) bad('Ask another admin to reset your own two-step login'); const u = await db.one('SELECT id, role FROM users WHERE id=$1', [id]); if (!u || u.role === 'trader') bad('Staff member not found', 404); await require('./mfa').reset(id); await core.audit(req.user.id, 'staff.mfa_reset', String(id), {}); }));
-  r.post('/staff/invite', h(async (req) => { need(req.user); const email = clean(req.body.email, 120).toLowerCase(); const role = req.body.role; if (!['admin', 'support', 'risk', 'finance'].includes(role)) bad('Unknown role'); const u = await db.one('SELECT id FROM users WHERE lower(email)=$1', [email]); if (!u) bad('That person needs to sign up first, then you can give them a role'); await db.q('UPDATE users SET role=$2 WHERE id=$1', [u.id, role]); await core.audit(req.user.id, 'staff.role', email, { role }); }));
+  r.post('/staff/invite', h(async (req) => { need(req.user); const email = clean(req.body.email, 120).toLowerCase(); const role = req.body.role; if (!['admin', 'support', 'risk', 'finance'].includes(role)) bad('Unknown role'); if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) bad('Enter an email address');
+    // The role is only given to an account whose email is confirmed. Anyone else (no account yet, or signed up but not confirmed) gets a
+    // waiting invitation, and the role is given when that email is confirmed, the same as a new sign-up.
+    const u = await db.one('SELECT id, first, last, verified, role FROM users WHERE lower(email)=$1', [email]);
+    if (u && u.id === req.user.id) bad('You cannot change your own role');
+    if (u && u.verified) { await db.q('UPDATE users SET role=$2 WHERE id=$1', [u.id, role]); if (u.role !== role) await db.q('DELETE FROM sessions WHERE user_id=$1', [u.id]); await core.audit(req.user.id, 'staff.role', email, { role }); return { ok: true, granted: true, name: `${u.first} ${u.last || ''}`.trim() }; }
+    const invs = (((await db.one("SELECT v FROM kv WHERE k='store.team.invites'")) || {}).v || []).filter((x) => String(x.email).toLowerCase() !== email);
+    invs.push({ email, role, by: req.user.id, byName: `${req.user.first} ${req.user.last || ''}`.trim(), at: new Date().toISOString(), waiting: u ? 'verify' : 'signup' });
+    await db.q("INSERT INTO kv(k,v) VALUES('store.team.invites',$1) ON CONFLICT (k) DO UPDATE SET v=$1, updated_at=now()", [JSON.stringify(invs)]); await core.audit(req.user.id, 'staff.invite', email, { role, waiting: u ? 'verify' : 'signup' });
+    return { ok: true, granted: false, waiting: u ? 'verify' : 'signup' }; }));
   // Fraud signals: each shared thing is keyed by a full SHA-256 of its value, so two different values never land on the same key
   r.get('/fraud', h(async (req) => { need(req.user, 'risk'); const [sess, methods, kyc] = await Promise.all([db.all('SELECT user_id, ip, ua, created_at FROM sessions'), db.all('SELECT user_id, label FROM payout_methods'), db.all("SELECT id, kyc FROM users WHERE kyc ? 'name'")]);
     const sha = (v) => require('crypto').createHash('sha256').update(String(v)).digest('hex');
@@ -665,9 +800,10 @@ function router(h) {
     const Q = {
       orders: { cols: ['code', 'paid_at', 'refunded_at', 'created_at', 'email', 'kind', 'subtotal', 'discount', 'total', 'promo', 'status', 'provider', 'pay_method'], sql: `SELECT o.code, ${ET('o.paid_at')}, ${ET('o.refunded_at')}, ${ET('o.created_at')}, u.email, o.kind, o.subtotal, o.discount, o.total, o.promo, o.status, o.provider, o.pay_method FROM orders o JOIN users u ON u.id=o.user_id WHERE o.status IN ('paid','refunded') AND o.paid_at IS NOT NULL${mo ? ` AND (${inMonth('o.paid_at')} OR (o.refunded_at IS NOT NULL AND ${inMonth('o.refunded_at')}))` : ''} ORDER BY o.paid_at, o.id` },
       payouts: { cols: ['code', 'paid_at', 'requested_at', 'approved_at', 'email', 'country', 'account_id', 'number', 'gross', 'split', 'amount', 'method', 'rail', 'status', 'batch', 'tx_hash'], sql: `SELECT p.code, ${ET('p.paid_at')}, ${ET('p.requested_at')}, ${ET('p.approved_at')}, u.email, u.country, p.account_id, p.number, p.gross, p.split, p.amount, p.method, p.rail, p.status, p.batch, p.tx_hash FROM payouts p JOIN users u ON u.id=p.user_id${mo ? ` WHERE p.status='paid' AND ${inMonth('p.paid_at')}` : ''} ORDER BY COALESCE(p.paid_at, p.requested_at), p.id` },
+      commission: { cols: ['id', 'paid_at', 'email', 'code', 'amount', 'method', 'ref', 'paid_by'], rows: async () => { const ps = ((await db.one("SELECT v FROM kv WHERE k='store.affiliate.payments'")) || {}).v || []; const em = new Map((await db.all('SELECT id, email FROM users WHERE id = ANY($1)', [ps.map((p) => +p.user || 0)])).map((u) => [u.id, u.email])); const et = (d) => new Date(d).toLocaleString('sv-SE', { timeZone: 'America/New_York' }); return ps.filter((p) => !mo || et(p.at).slice(0, 7) === mo).map((p, i) => ({ id: p.id || 'AC-' + (i + 1), paid_at: et(p.at), email: em.get(+p.user) || '', code: p.code || '', amount: Number(p.amount).toFixed(2), method: p.method || '', ref: p.ref || '', paid_by: p.by || '' })); } },
       users: { cols: ['tid', 'created_at', 'email', 'first', 'last', 'country', 'role', 'status', 'kyc_status', 'tax_status', 'points'], sql: `SELECT tid, ${ET('created_at')}, email, first, last, country, role, status, kyc_status, tax_status, points FROM users${mo ? ` WHERE ${inMonth('created_at')}` : ''} ORDER BY id` },
       accounts: { cols: ['id', 'created_at', 'user_id', 'plan', 'size', 'kind', 'phase', 'start_bal', 'balance', 'floor', 'days_traded', 'payout_count', 'paid_total', 'passed_at', 'breached_at', 'breach_reason'], sql: `SELECT id, ${ET('created_at')}, user_id, plan, size, kind, phase, start_bal, balance, floor, days_traded, payout_count, paid_total, ${ET('passed_at')}, ${ET('breached_at')}, breach_reason FROM accounts${mo ? ` WHERE ${inMonth('created_at')}` : ''} ORDER BY created_at` } };
-    if (!Q[w]) return res.status(404).end(); const rows = await db.all(Q[w].sql, mo ? [mo] : []);
+    if (!Q[w]) return res.status(404).end(); const rows = Q[w].rows ? await Q[w].rows() : await db.all(Q[w].sql, mo ? [mo] : []);
     const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
     res.setHeader('Content-Type', 'text/csv; charset=utf-8'); res.setHeader('Content-Disposition', `attachment; filename="fundedsky-${w}-${mo || today}.csv"`); res.send(csv(Q[w].cols, rows)); } catch (e) { console.error('export', e.message); res.status(500).send('error'); } });
   return r;

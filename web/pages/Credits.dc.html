@@ -55,6 +55,7 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 .fs-amtbtn:hover{border-color:#7CC4FF}
 .fs-amtbtn:focus-visible{outline:2px solid #7CC4FF;outline-offset:2px}
 .fs-amtbtn[disabled]{opacity:.35;cursor:not-allowed}
+@media (max-width:760px){.fs-amtrow{grid-template-columns:minmax(0,1fr)!important}}
 </style>
 </helmet>
 <div style="min-height: 1060px; background: #08080A; color: #F4F2F1; font-family: 'Mona Sans', system-ui, sans-serif;">
@@ -99,11 +100,11 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 </div>
 <sc-if value="{{ custom }}" hint-placeholder-val="{{ false }}">
 <div style="background: #111113; border: 1px solid #26262A; border-radius: 8px; padding: 18px; display: flex; flex-direction: column; gap: 14px;">
-<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: end;">
-<div style="display: flex; flex-direction: column; gap: 6px; min-width: 0;"><label for="amt" style="font-size: 13px; color: #9C9693;">Amount (USD)</label><div class="fs-amt"><span aria-hidden="true" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #9C9693; font-family: 'Geist Mono', monospace; font-size: 15px; pointer-events: none;">$</span><input id="amt" class="fs-in" type="number" min="{{ cMin }}" max="{{ cMax }}" step="5" inputmode="numeric" value="{{ customAmt }}" onChange="{{ setCustom }}" style="height: 48px; width: 100%; min-width: 0; box-sizing: border-box; background: #08080A; border-radius: 4px; padding: 0 96px 0 28px; color: #F4F2F1; font-family: 'Geist Mono', monospace; font-size: 15px;"><span style="position: absolute; right: 6px; top: 6px; bottom: 6px; display: flex; gap: 4px;"><button type="button" class="fs-amtbtn" onClick="{{ amtDown }}" aria-label="$5 less" disabled="{{ amtMin }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"></path></svg></button><button type="button" class="fs-amtbtn" onClick="{{ amtUp }}" aria-label="$5 more" disabled="{{ amtMax }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button></span></div></div>
+<div class="fs-amtrow" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: end;">
+<div style="display: flex; flex-direction: column; gap: 6px; min-width: 0;"><label for="amt" style="font-size: 13px; color: #9C9693;">Amount (USD)</label><div class="fs-amt"><span aria-hidden="true" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #9C9693; font-family: 'Geist Mono', monospace; font-size: 15px; pointer-events: none;">$</span><input id="amt" class="fs-in" type="number" min="{{ cMin }}" max="{{ cMax }}" step="any" inputmode="decimal" aria-invalid="{{ customBad }}" value="{{ customAmt }}" onChange="{{ setCustom }}" style="height: 48px; width: 100%; min-width: 0; box-sizing: border-box; background: #08080A; border-radius: 4px; padding: 0 96px 0 28px; color: #F4F2F1; font-family: 'Geist Mono', monospace; font-size: 15px;"><span style="position: absolute; right: 6px; top: 6px; bottom: 6px; display: flex; gap: 4px;"><button type="button" class="fs-amtbtn" onClick="{{ amtDown }}" aria-label="$5 less" disabled="{{ amtMin }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"></path></svg></button><button type="button" class="fs-amtbtn" onClick="{{ amtUp }}" aria-label="$5 more" disabled="{{ amtMax }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button></span></div></div>
 <div style="display: flex; flex-direction: column; gap: 2px; min-width: 0; padding-bottom: 4px;"><span style="font-size: 13px; color: #9C9693;">You Get</span><span style="font-family: 'Geist Mono', monospace; font-size: 18px; line-height: 26px;">{{ customCredits }} credits</span></div>
 </div>
-<p style="margin: 0; font-size: 12.5px; color: #9C9693;">{{ customNote }}</p>
+<sc-if value="{{ customErr }}"><p role="alert" style="margin: 0; font-size: 13px; line-height: 18px; color: #F2777F;">{{ customErr }}</p></sc-if><p style="margin: 0; font-size: 12.5px; color: #9C9693;">{{ customNote }}</p>
 </div>
 </sc-if>
 </fieldset>
@@ -161,6 +162,7 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 <sc-if value="{{ notAgreed }}" hint-placeholder-val="{{ false }}"><button type="button" disabled style="height: 48px; padding: 0 28px; background: #26262A; color: #9C9693; border: 0; border-radius: 4px; font: inherit; font-size: 15px; font-weight: 600; font-stretch: 112%;">Pay</button></sc-if>
 </div>
 <sc-if value="{{ notAgreed }}" hint-placeholder-val="{{ false }}"><p style="margin: 0; font-size: 12px; line-height: 16px; color: #9C9693;">Agree to the rules and terms to pay.</p></sc-if>
+<sc-if value="{{ err }}"><p role="alert" style="margin: 0; font-size: 13px; line-height: 18px; color: #F2777F;">{{ err }}</p></sc-if>
 </div>
 </div>
 </x-dc>
@@ -177,19 +179,34 @@ class Component extends DCLogic {
     try {
       const [cat, pk] = await Promise.all([FSX.loadCatalog(), DC.api('/api/packs').catch(() => null)]);
       if (!cat.credits) { location.replace('/app'); return; }
-      const n = cat.credits.bundles.length; this.setState({ me, cat, cr: cat.credits, bal: pk ? pk.bal : 0, b: Math.min(Math.max(0, this.state.b), Math.max(0, n - 1)), custom: this.state.custom || !n });
+      // back from the thank-you page: an order that is already paid goes to its confirmation, not to a fresh form
+      const oc = DC.qs('order'); if (oc) { const o = await DC.api('/api/orders/' + encodeURIComponent(oc)).catch(() => null); if (o && o.status === 'paid') { location.replace('/checkout/confirmed?order=' + encodeURIComponent(oc)); return; } history.replaceState(null, '', '/checkout/credits'); }
+      const n = cat.credits.bundles.length; this.setState({ me, cat, cr: cat.credits, bal: pk ? pk.bal : 0, capLeft: pk && pk.capLeft != null ? pk.capLeft : null, customMax: pk && pk.capLeft != null && pk.customMax != null ? pk.customMax : null, dailyCap: pk ? pk.dailyCap : 0, b: Math.min(Math.max(0, this.state.b), Math.max(0, n - 1)), custom: this.state.custom || !n });
     } catch (e) { this.setState({ me, err: e.message }); }
     if (DC.qs('canceled')) this.setState({ err: 'Payment was canceled. You can try again.' });
   }
+  // What is being bought. Nothing is changed quietly: an amount that cannot be bought comes back with `bad`, the reason shown under the field.
   pick() { const st = this.state; const C = st.cr || { bundles: [], perDollar: 100, custom: { min: 10, max: 2000 }, cryptoBonus: 0 };
-    if (st.custom) { const usd = Math.round(Math.max(C.custom.min, Math.min(C.custom.max, Number(st.amt) || 0)) * 100) / 100; const tb = C.bundles.filter((x) => x.usd <= usd).sort((a, b) => b.usd - a.usd)[0]; const bonus = tb ? tb.bonus : 0; return { usd, bonus, base: Math.round(usd * C.perDollar), cr: Math.round(usd * C.perDollar * (1 + bonus / 100)) }; }
-    const b = C.bundles[st.b] || C.bundles[0] || { usd: 0, cr: 0, bonus: 0 }; return { usd: b.usd, bonus: b.bonus, base: Math.round(b.usd * C.perDollar), cr: b.cr }; }
+    const fmt = (n) => Math.round(n).toLocaleString('en-US'); const left = st.capLeft; const cap = st.dailyCap;
+    const credits = (usd) => { const tb = C.bundles.filter((x) => x.usd <= usd).sort((a, b) => b.usd - a.usd)[0]; const bonus = tb ? tb.bonus : 0; return { bonus, cr: Math.round(usd * C.perDollar * (1 + bonus / 100)) }; };
+    // the largest whole-dollar custom amount the daily limit still allows
+    let cmax = Math.floor(C.custom.max); if (left != null) { if (st.customMax != null) cmax = Math.min(cmax, st.customMax); else { while (cmax >= C.custom.min && credits(cmax).cr > left) cmax--; } if (cmax < C.custom.min) cmax = 0; }
+    const over = left != null && left <= 0 ? `You have reached today's limit of ${fmt(cap)} credits. Come back tomorrow.` : '';
+    if (st.custom) { const raw = String(st.amt == null ? '' : st.amt).trim(); const v = Number(raw); let bad = '';
+      if (raw === '' || !Number.isFinite(v)) bad = 'Enter an amount in dollars.';
+      else if (Math.abs(v * 100 - Math.round(v * 100)) > 1e-6) bad = 'Use dollars and cents, like 75 or 75.50.';
+      else if (v < C.custom.min) bad = `The smallest amount is ${FSX.money(C.custom.min)}.`;
+      else if (v > C.custom.max) bad = `The largest amount is ${FSX.money(C.custom.max)}.`;
+      else if (left != null && credits(v).cr > left) bad = over || (cmax ? `You can buy up to ${fmt(cap)} credits a day, and ${fmt(left)} are left today. The most you can buy right now is ${FSX.money(cmax)}.` : `You can buy up to ${fmt(cap)} credits a day, and only ${fmt(left)} are left today. Come back tomorrow.`);
+      const usd = bad ? 0 : Math.round(v * 100) / 100; const c = credits(usd); return { usd, bonus: usd ? c.bonus : 0, base: Math.round(usd * C.perDollar), cr: usd ? c.cr : 0, bad, cmax }; }
+    const b = C.bundles[st.b] || C.bundles[0] || { usd: 0, cr: 0, bonus: 0 };
+    return { usd: b.usd, bonus: b.bonus, base: Math.round(b.usd * C.perDollar), cr: b.cr, cmax, bad: left != null && b.cr > left ? (over || `This bundle is more than you can still buy today: ${fmt(left)} of the ${fmt(cap)} credits a day are left.`) : '' }; }
   async submit(backup) {
     const st = this.state; if (st.busy || !st.cr) return;
     if (st.method === 'apple' && st.cfg && st.cfg.card === 'test' && !st.cfg.live) return this.setState({ err: 'Apple Pay is not available in test mode. Use the test card.' });
     this.setState({ busy: true, err: '', fallback: false }); st.backup = !!backup;
     try {
-      const k = this.pick(); const key = st.custom ? 'c' + k.usd : 'b' + st.b;
+      const k = this.pick(); if (k.bad) { this.setState({ busy: false, err: k.bad }); return; } const key = st.custom ? 'c' + k.usd : 'b' + st.b;
       // one order per choice: changing the bundle makes a new order
       if (!st.code || st.codeKey !== key) { const o = await DC.api('/api/orders/credits', st.custom ? { custom: k.usd } : { bundle: st.b }); st.code = o.code; st.codeKey = key; history.replaceState(null, '', '/checkout/credits?order=' + o.code); }
       const sum = FSX.checkout.fromOrder(await DC.api('/api/orders/' + st.code), st.cat);
@@ -208,27 +225,28 @@ class Component extends DCLogic {
     const methods = defs.map((d) => { const sel = st.method === d.id; return Object.assign({}, d, { on: sel, bg: sel ? '#13202E' : '#111113', bd: sel ? '#7CC4FF' : '#26262A', pick: () => this.setState({ method: d.id, err: '' }) }); });
     const set = (k) => (e) => this.setState({ [k]: e.target.value, err: '' });
     const pk = (o) => ({ bg: o ? '#13202E' : '#111113', bd: o ? '#7CC4FF' : '#26262A' });
-    const k = this.pick(); const isCrypto = st.method === 'crypto';
+    const k = this.pick(); const isCrypto = st.method === 'crypto'; const cMaxNow = k.cmax == null ? C.custom.max : k.cmax; const capped = cMaxNow < C.custom.max;
     const cryptoCr = isCrypto && C.cryptoBonus ? Math.round(k.cr * C.cryptoBonus / 100) : 0; const total = k.cr + cryptoCr;
-    const bundles = C.bundles.map((b, i) => { const on = !st.custom && st.b === i; return Object.assign({ on, big: fmt(b.cr), unit: 'Credits', sub: b.bonus ? `Includes ${b.bonus}% bonus` : 'No bonus', tag: b.badge || '', hasTag: !!b.badge, price: usd(b.usd), pick: () => this.setState({ b: i, custom: false, err: '' }) }, pk(on)); });
-    if (C.custom && C.custom.on) bundles.push(Object.assign({ on: st.custom, big: st.custom ? fmt(k.cr) : 'Custom', unit: st.custom ? 'Credits' : 'Any Amount', sub: st.custom ? (k.bonus ? `Includes ${k.bonus}% bonus` : 'No bonus') : 'Up to ' + usd(C.custom.max), tag: '', hasTag: false, price: st.custom ? usd(k.usd) : usd(C.custom.min) + '+', pick: () => this.setState({ custom: true, err: '' }) }, pk(st.custom)));
+    const bundles = C.bundles.map((b, i) => { const on = !st.custom && st.b === i; return Object.assign({ on, big: fmt(b.cr), unit: 'Credits', sub: st.capLeft != null && b.cr > st.capLeft ? 'Over today\'s limit' : b.bonus ? `Includes ${b.bonus}% bonus` : 'No bonus', tag: b.badge || '', hasTag: !!b.badge, price: usd(b.usd), pick: () => this.setState({ b: i, custom: false, err: '' }) }, pk(on)); });
+    if (C.custom && C.custom.on) bundles.push(Object.assign({ on: st.custom, big: st.custom && !k.bad ? fmt(k.cr) : 'Custom', unit: st.custom && !k.bad ? 'Credits' : 'Any Amount', sub: st.custom && !k.bad ? (k.bonus ? `Includes ${k.bonus}% bonus` : 'No bonus') : cMaxNow ? 'Up to ' + usd(cMaxNow) : 'Daily limit reached', tag: '', hasTag: false, price: st.custom && !k.bad ? usd(k.usd) : usd(C.custom.min) + '+', pick: () => this.setState({ custom: true, err: '' }) }, pk(st.custom)));
     const tiers = C.bundles.filter((b) => b.bonus).map((b) => `${usd(b.usd)} for ${b.bonus}%`);
-    const price = usd(k.usd);
+    const price = k.bad ? '—' : usd(k.usd);
     const lines = [{ label: fmt(k.base) + ' Credits', amount: price, color: '#D4CFCD' }];
     if (k.cr > k.base) lines.push({ label: `Bundle Bonus (${k.bonus}%)`, amount: '+' + fmt(k.cr - k.base), color: '#5FD39B' });
     if (cryptoCr) lines.push({ label: `Crypto Bonus (${C.cryptoBonus}%)`, amount: '+' + fmt(cryptoCr), color: '#5FD39B' });
-    lines.push({ label: 'Balance After', amount: fmt(st.bal + total) + ' credits', color: '#9C9693' });
+    if (k.bad) lines.length = 0;
+    lines.push({ label: 'Balance After', amount: fmt(st.bal + (k.bad ? 0 : total)) + ' credits', color: '#9C9693' });
     return {
-      balTxt: fmt(st.bal), bundles, custom: st.custom, customAmt: st.amt, customCredits: fmt(k.cr), cMin: C.custom.min, cMax: C.custom.max,
-      customNote: `${usd(C.custom.min)} to ${usd(C.custom.max)}.${tiers.length ? ' Spend ' + tiers.join(', ') + ' bonus credits.' : ''}`,
-      setCustom: (e) => this.setState({ amt: e.target.value, err: '' }), amtDown: () => this.setState({ amt: Math.max(C.custom.min, (Number(st.amt) || C.custom.min) - 5) }), amtUp: () => this.setState({ amt: Math.min(C.custom.max, (Number(st.amt) || C.custom.min) + 5) }), amtMin: (Number(st.amt) || 0) <= C.custom.min, amtMax: (Number(st.amt) || 0) >= C.custom.max,
+      balTxt: fmt(st.bal), bundles, custom: st.custom, customAmt: st.amt, customCredits: k.bad ? '—' : fmt(k.cr), cMin: C.custom.min, cMax: cMaxNow || C.custom.max, customErr: st.custom ? k.bad : '', customBad: !!(st.custom && k.bad),
+      customNote: `${cMaxNow ? `${usd(C.custom.min)} to ${usd(cMaxNow)}${capped ? ` today (you can buy up to ${fmt(st.dailyCap)} credits a day)` : ''}.` : `You can buy up to ${fmt(st.dailyCap)} credits a day.`}${tiers.length ? ' Spend ' + tiers.join(', ') + ' bonus credits.' : ''}`,
+      setCustom: (e) => this.setState({ amt: e.target.value, err: '' }), amtDown: () => this.setState({ err: '', amt: Math.max(C.custom.min, Math.min(cMaxNow || C.custom.min, (Number(st.amt) || C.custom.min) - 5)) }), amtUp: () => this.setState({ err: '', amt: Math.max(C.custom.min, Math.min(cMaxNow || C.custom.min, (Number(st.amt) || C.custom.min) + 5)) }), amtMin: (Number(st.amt) || 0) <= C.custom.min, amtMax: (Number(st.amt) || 0) >= (cMaxNow || C.custom.min),
       methods, isNew: st.method === 'card' && (test || sx), testMode: test, sx,
       cardNote: sx ? 'Card details go straight to Stripe. Funded Sky never sees your card number.' : 'Test mode: use 4242 4242 4242 4242, any future date and any CVC. No real charge.',
       agreed: st.agreed, notAgreed: !st.agreed, toggleAgree: () => this.setState({ agreed: !st.agreed }),
       card: st.card, exp: st.exp, cvc: st.cvc, set_card: set('card'), set_exp: set('exp'), set_cvc: set('cvc'),
       ini: ((me.first || '')[0] || '') + ((me.last || '')[0] || ''), firstName: me.first || '', fullName: `${me.first || ''} ${me.last || ''}`, emailLine: me.email || '',
-      sumTitle: fmt(total) + ' Credits', sumSub: 'For Packs · Never Expire', lines, total: price,
-      payLabel: st.busy ? 'Working…' : 'Pay ' + price, payLabel0: 'Pay ' + price, payShort: st.busy ? '…' : 'Pay', busy: st.busy, err: st.err, submit: () => this.submit(), fallback: !!st.fallback, payBackup: () => this.submit(true),
+      sumTitle: k.bad ? (st.custom ? 'Custom Amount' : 'Credits') : fmt(total) + ' Credits', sumSub: 'For Packs · Never Expire', lines, total: price,
+      payLabel: st.busy ? 'Working…' : k.bad ? 'Pay' : 'Pay ' + price, payLabel0: k.bad ? 'Pay' : 'Pay ' + price, payShort: st.busy ? '…' : 'Pay', busy: st.busy, err: st.err, submit: () => this.submit(), fallback: !!st.fallback, payBackup: () => this.submit(true),
       secureNote: tp ? 'Press Pay and enter your card in the secure payment window. Funded Sky never sees your card number.' : 'You enter your card on our payment processor\'s secure page after you press Pay.',
       cryptoNote: cfg.crypto ? 'Pay with USDC, USDT or other coins on Confirmo\'s secure page. Crypto payments are final.' : 'Crypto checkout is not available yet. Use a card.',
       trust1: 'Credits are added the moment payment clears', trust2: test ? 'Test mode: no real charge' : tp ? 'Cards processed securely by TailoredPay' : 'Cards processed securely by Stripe',

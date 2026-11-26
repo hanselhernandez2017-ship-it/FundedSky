@@ -94,8 +94,8 @@ function startBoard(root) {
   const hbars = (items, fmt, color) => { const mx = Math.max(1, ...items.map((x) => x[1])); return items.map((x) => `<div><div class="rowl"><span>${x[0]}</span><b>${fmt(x[1])}${x[2] ? `<em class="hint"> · ${x[2]}</em>` : ''}</b></div><div class="split"><i style="width:${x[1] / mx * 100}%${color ? ';background:' + color : ''}"></i></div></div>`).join(''); };
   const meter = (p, c) => `<div class="mtw"><div class="mt"><i style="width:${Math.min(100, p)}%;background:${c || 'var(--sky)'}"></i></div><span>${Math.round(p)}%</span></div>`;
   const tl = (items) => `<div class="tl2">${items.map((e) => `<div><i></i><div><b>${e[0]}</b><p>${e[1]}</p></div></div>`).join('')}</div>`;
-  const XL = (board, hash, label, cls) => `<a class="${cls || 'lnk'}" href="Admin${board}.dc.html${hash ? '#' + hash : ''}">${label}</a>`;
-  const UL = (name) => XL('Users', 'user?name=' + encodeURIComponent(name), esc(name));
+  const XL = (board, hash, label, cls) => `<a class="${cls || 'lnk'}" href="/admin/${board.toLowerCase()}${hash ? '#' + hash : ''}">${label}</a>`;
+  const UL = (name, uid) => XL('Users', uid != null && uid !== '' ? 'user?id=' + encodeURIComponent(uid) : 'user?name=' + encodeURIComponent(name), esc(name)); // by user ID, so two people with the same name never share a link
   const CHARTS = {};
   const nice = (v) => { if (v <= 0) return 1; const e = Math.pow(10, Math.floor(Math.log10(v))); const f = v / e; return [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10].find((s) => f <= s) * e; };
   function lineChart(id, labels, sers, fmt, opt = {}) {
@@ -119,7 +119,7 @@ function startBoard(root) {
   const svcSt = (x) => (!x.enabled ? 'off' : x.status === 'live' ? 'ok' : 'slow');
   const SV = [
     { g: 'Funded Sky', n: 'Website and Checkout', st: 'ok' }, { g: 'Funded Sky', n: 'Trader Dashboard', st: 'ok' }, { g: 'Funded Sky', n: 'Back Office', st: 'ok' }, { g: 'Funded Sky', n: 'Public API', st: 'ok' },
-    { g: 'Trading Platforms', n: 'Simulated Trade Feed', st: 'ok', go: 'Platforms#feed', feed: 1 },
+    { g: 'Trading Platforms', n: 'Simulated Trade Feed', st: 'ok', go: 'Platforms#data', feed: 1 },
     ...[...new Set([].concat(...BO.catalog.plans.map((p) => p.platforms || [])))].map((n) => ({ g: 'Trading Platforms', n, st: 'off', go: 'Platforms#conn', note: 'Not connected' })),
     ...[['tailoredpay', 'Payments · TailoredPay', 'Finance#processor'], ['stripe', 'Backup Payments · Stripe', 'Finance#processor'], ['confirmo', 'Crypto · Confirmo', 'Settings#int'], ['rise', 'Payouts · Rise', 'Finance#rails'], ['sumsub', 'KYC · Sumsub', 'Users#kprov'], ['track1099', 'Tax Forms · Track1099', 'Compliance#forms'], ['resend', 'Email · Resend', 'Emails#logs'], ['crisp', 'Live Chat · Crisp', 'Settings#int'], ['posthog', 'Analytics · PostHog', 'Settings#int'], ['slack', 'Alerts · Slack', 'Settings#int'], ['discord', 'Community · Discord', 'Settings#int']].map(([id, n, go]) => ({ g: 'Outside Services', n, id, st: svcSt(iv(id)), go, note: iv(id).enabled ? (iv(id).lastError || '') : 'Not connected' }))];
   const dayKey = (i) => F.isoET(Date.now() - (89 - i) * 864e5);
@@ -171,7 +171,7 @@ function startBoard(root) {
     areas: [{ h: 'Health' }, { id: 'ov', n: 'Status', b: () => (HD && issues().length) || null, bad: true, tabs: [['overview', 'Status']] }, { id: 'jb', n: 'Background Jobs', b: () => (HD && HD.jobs.filter((j) => !j.ok).length) || null, tabs: [['jobs', 'Background Jobs']] }, { id: 'hk', n: 'Webhooks', tabs: [['hooks', 'Webhooks']] }, { id: 'er', n: 'API Errors', tabs: [['errors', 'API Errors']] }, { h: 'Response' }, { id: 'in', n: 'Incidents', b: () => INC.filter((x) => x.st !== 'resolved').length || null, tabs: [['incidents', 'Incidents']] }, { id: 'oc', n: 'On Call', tabs: [['oncall', 'On Call']] }],
     views: { overview: vOverview, jobs: vJobs, hooks: vHooks, errors: vErrors, incidents: vIncidents, oncall: vOncall },
     click: (a, el, id, k) => { switch (a) {
-      case 'upd': { const t = prompt('Update:'); if (!t) return 0; const v = RAWI.slice(); v[+k] = Object.assign({}, v[+k], { upd: (v[+k].upd || []).concat([{ at: new Date().toISOString(), text: t }]) }); putI(v, 'Update posted'); return 0; }
+      case 'upd': F.form({ title: 'Post an Update', intro: 'Added to this incident with the time.', fields: [{ k: 't', label: 'Update', type: 'textarea', req: 'Write the update', max: 600 }], ok: 'Post Update' }).then((f) => { if (!f) return; const v = RAWI.slice(); v[+k] = Object.assign({}, v[+k], { upd: (v[+k].upd || []).concat([{ at: new Date().toISOString(), text: f.t }]) }); putI(v, 'Update posted'); }); return 0;
       case 'resolve': { const v = RAWI.slice(); const x = v[+k]; v[+k] = Object.assign({}, x, { st: 'resolved', resolved: new Date().toISOString(), lasted: (() => { const m = Math.round((Date.now() - new Date(x.at)) / 6e4); return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h ' + (m % 60) + ' min'; })(), upd: (x.upd || []).concat([{ at: new Date().toISOString(), text: 'Resolved by ' + F.me() }]) }); putI(v, 'Resolved. The status page is updated.'); return 0; }
       case 'newInc': S.drawer = { id: 'new' }; return 1;
       case 'saveInc': { const t = ((root.querySelector('#it') || {}).value || '').trim(); if (!t) { toast('Say what is wrong'); return 0; } const svc = root.querySelector('#isc').value; S.drawer = null; putI([{ id: 'INC-' + (RAWI.length + 1), t, text: t, service: svc, sev: root.querySelector('#isv').value, st: 'watching', at: new Date().toISOString(), who: F.me(), pub: root.querySelector('#ipb').checked, upd: [{ at: new Date().toISOString(), text: t }] }].concat(RAWI), 'Reported'); return 0; }

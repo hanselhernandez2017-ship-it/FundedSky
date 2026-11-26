@@ -21,7 +21,7 @@
   "title": "Funded Sky admin: checkout catalog"
  },
  "competitions": {
-  "boot": "startBoard(root); startGlobal(root, 'competitions');",
+  "boot": "window.__CMP = await fetch('/api/admin/competitions', { credentials: 'same-origin' }).then((r) => r.json()).catch(() => null); startBoard(root); startGlobal(root, 'competitions');",
   "links": [
    "<link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css2?family=Mona+Sans:wdth,wght@100..125,400..700&amp;display=swap\">"
   ],

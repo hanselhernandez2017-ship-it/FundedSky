@@ -10,6 +10,10 @@
 .fsbo .pln .kv{margin-top:2px}
 .fsbo .cert .cb>span{display:flex;flex-direction:column;gap:2px;min-width:0}
 .fsbo .cert .cb>span small{font-size:11.5px;color:var(--fa)}
+/* certificate card stays dark in both themes, so its wordmark stays light */
+.fsbo .cert .cp .lg{color:#F4F2F1}
+/* rewards switched off: no link to Rewards anywhere in the app */
+.fsbo.norw a[href="#rewards"],.fsbo.norw a[href="/app/rewards"]{display:none!important}
 .fsbo .tkh{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:14px 0 20px}
 .fsbo table.t th:nth-child(4),.fsbo table.t td:nth-child(4){padding-right:24px}.fsbo table.t th:last-child,.fsbo table.t td:last-child{padding-right:0}
 .fsbo .gz>div{justify-content:flex-start}
@@ -45,6 +49,7 @@
   .fsbo .gz .vzr{width:92px!important;height:92px!important}
   /* tables become stacked rows */
   .fsbo .tsc:not(.keep){overflow:visible;margin:0;padding:0}
+  .fsbo .tsc:not(.keep) .mlab{display:inline}
   .fsbo .tsc:not(.keep) table.t,.fsbo .tsc:not(.keep) table.t tbody{display:block;width:100%;min-width:0}
   .fsbo .tsc:not(.keep) table.t thead{display:none}
   .fsbo .tsc:not(.keep) table.t tr{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;padding:13px 0;border-bottom:1px solid var(--ln2)}
@@ -118,3 +123,82 @@
 /* dropdown arrow: 14px in from the edge */
 .fsbo select{-webkit-appearance:none!important;-moz-appearance:none!important;appearance:none!important;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239C9693' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")!important;background-repeat:no-repeat!important;background-position:right 14px center!important;background-size:16px 16px!important;padding-right:42px!important;text-overflow:ellipsis;cursor:pointer}.fsbo select::-ms-expand{display:none}
 .fsbo.light select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%235E636C' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")!important;background-repeat:no-repeat!important;background-position:right 14px center!important;background-size:16px 16px!important;padding-right:42px!important;text-overflow:ellipsis;cursor:pointer}.fsbo.light select::-ms-expand{display:none}
+/* ===== dashboard design QC ===== */
+/* sidebar fits common laptop heights; Buy Account and the profile stay pinned and reachable when it still has to scroll */
+.fsbo .side{scrollbar-width:thin;scrollbar-color:var(--ln) transparent;padding-bottom:0}
+.fsbo .side .sbuy{position:sticky;bottom:74px;z-index:2;box-shadow:0 12px 0 var(--p1)}
+.fsbo .side .me{position:sticky;bottom:0;z-index:2;background:var(--p1);min-height:60px;box-sizing:border-box;flex:none}
+.fsbo .side .promo,.fsbo .side .nav,.fsbo .side .logo,.fsbo .side .sdiv{flex:none}
+@media (min-width:861px) and (max-height:960px){.fsbo .side{padding-top:16px}.fsbo .side .logo{padding-bottom:16px}.fsbo .side .ni{height:36px}.fsbo .side .sdiv{margin:10px 12px}.fsbo .side .promo{margin:12px 4px 12px;padding:12px}}
+@media (min-width:861px) and (max-height:840px){.fsbo .side{padding-top:12px}.fsbo .side .logo{padding-bottom:10px}.fsbo .side .ni{height:33px}.fsbo .side .sdiv{margin:7px 12px}.fsbo .side .promo{margin:10px 4px;padding:9px 12px;gap:2px}.fsbo .side .promo span:not(.pt),.fsbo .side .promo em{display:none}.fsbo .side .sbuy{height:40px;margin-bottom:10px;bottom:70px}}
+@media (min-width:861px) and (max-height:740px){.fsbo .side .ni{height:31px;font-size:13.5px}.fsbo .side .sdiv{margin:5px 12px}.fsbo .side .promo .pt{display:none}.fsbo .side .me{min-height:52px;padding-top:8px;padding-bottom:8px}.fsbo .side .sbuy{bottom:62px}}
+/* phone: toast clears the bottom navigation */
+@media (max-width:860px){.fsbo .toast{bottom:calc(84px + env(safe-area-inset-bottom));text-align:center}}
+/* phone-only cell labels for stacked tables */
+.fsbo .ml{display:none}
+@media (max-width:860px){.fsbo .tsc:not(.keep) table.t td .ml{display:inline;color:var(--fa);font-weight:400}
+  /* the "·" between stacked cells sits in each cell's left gutter, which is clipped at the start of a wrapped line */
+  .fsbo .tsc:not(.keep) table.t tr:not(.sub){overflow:hidden}
+  .fsbo .tsc:not(.keep) table.t td:not(:first-child):not(:last-child){position:relative;margin:0 10px 0 -18px;padding-left:18px!important}
+  .fsbo .tsc:not(.keep) table.t td:not(:first-child):not(:last-child):not(:empty)~td:not(:last-child):not(:empty)::before{content:none}
+  .fsbo .tsc:not(.keep) table.t td:not(:first-child):not(:last-child)::before{content:'·'!important;position:absolute;left:0;width:18px;margin:0;text-align:center;color:var(--fa)}
+}
+.fsbo .note+.fl{margin-top:16px}
+/* account cards: the plan line runs under the status badge instead of being cut by it */
+.fsbo .acard .ach{display:grid;grid-template-columns:44px minmax(0,1fr) auto;column-gap:12px;row-gap:1px;align-items:center}
+.fsbo .acard .ach .asz{grid-row:1/3}
+.fsbo .acard .ach .act{display:contents}
+.fsbo .acard .ach .act b{grid-column:2;grid-row:1;align-self:end;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fsbo .acard .ach>.bd{grid-column:3;grid-row:1;align-self:end}
+.fsbo .acard .ach .act span{grid-column:2/4;grid-row:2;align-self:start}
+@media (max-width:1360px) and (min-width:861px){.fsbo .homeg .acard .ach{grid-template-columns:minmax(0,1fr) auto}.fsbo .homeg .acard .ach .asz{display:none}.fsbo .homeg .acard .ach .act b{grid-column:1}.fsbo .homeg .acard .ach>.bd{grid-column:2}.fsbo .homeg .acard .ach .act span{grid-column:1/3}
+  .fsbo .hside .sh{flex-wrap:wrap;row-gap:2px}.fsbo .hside .sh:has(.r) .lab{order:3;flex:1 0 100%;margin-left:0}.fsbo .hside .sh .r{white-space:nowrap}}
+.fsbo .acf .mono,.fsbo .acf .lk{white-space:nowrap}.fsbo .acf{flex-wrap:wrap;row-gap:10px}
+/* payout progress: four equal steps, number on top, so long labels wrap without pushing the row out of line */
+@media (min-width:861px){.fsbo .steps.wide.stk{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;align-items:start}.fsbo .steps.wide.stk em{display:none}.fsbo .steps.wide.stk>div{flex-direction:column;align-items:flex-start;gap:8px}.fsbo .steps.wide.stk>div span{padding-top:0}}
+@media (max-width:860px){.fsbo .tsc:not(.keep) table.t tr.mine{box-shadow:-10px 0 0 var(--skyt),10px 0 0 var(--skyt);border-bottom-color:transparent}}
+/* ticket thread: the trader's own bubbles picked up the sidebar profile block's layout (.me) */
+.fsbo .msg.me{display:block;margin-top:0;margin-right:0}
+.fsbo .msg{white-space:pre-wrap;overflow-wrap:anywhere}.fsbo .msg small{white-space:normal}
+.fsbo:not(.light) input[type=date]{color-scheme:dark}
+.fsbo .chk+.note{margin-top:14px}
+
+/* education: lesson reader in the course drawer, lesson list, chips scroll hint */
+.fsbo .lsn{margin-top:22px;padding:18px 20px;border:1px solid var(--ln);border-radius:12px;background:var(--p2);overflow-wrap:anywhere}
+.fsbo .lsn h4{margin:0 0 10px;font-size:17px;font-weight:600;letter-spacing:-.01em}
+.fsbo .lsn p{margin:0 0 12px;font-size:14.5px;line-height:1.65;color:var(--t2,var(--tx))}.fsbo .lsn p:last-child{margin-bottom:0}
+.fsbo .lsn a{color:var(--sky);text-decoration:underline}
+.fsbo .lsl{margin-top:22px}.fsbo .lsl .eyebrow{margin-bottom:2px}
+.fsbo .lsl .chk{all:unset;box-sizing:border-box;width:100%;cursor:pointer;display:flex;align-items:flex-start;gap:12px;padding:11px 8px;margin:0 -8px;width:calc(100% + 16px);border-bottom:1px solid var(--ln2);border-radius:8px}
+.fsbo .lsl .chk:last-child{border-bottom:0}.fsbo .lsl .chk:hover,.fsbo .lsl .chk.on{background:var(--p2)}.fsbo .lsl .chk:focus-visible{outline:2px solid var(--sky);outline-offset:-2px}
+.fsbo .lsl .chk>div{min-width:0}.fsbo .chk b{overflow-wrap:anywhere}.fsbo .drw .db>p.mu{overflow-wrap:anywhere}
+.fsbo .cc b,.fsbo .cc p,.fsbo .cinfo h3,.fsbo .cinfo p{overflow-wrap:anywhere}
+@media (max-width:860px){
+  .fsbo .sh .r:has(.edchips){min-width:0;position:relative}
+  .fsbo .vzchips.edchips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-right:-16px;padding-right:44px;-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 56px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 56px),transparent)}
+  .fsbo .vzchips.edchips::-webkit-scrollbar{display:none}
+}
+
+/* Rule tables (Resources > Rules): on a phone, one size at a time with size buttons, so nothing scrolls sideways or is cut off */
+.fsbo .rsz{display:none}
+@media (max-width:860px){
+  .fsbo .rsz{display:flex;margin:0 0 6px}
+  .fsbo .rsz button{flex:1;justify-content:center;height:36px;font-weight:500}
+  .fsbo .tsc.keep.rt{overflow:visible;margin:0;padding:0}
+  .fsbo .rt table.t,.fsbo .rt table.t tbody{display:block;width:100%;min-width:0}
+  .fsbo .rt table.t thead{display:none}
+  .fsbo .rt table.t tr{display:flex;gap:16px;align-items:flex-start;border-bottom:1px solid var(--ln2)}
+  .fsbo .rt table.t tr:last-child{border-bottom:0}
+  .fsbo .rt table.t td{display:block;border:0!important;background:none!important;flex:1 1 0;min-width:0;white-space:normal;overflow-wrap:break-word;padding-left:0;padding-right:0}
+  .fsbo .rt table.t td:not(:first-child):not(.on){display:none}
+  .fsbo .rt table.t td.on{text-align:right}
+}
+/* Settings on a phone: a short header (the setup gauge becomes one badge) so the tabs and their content start on the first screen */
+.fsbo .setm{display:none}
+@media (max-width:860px){.fsbo .sethero .hviz{display:none}.fsbo .sethero .setm{display:inline-flex}.fsbo .sethero .eyebrow{display:none}.fsbo .sethero .prof{flex-direction:row;align-items:center;gap:14px}.fsbo .sethero .avb{width:52px;height:52px;border-radius:16px;font-size:17px;flex:none}.fsbo .sethero .prof .hero{font-size:24px;margin-bottom:4px!important}.fsbo .sethero .prof p{font-size:12.5px;margin-bottom:10px!important}.fsbo .content>.sec.first.sethero{padding-bottom:16px}}
+/* words shown only when a table is stacked on a phone, in place of its column headers */
+.fsbo .mlab{display:none}
+/* support: long unbroken text (a pasted link or log line) wraps instead of widening the page; bubbles never pass the content edge */
+.fsbo .msg{box-sizing:border-box}
+.fsbo .tkh h2{min-width:0;max-width:100%;overflow-wrap:anywhere}.fsbo .row.tkr .t{min-width:0;overflow-wrap:anywhere}.fsbo .row.tkr>p{min-width:0;overflow-wrap:anywhere}
+.fsbo .fl .cnt{align-self:flex-end;font-size:11.5px;color:var(--fa);margin-top:-2px}

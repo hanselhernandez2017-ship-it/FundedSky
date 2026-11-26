@@ -224,6 +224,7 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 </div>
 
 <dl style="margin: 0; display: flex; flex-direction: column; gap: 10px; font-size: 14px; border-top: 1px solid #26262A; padding-top: 16px;">
+<sc-if value="{{ multi }}" hint-placeholder-val="{{ false }}"><div style="display: flex; justify-content: space-between; gap: 12px;"><dt style="color: #9C9693;">Rules For</dt><dd style="margin: 0; font-weight: 600; text-align: right;">{{ rulesFor }}</dd></div></sc-if>
 <div style="display: flex; justify-content: space-between;"><dt style="color: #9C9693;">{{ rules.targetLabel }}</dt><dd style="margin: 0; font-family: 'Geist Mono', monospace;">{{ rules.target }}</dd></div>
 <div style="display: flex; justify-content: space-between;"><dt style="color: #9C9693;">{{ rules.maxLossLabel }}</dt><dd style="margin: 0; font-family: 'Geist Mono', monospace;">{{ rules.maxLoss }}</dd></div>
 <div style="display: flex; justify-content: space-between;"><dt style="color: #9C9693;">{{ rules.dllLabel }}</dt><dd style="margin: 0; font-family: 'Geist Mono', monospace;">{{ rules.dll }}</dd></div>
@@ -233,8 +234,9 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 <a href="{{ rulesHref }}" style="font-size: 13px;">{{ rulesNote }}</a>
 
 <div style="display: flex; flex-direction: column; gap: 8px; border-top: 1px solid #26262A; padding-top: 16px;">
-<label for="promo" style="font-size: 13px; color: #9C9693;">Promo Code</label>
+<label for="promo" style="font-size: 13px; color: #9C9693;">Promo or Reward Code</label>
 <div style="display: flex; gap: 8px;"><input id="promo" class="fs-in" type="text" placeholder="Enter Code" value="{{ promoInput }}" onChange="{{ setPromo }}" style="flex: 1; min-width: 0; height: 44px; box-sizing: border-box; background: #111113; border-radius: 4px; padding: 0 12px; color: #F4F2F1; font: inherit; font-size: 15px;"><button type="button" class="fs-opt" onClick="{{ applyPromo }}" style="height: 44px; background: transparent; border: 1px solid #26262A; border-radius: 4px; padding: 0 16px; color: #F4F2F1; font: inherit; font-size: 14px; font-weight: 500; cursor: pointer;">Apply</button></div><sc-if value="{{ promoMsg }}"><p style="margin: 6px 0 0; font-size: 12.5px; line-height: 18px; color: {{ promoColor }};">{{ promoMsg }}</p></sc-if>
+<sc-if value="{{ hasCodes }}"><div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px;" aria-label="Your reward codes"><sc-for list="{{ myCodes }}" as="rc" hint-placeholder-count="1"><button type="button" class="fs-opt" onClick="{{ rc.use }}" title="{{ rc.code }}" style="min-height: 36px; background: {{ rc.bg }}; border: 1px solid {{ rc.bd }}; border-radius: 999px; padding: 6px 14px; color: #F4F2F1; font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; text-align: left;">{{ rc.label }}</button></sc-for></div></sc-if>
 </div>
 
 <div style="display: flex; flex-direction: column; gap: 8px; font-size: 14px; border-top: 1px solid #26262A; padding-top: 16px;">
@@ -250,6 +252,7 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 </main>
 
 <div class="fs-bar" style="position: sticky; bottom: 0; background: #111113; border-top: 1px solid #26262A; padding: 12px 20px 28px; flex-direction: column; gap: 12px;">
+<sc-if value="{{ blockMsg }}"><p role="status" style="margin: 0; font-size: 13px; line-height: 18px; color: #F2C46D;">{{ blockMsg }}</p></sc-if>
 <div style="display: flex; justify-content: space-between; font-size: 13px; line-height: 16px; color: #9C9693;"><span>{{ accountsLabel }}</span><a href="#order" style="font-weight: 500;">View Order</a></div>
 <div style="display: flex; align-items: center; gap: 16px;">
 <div style="flex: 1; display: flex; flex-direction: column; gap: 2px;"><span style="font-size: 11px; line-height: 14px; color: #9C9693;">Total Today</span><span style="font-family: 'Geist Mono', monospace; font-size: 22px; line-height: 26px; font-weight: 500;">{{ total }}</span></div>
@@ -264,7 +267,7 @@ class Component extends DCLogic {
     super(props);
     const saved = FSX.cart.get();
     const qp = DC.qs('plan'); const qpromo = DC.qs('promo');
-    this.state = { cat: null, cart: saved && saved.cart && saved.cart.length ? saved.cart : [{ id: 1, plan: qp || 'prime', size: 50000, platform: '', addons: {}, qty: 1 }], active: 1, nextId: 9, promo: qpromo || (saved && saved.promo) || '', promoInput: qpromo || (saved && saved.promo) || '', priced: null, promoMsg: '', promoOk: false, me: null };
+    this.state = { cat: null, cart: saved && saved.cart && saved.cart.length ? saved.cart : [{ id: 1, plan: qp || 'prime', size: 50000, platform: '', addons: {}, qty: 1 }], active: 1, nextId: 9, promo: qpromo || (saved && saved.promo) || '', promoInput: qpromo || (saved && saved.promo) || '', priced: null, promoMsg: '', promoOk: false, promoAuto: !!qpromo, me: null, codes: [] };
     this.state.active = this.state.cart[0].id; this.state.nextId = Math.max(...this.state.cart.map((c) => c.id)) + 1;
   }
   async componentDidMount() {
@@ -272,6 +275,8 @@ class Component extends DCLogic {
     const cart = this.state.cart.map((c) => this.fix(cat, c));
     this.setState({ cat, me, cart });
     this.reprice();
+    // a logged-in trader's own unused reward codes, offered as one-tap chips under the code field
+    if (me) DC.api('/api/checkout/codes').then((r) => this.setState({ codes: (r && r.codes) || [] })).catch(() => {});
   }
   fix(cat, c) { const p = cat.plans.find((x) => x.id === c.plan) || cat.plans.find((x) => x.badge) || cat.plans[0]; const sz = p.sizes.find((z) => z.size === Number(c.size)) ? Number(c.size) : p.sizes[Math.min(1, p.sizes.length - 1)].size; const addons = {}; Object.keys(c.addons || {}).forEach((k) => { if (c.addons[k] && p.addons.includes(k)) addons[k] = true; }); return Object.assign({}, c, { plan: p.id, size: sz, platform: p.platforms.includes(c.platform) ? c.platform : (p.defPlatform && p.platforms.includes(p.defPlatform) ? p.defPlatform : p.platforms[0]), addons }); }
   updActive(fn) { const cat = this.state.cat; this.setState({ cart: this.state.cart.map((c) => (c.id === this.state.active ? this.fix(cat, Object.assign({}, c, fn(c))) : c)) }); this.reprice(); }
@@ -282,8 +287,12 @@ class Component extends DCLogic {
       const st = this.state; if (!st.cat) return;
       const items = st.cart.map((c) => ({ plan: c.plan, size: c.size, platform: c.platform, addons: Object.keys(c.addons).filter((k) => c.addons[k]), qty: c.qty }));
       FSX.cart.set({ cart: st.cart, promo: st.promoOk || !st.promo ? st.promo : '' });
-      try { const priced = await DC.api('/api/cart/price', { items, promo: st.promo || undefined }); this.setState({ priced, promoOk: !!st.promo, promoMsg: st.promo ? (priced.applied && priced.applied.type === 'promo' ? `${st.promo.toUpperCase()} applied.` : priced.applied ? `Your ${priced.applied.label.split(':')[0].toLowerCase()} saves more, so we used that instead.` : '') : '' }); }
-      catch (e) { if (st.promo) { this.setState({ promo: '', promoOk: false, promoMsg: e.message }); this.reprice(); } }
+      // why the last code was refused stays under the box until the trader tries another code or changes the cart
+      const why = this._promoErr || ''; this._promoErr = '';
+      try { const priced = await DC.api('/api/cart/price', { items, promo: st.promo || undefined }); this.setState({ priced, promoOk: !!st.promo, promoMsg: st.promo ? ((priced.applied && priced.applied.type === 'promo') || [priced.promo, priced.coupon].some((c) => c && String(c).toUpperCase() === st.promo.trim().toUpperCase()) ? `${st.promo.toUpperCase()} applied.` : priced.applied ? `Your ${priced.applied.label.split(':')[0].toLowerCase()} saves more, so we used that instead.` : '') : why });
+        // save again now that the code is confirmed, so the payment page and the order use it
+        if (st.promo) FSX.cart.set({ cart: st.cart, promo: st.promo }); }
+      catch (e) { if (st.promo) { this._promoErr = st.promoAuto ? '' : e.message; this.setState(Object.assign({ promo: '', promoOk: false, promoMsg: this._promoErr }, st.promoAuto ? { promoInput: '', promoAuto: false } : {})); this.reprice(); } }
     }, 120);
   }
   renderVals() {
@@ -292,7 +301,7 @@ class Component extends DCLogic {
     const mt = (window.FSPAY && FSPAY.cfg && FSPAY.cfg.maint) || '';
     const on = { bg: '#13202E', bd: '#7CC4FF', sub: '#D4CFCD', fg: '#F4F2F1', ring: '6px solid #7CC4FF' };
     const off = { bg: '#111113', bd: '#26262A', sub: '#9C9693', fg: '#D4CFCD', ring: '1.5px solid #3A3A40' };
-    const empty = { blockMsg: '', plans: [], sizes: [], platforms: [], addons: [], bundles: [], cart: [], lines: [], rules: {}, total: '…', accountsLabel: 'Loading', activeLabel: '', activeQty: 1, atMin: true, feeTerms: '', ctaOp: '1', ctaOff: 'false', loginHref: '/login?next=/checkout', nextHref: '#', rulesHref: '#', rulesNote: '', loginText: 'Log In', meOut: !st.me, meIn: !!st.me, ini: st.me ? ((st.me.first || '')[0] || '') + ((st.me.last || '')[0] || '') : '', firstName: st.me ? st.me.first : '' };
+    const empty = { hasCodes: false, myCodes: [], blockMsg: '', plans: [], sizes: [], platforms: [], addons: [], bundles: [], cart: [], lines: [], rules: {}, total: '…', accountsLabel: 'Loading', activeLabel: '', activeQty: 1, atMin: true, feeTerms: '', ctaOp: '1', ctaOff: 'false', loginHref: '/login?next=/checkout', nextHref: '#', rulesHref: '#', rulesNote: '', loginText: 'Log In', meOut: !st.me, meIn: !!st.me, ini: st.me ? ((st.me.first || '')[0] || '') + ((st.me.last || '')[0] || '') : '', firstName: st.me ? st.me.first : '' };
     if (!cat) return empty;
     const cur = st.cart.find((c) => c.id === st.active) || st.cart[0];
     const P = (id) => cat.plans.find((p) => p.id === id);
@@ -304,7 +313,9 @@ class Component extends DCLogic {
     const platforms = pc.platforms.map((s) => Object.assign({ label: s }, cur.platform === s ? on : off, { on: cur.platform === s, pick: () => this.updActive(() => ({ platform: s })) }));
     const addons = pc.addons.map((k) => { const a = cat.addons[k]; const sel = !!cur.addons[k]; return Object.assign({ id: k, name: a.name, desc: a.desc, price: '+' + M(a.flat != null && Number(a.flat) > 0 ? Number(a.flat) : Math.round(sd.price * (a.pct || 0) / 100)) }, sel ? on : off, { on: sel, toggle: () => this.updActive((c) => ({ addons: Object.assign({}, c.addons, { [k]: !sel }) })) }); });
     const count = st.cart.reduce((n, c) => n + c.qty, 0);
-    const bundles = (cat.bundles || []).map((b) => { const ok = count >= b.min; return Object.assign({ buy: b.buy, get: b.get }, ok ? on : off, { on: ok, state: ok ? 'Applied' : `Add ${b.min - count} More`, cta: ok ? '#7CC4FF' : '#9C9693', pick: () => { if (!ok) this.setCart(st.cart.map((c) => (c.id === cur.id ? Object.assign({}, c, { qty: c.qty + (b.min - count) }) : c))); } }); });
+    // a bundle only says Applied when its saving is in the summary (a promo code that saves more replaces it)
+    const prB = st.priced; const bunNames = (cat.bundles || []).map((b) => b.buy).filter(Boolean).concat([cat.bundleName || 'Multi-Account Savings']); const bunIn = !prB || prB.lines.some((l) => l.amount < 0 && bunNames.some((n) => String(l.label).indexOf(n + ':') === 0));
+    const bundles = (cat.bundles || []).map((b) => { const ok = count >= b.min; const used = ok && bunIn; return Object.assign({ buy: b.buy, get: b.get }, used ? on : off, { on: used, state: used ? 'Applied' : ok ? (st.promoOk ? 'Not Combined With Your Code' : 'Not Applied') : `Add ${b.min - count} More`, cta: used ? '#7CC4FF' : '#9C9693', pick: () => { if (!ok) this.setCart(st.cart.map((c) => (c.id === cur.id ? Object.assign({}, c, { qty: c.qty + (b.min - count) }) : c))); } }); });
     const many = st.cart.length > 1;
     const cart = st.cart.map((c) => {
       const editing = c.id === st.active; const p = P(c.plan);
@@ -316,7 +327,7 @@ class Component extends DCLogic {
         remove: () => { const rest = st.cart.filter((x) => x.id !== c.id); this.setCart(rest, { active: editing ? rest[0].id : st.active }); } };
     });
     const pr = st.priced;
-    const lines = pr ? pr.lines.map((l) => ({ label: l.label, amount: l.amount < 0 ? '−' + M(-l.amount) : M(l.amount), color: l.amount < 0 ? '#5FD39B' : l.kind === 'addon' ? '#9C9693' : '#D4CFCD' })) : [];
+    const lines = pr ? pr.lines.map((l) => ({ label: l.label, amount: l.free ? 'Free' : l.amount < 0 ? '−' + M(-l.amount) : M(l.amount), color: l.free ? '#7CC4FF' : l.amount < 0 ? '#5FD39B' : l.kind === 'addon' ? '#9C9693' : '#D4CFCD' })) : [];
     const isI = pc.kind === 'funded';
     const r = ((cat.rules || {})[pc.id] || {})[cur.size] || (isI ? Object.assign({ target: cat.instantRules[cur.size].goal }, cat.instantRules[cur.size]) : cat.evalRules[cur.size]);
     const rules = { targetLabel: isI ? 'Profit Goal Before First Payout' : 'Profit Target', target: M(r.target), maxLossLabel: { intraday: 'Max Loss (Trailing, Intraday)', static: 'Max Loss (Static)' }[r.ddType] || 'Max Loss (Trailing, End of Day)', maxLoss: M(r.maxLoss), dllLabel: 'Daily Loss Limit', dll: r.dllOff || !r.dll ? 'None' : M(r.dll), contracts: r.contracts,
@@ -350,7 +361,6 @@ class Component extends DCLogic {
         line: gotTop ? '#7CC4FF' : '#3A3A40', bg: gotTop ? '#13202E' : '#111113', fx: gotTop ? 'none' : 'saturate(.35) brightness(.7)' };
       packNudge = !curOk && !nAcc ? `Free packs come with ${okTxt} accounts` : !curOk && nextT ? `${okTxt} accounts count toward free packs` : nextT ? `Add ${nextT.n - nAcc} more for ${title(nextT)}` : 'Top reward unlocked';
       const li = st.ladIdx || 0; ladDots = LAD.map((t, i) => ({ w: i === li ? '18px' : '6px', c: i === li ? '#7CC4FF' : '#3A3A40' }));
-      if (tier) lines.push({ label: 'Free Packs: ' + title(tier), amount: 'Free', color: '#7CC4FF' });
     }
     const ladScroll = (e) => { const el = e.target; const max = el.scrollWidth - el.clientWidth; const i = max <= 0 ? 0 : Math.round(el.scrollLeft / max * (ladder.length - 1)); if (i !== (st.ladIdx || 0)) this.setState({ ladIdx: i }); };
     const act = st.cart.some((c) => (P(c.plan).sizes.find((z) => z.size === c.size) || {}).activation);
@@ -363,10 +373,12 @@ class Component extends DCLogic {
       addLine: () => this.setCart(st.cart.concat([{ id: st.nextId, plan: cur.plan, size: cur.size, platform: cur.platform, addons: {}, qty: 1 }]), { active: st.nextId, nextId: st.nextId + 1 }),
       accountsLabel: count + (count === 1 ? ' Account' : ' Accounts'),
       total: pr ? M(pr.total) : '…',
-      feeTerms: mt || 'One-time payment, no subscription.' + (act ? ' Essential accounts pay a one-time activation fee when they pass.' : ''), ctaOp: mt ? '.45' : '1', ctaOff: mt ? 'true' : 'false',
+      feeTerms: mt || 'One-time payment, no subscription.' + (act ? ' Essential accounts pay a one-time activation fee when they pass.' : ''), ctaOp: mt || (pr && pr.blocked) ? '.45' : '1', ctaOff: mt || (pr && pr.blocked) ? 'true' : 'false',
       promoInput: st.promoInput, promoMsg: st.promoMsg, blockMsg: pr ? [pr.blocked].concat(pr.notes || []).filter(Boolean).join(' ') : '', promoColor: st.promoOk ? '#5FD39B' : '#F2777F',
       setPromo: (e) => this.setState({ promoInput: e.target.value }),
-      applyPromo: () => { const v = (st.promoInput || '').trim(); this.setState({ promo: v, promoOk: false, promoMsg: '' }); this.reprice(); },
+      hasCodes: st.codes.length > 0, myCodes: st.codes.map((c) => { const on = st.promoOk && String(st.promo).toUpperCase() === c.code.toUpperCase(); return { code: c.code, label: (on ? '✓ ' : '') + c.label.replace(/^Reward: /, ''), bg: on ? '#13202E' : 'transparent', bd: on ? '#7CC4FF' : '#26262A', use: () => { this._promoErr = ''; this.setState(on ? { promo: '', promoInput: '', promoOk: false, promoAuto: false, promoMsg: '' } : { promo: c.code, promoInput: c.code, promoOk: false, promoAuto: false, promoMsg: '' }); this.reprice(); } }; }),
+      applyPromo: () => { const v = (st.promoInput || '').trim(); this._promoErr = ''; this.setState({ promo: v, promoOk: false, promoAuto: false, promoMsg: '' }); this.reprice(); },
+      rulesFor: P(cur.plan).short + ' · ' + K(cur.size),
       rulesHref: st.me ? '/app/resources?tab=rules' : '#order', rulesNote: isI ? 'Instant: funded from day one' : (() => { const ev = cat.plans.filter((p) => p.kind !== 'funded' && p.sizes.some((z) => z.size === cur.size)).map((p) => JSON.stringify(((cat.rules || {})[p.id] || {})[cur.size] || null)); return ev.length > 1 && ev.every((x) => x === ev[0]) ? 'Same Rules on Every Evaluation Plan' : 'See the Full Rules'; })(),
       nextHref: mt ? '#' : pr && pr.blocked ? '#order' : next, loginHref: st.me ? '/app' : '/login?next=/checkout', loginText: st.me ? 'Dashboard' : 'Log In',
       meIn: !!st.me, meOut: !st.me, ini: st.me ? ((st.me.first || '')[0] || '') + ((st.me.last || '')[0] || '') : '', firstName: st.me ? st.me.first : ''

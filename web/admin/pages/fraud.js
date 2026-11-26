@@ -56,8 +56,18 @@ function startBoard(root) {
         LAY[key] = P; }
       const P = LAY[key]; const sel = opt.sel;
       const ed = edges.map(([u, v]) => `<line x1="${P[u][0].toFixed(0)}" y1="${P[u][1].toFixed(0)}" x2="${P[v][0].toFixed(0)}" y2="${P[v][1].toFixed(0)}" class="${sel && (u === sel || v === sel) ? 'hot' : ''}"/>`).join('');
-      const nd = nodes.map((n) => { const [x, y] = P[n.id]; const tr = n.t === 'trader'; const cls = `vzgn ${n.t}${n.flag ? ' ' + n.flag : ''}${sel === n.id ? ' sel' : ''}`;
-        return `<g class="${cls}"${opt.act ? ` data-act="${opt.act}" data-id="${E(n.id)}"` : ''} transform="translate(${x.toFixed(0)},${y.toFixed(0)})">${tr ? '<circle r="13"/>' : '<rect x="-7" y="-7" width="14" height="14" rx="3"/>'}<text y="${tr ? 28 : -13}">${E(n.n)}</text><title>${E(n.n)}</title></g>`; }).join('');
+      // Labels: long trader names are cut to 16 characters and other labels to 26 (full text on hover) and each label takes the free side of its node (below, above, right or left) so labels do not sit on each other or on other nodes.
+      const cut = (t, mx) => { t = String(t); return t.length > mx + 1 ? t.slice(0, mx).trimEnd() + '…' : t; };
+      const boxes = nodes.map((n) => { const [x, y] = P[n.id]; const r = n.t === 'trader' ? 15 : 9; return [x - r, y - r, x + r, y + r]; }); const placed = [];
+      const hit = (a, b2) => Math.max(0, Math.min(a[2], b2[2]) - Math.max(a[0], b2[0])) * Math.max(0, Math.min(a[3], b2[3]) - Math.max(a[1], b2[1]));
+      const LB = {}; nodes.map((n, i) => ({ n, i })).sort((a, b2) => (a.n.t === 'trader' ? 0 : 1) - (b2.n.t === 'trader' ? 0 : 1)).forEach(({ n, i }) => { const [x, y] = P[n.id]; const tr = n.t === 'trader'; const t = cut(n.n, tr ? 16 : 26); const w = t.length * (tr ? 6.3 : 5.8) + 6, r = tr ? 13 : 7, h = 13;
+        const opts = [[0, r + 15, 'middle'], [0, -r - 6, 'middle'], [r + 6, 4, 'start'], [-r - 6, 4, 'end'], [r + 2, r + 13, 'start'], [-r - 2, r + 13, 'end'], [r + 2, -r - 4, 'start'], [-r - 2, -r - 4, 'end']]; if (!tr) opts.unshift(opts.splice(1, 1)[0]);
+        let best = null; opts.forEach(([dx, dy, an], k) => { const x0 = an === 'middle' ? x + dx - w / 2 : an === 'start' ? x + dx : x + dx - w; const bx = [x0, y + dy - h + 2, x0 + w, y + dy + 3];
+          let sc = k * 3 + Math.max(0, -bx[0]) * 40 + Math.max(0, bx[2] - Wd) * 40 + Math.max(0, -bx[1]) * 40 + Math.max(0, bx[3] - H) * 40; boxes.forEach((o, j) => { if (j !== i) sc += hit(bx, o) * 2; }); placed.forEach((o) => { sc += hit(bx, o) * 3; });
+          if (!best || sc < best.sc) best = { sc, dx, dy, an, bx }; });
+        placed.push(best.bx); LB[n.id] = { t, dx: best.dx, dy: best.dy, an: best.an }; });
+      const nd = nodes.map((n) => { const [x, y] = P[n.id]; const tr = n.t === 'trader'; const cls = `vzgn ${n.t}${n.flag ? ' ' + n.flag : ''}${sel === n.id ? ' sel' : ''}`; const L = LB[n.id];
+        return `<g class="${cls}"${opt.act ? ` data-act="${opt.act}" data-id="${E(n.id)}"` : ''} transform="translate(${x.toFixed(0)},${y.toFixed(0)})">${tr ? '<circle r="13"/>' : '<rect x="-7" y="-7" width="14" height="14" rx="3"/>'}<text x="${L.dx}" y="${L.dy}" style="text-anchor:${L.an}">${E(L.t)}</text><title>${E(n.n)}</title></g>`; }).join('');
       return `<div class="vzgraph"><svg viewBox="0 0 ${Wd} ${H}" role="img" aria-label="${E(opt.label || 'Network')}">${ed}${nd}</svg></div>`; }
     // bubble chart: items [{n, x, y, v, c}], axes labels
     function bubbles(items, xl, yl, fx, fy, opt = {}) { const H = opt.h || 260; const xs = items.map((i) => i.x), ys = items.map((i) => i.y); const x0 = Math.min(0, ...xs), x1 = Math.max(...xs) * 1.15, y0 = Math.min(0, ...ys) * 1.4, y1 = Math.max(...ys) * 1.3; const mv = Math.max(...items.map((i) => i.v));
@@ -94,8 +104,8 @@ function startBoard(root) {
   const hbars = (items, fmt, color) => { const mx = Math.max(1, ...items.map((x) => x[1])); return items.map((x) => `<div><div class="rowl"><span>${x[0]}</span><b>${fmt(x[1])}${x[2] ? `<em class="hint"> · ${x[2]}</em>` : ''}</b></div><div class="split"><i style="width:${x[1] / mx * 100}%${color ? ';background:' + color : ''}"></i></div></div>`).join(''); };
   const meter = (p, c) => `<div class="mtw"><div class="mt"><i style="width:${Math.min(100, p)}%;background:${c || 'var(--sky)'}"></i></div><span>${Math.round(p)}%</span></div>`;
   const tl = (items) => `<div class="tl2">${items.map((e) => `<div><i></i><div><b>${e[0]}</b><p>${e[1]}</p></div></div>`).join('')}</div>`;
-  const XL = (board, hash, label, cls) => `<a class="${cls || 'lnk'}" href="Admin${board}.dc.html${hash ? '#' + hash : ''}">${label}</a>`;
-  const UL = (name) => XL('Users', 'user?name=' + encodeURIComponent(name), esc(name));
+  const XL = (board, hash, label, cls) => `<a class="${cls || 'lnk'}" href="/admin/${board.toLowerCase()}${hash ? '#' + hash : ''}">${label}</a>`;
+  const UL = (name, uid) => XL('Users', uid != null && uid !== '' ? 'user?id=' + encodeURIComponent(uid) : 'user?name=' + encodeURIComponent(name), esc(name)); // by user ID, so two people with the same name never share a link
   const CHARTS = {};
   const nice = (v) => { if (v <= 0) return 1; const e = Math.pow(10, Math.floor(Math.log10(v))); const f = v / e; return [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10].find((s) => f <= s) * e; };
   function lineChart(id, labels, sers, fmt, opt = {}) {

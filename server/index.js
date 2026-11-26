@@ -12,7 +12,7 @@ const content = require('./content');
 const I = require('./integrations');
 const flows = require('./flows');
 const { migrate } = require('./migrate');
-const { HttpError, bad, clean, round2 } = require('./util');
+const { HttpError, bad, clean, round2, emailOk } = require('./util');
 
 const app = express();
 // Client address (req.ip) for the staff network allowlist, the blocklist and rate limits. On Railway exactly one proxy (its edge)
@@ -38,6 +38,13 @@ app.use('/api/admin/store', express.json({ limit: '2mb' }));
 app.use(express.json({ limit: '200kb' }));
 app.use((err, req, res, next) => (err && (err.type === 'entity.too.large' || err.status === 413) ? res.status(413).json({ error: 'This is too large to save. Remove some entries and try again.' }) : err && err.type === 'entity.parse.failed' ? res.status(400).json({ error: 'The request was not valid JSON' }) : next(err)));
 app.use((req, res, next) => auth.loadUser(req, res, next).catch(next));
+// Device id: a long-lived cookie, remembered for each trader who signs in on this browser. Used to spot self-referrals (server/affiliates.js).
+const DID_SEEN = new Set();
+app.use((req, res, next) => {
+  try { if (req.user && req.user.id && req.user.role === 'trader') { let did = auth.parseCookies(req.headers.cookie).fs_did; if (!/^[a-f0-9]{32}$/.test(did || '')) { did = require('crypto').randomBytes(16).toString('hex'); res.append('Set-Cookie', `fs_did=${did}; Path=/; Max-Age=${730 * 86400}; SameSite=Lax; HttpOnly`); }
+    const k = req.user.id + ':' + did; if (!DID_SEEN.has(k)) { if (DID_SEEN.size > 50000) DID_SEEN.clear(); DID_SEEN.add(k); return require('./affiliates').seenDevice(req.user.id, did).catch(() => {}).then(() => next()); } } } catch (e) { /* never block a request for this */ }
+  next();
+});
 
 // Basic rate limit for auth endpoints
 const hits = new Map();
@@ -46,7 +53,7 @@ setInterval(() => hits.clear(), 10 * 60 * 1000).unref();
 
 const h = (fn) => async (req, res) => {
   try { const out = await fn(req, res); if (!res.headersSent) res.json(out || { ok: true }); }
-  catch (e) { const st = e instanceof HttpError ? e.status : e.status === 402 ? 402 : 500; if (st === 500) { console.error(req.method, req.path, e); db.q('INSERT INTO error_log(path,msg) VALUES($1,$2)', [req.method + ' ' + req.path, String(e.message || e).slice(0, 500)]).catch(() => {}); } res.status(st).json({ error: st === 500 ? 'Something went wrong on our side. Try again.' : e.message, fallback: e.fallback || undefined }); }
+  catch (e) { if (e && (e.code === '22021' || e.code === '22P05')) return res.status(400).json({ error: 'That text has characters we cannot save. Remove them and try again.' }); const st = e instanceof HttpError ? e.status : e.status === 402 ? 402 : 500; if (st === 500) { console.error(req.method, req.path, e); db.q('INSERT INTO error_log(path,msg) VALUES($1,$2)', [req.method + ' ' + req.path, String(e.message || e).slice(0, 500)]).catch(() => {}); } res.status(st).json({ error: st === 500 ? 'Something went wrong on our side. Try again.' : e.message, fallback: e.fallback || undefined, repriced: e.repriced || undefined }); }
 };
 
 // ---------- public ----------
@@ -75,9 +82,13 @@ app.post('/api/auth/reset/check', limit(20, 60000), h((req) => auth.resetCheck(r
 app.post('/api/auth/verify', limit(10, 60000), h((req) => auth.verifyEmail(req)));
 app.post('/api/auth/resend', auth.needUser, limit(4, 60000), h((req) => auth.resendVerify(req)));
 app.post('/api/auth/email', auth.needUser, limit(4, 60000), h((req) => auth.changeEmail(req)));
-app.post('/api/cart/price', h(async (req) => { const out = await core.priceCart(req.body.items, { promo: req.body.promo, coupon: req.body.coupon, userId: req.user && req.user.id });
+// The trader's own unused codes that work at checkout, for the one-tap chips under the code field (nothing when logged out or rewards are off)
+app.get('/api/checkout/codes', h(async (req) => ({ codes: req.user ? (await trader.myCodes(req.user.id, await flagOn('rewards'))).filter((c) => c.co && !c.used).map((c) => ({ code: c.code, label: c.label })) : [] })));
+app.post('/api/cart/price', h(async (req) => { const out = await core.priceCart(req.body.items, { promo: req.body.promo, coupon: req.body.coupon, userId: req.user && req.user.id, ref: req.user ? null : await auth.refOf(auth.parseCookies(req.headers.cookie).fs_ref) });
   // the same limits the order is checked against (blocked countries, caps), so checkout can say why before payment
   if (req.user) { try { await pay.checkLimits(req.user, out.items); } catch (e) { if (!e.status || e.status >= 500) throw e; out.blocked = e.message; } }
+  // free packs earned by this cart: one summary line for every checkout step (display only; orders keep their own lines)
+  { const fl = await require('./packs').ladderLine(out.items).catch(() => null); if (fl) out.lines = out.lines.concat([fl]); }
   return out; }));
 
 // ---------- trader ----------
@@ -94,12 +105,15 @@ T.post(['/orders', '/orders/reset', '/orders/activation', '/orders/credits', '/p
 // Packs and credits (switched by settings.flags.packs)
 const PK = require('./packs');
 T.get('/packs', h(async (req) => { const d = await PK.traderData(req.user.id); if (!d) bad('Packs are switched off right now', 403); return d; }));
+T.get('/packs/history', h((req) => PK.history(req.user.id, req.query.before)));
 T.post('/packs/buy', limit(30, 60000), h((req) => PK.buy(req.user, clean(req.body.pack, 30))));
 T.post('/packs/open', limit(30, 60000), h((req) => PK.openOwned(req.user, req.body.id)));
 T.post('/cards/:id/use', limit(20, 60000), h((req) => PK.useCard(req.user, req.params.id, req.body || {})));
 T.post('/orders/credits', h(async (req) => { const m = await maintOn(); if (m) bad(m, 503); if (await auth.blockedReq(req, req.user.email)) bad('This purchase could not be completed. Contact support.', 403); return PK.createCreditsOrder(req.user, req.body || {}); }));
 T.post('/orders', h(async (req) => { const m = await maintOn(); if (m) bad(m, 503); if (await auth.blockedReq(req, req.user.email)) bad('This purchase could not be completed. Contact support.', 403); { const sw = ((await db.one("SELECT v FROM kv WHERE k='store.risk.switches'")) || {}).v || {}; if (sw.sales) bad('New purchases are paused for a short time. Try again soon.', 503); } return pay.createOrder(req.user, req.body); }));
 T.post('/orders/reset', h((req) => pay.createResetOrder(req.user, req.body)));
+T.post('/orders/reset/price', h((req) => pay.quoteReset(req.user, req.body)));
+T.post('/orders/:code/code', limit(20, 60000), h((req) => pay.applyCode(req.user, req.params.code, req.body)));
 T.post('/orders/activation', h((req) => pay.createActivationOrder(req.user, req.body)));
 T.get('/orders/:code', h((req) => pay.getOrder(req.user, req.params.code, req.query.session_id)));
 T.post('/orders/:code/pay', h((req) => pay.payOrder(req.user, req.params.code, req.body)));
@@ -107,33 +121,52 @@ T.get('/orders/:code/receipt', async (req, res) => { try { res.type('html').send
 T.post('/accounts/:id/agreement', h(async (req) => { const r = await core.signAgreement(req.user.id, req.params.id); if (r.activation) { const o = await pay.createActivationOrder(req.user, { account: req.params.id }); return { checkout: '/checkout/payment?order=' + o.code }; } return r; }));
 T.post('/payouts', h(async (req) => { const sw = ((await db.one("SELECT v FROM kv WHERE k='store.risk.switches'")) || {}).v || {}; if (sw.payouts) bad('Payout requests are paused for a short time. Try again later.', 503); return core.requestPayout(req.user.id, clean(req.body.account, 40), req.body.amount, parseInt(req.body.method, 10)); }));
 T.post('/payout-methods', h(async (req) => {
-  const rail = ['Rise', 'USDC'].includes(req.body.rail) ? req.body.rail : 'Rise'; if (rail === 'USDC' && !(await flagOn('cryptoPayouts'))) bad('USDC payouts are switched off right now. Pick another method.'); const railsOff = ((await db.one("SELECT v FROM kv WHERE k='store.finance.rails'")) || {}).v || {}; if (railsOff[rail.toLowerCase()] === false) bad(rail + ' payouts are not offered right now. Pick another method.'); const raw = clean(req.body.label, 120); if (raw.length < 4) bad('Enter your account or wallet details');
-  if (rail === 'USDC' && !/^0x[a-fA-F0-9]{40}$/.test(raw)) bad('Enter a full wallet address that starts with 0x');
-  const label = rail === 'USDC' ? `USDC · Wallet ${raw.slice(0, 6)}…${raw.slice(-4)}` : `Rise · Bank •••• ${raw.replace(/\D/g, '').slice(-4) || raw.slice(-4)}`;
-  const n = (await db.one('SELECT count(*)::int n FROM payout_methods WHERE user_id=$1', [req.user.id])).n; if (n >= 5) bad('You can keep up to 5 payout methods');
-  // The full wallet address is stored encrypted for Finance; traders and other staff only see the masked label. The keyed hash finds one destination saved by several traders.
-  const norm = rail === 'USDC' ? raw.toLowerCase() : raw.replace(/[^0-9a-z]/gi, '').toLowerCase();
-  await db.q("INSERT INTO payout_methods(user_id,rail,label,is_default,unlock_at,dest,dest_hash) VALUES($1,$2,$3,$4, now() + interval '48 hours',$5,$6)", [req.user.id, rail, label, n === 0, rail === 'USDC' ? I.enc(raw) : null, I.mac(rail + ':' + norm)]);
+  const rail = req.body.rail; if (!['Rise', 'USDC'].includes(rail)) bad('Choose Rise or a USDC wallet as the payout method type'); if (rail === 'USDC' && !(await flagOn('cryptoPayouts'))) bad('USDC payouts are switched off right now. Pick another method.'); const railsOff = ((await db.one("SELECT v FROM kv WHERE k='store.finance.rails'")) || {}).v || {}; if (railsOff[rail.toLowerCase()] === false) bad(rail + ' payouts are not offered right now. Pick another method.'); const raw = clean(req.body.label, 120); if (!raw) bad(rail === 'USDC' ? 'Enter your wallet address' : 'Enter the email of your Rise account');
+  // Each type takes one kind of detail: Rise pays to the email of the trader's Rise account, USDC to a wallet address
+  if (rail === 'USDC' && !/^0x[a-fA-F0-9]{40}$/.test(raw)) bad(emailOk(raw) ? 'That is an email. Choose Rise to be paid through your Rise account.' : 'Enter a full wallet address that starts with 0x');
+  if (rail === 'Rise' && !emailOk(raw)) bad(/^0x[a-fA-F0-9]+$/.test(raw) ? 'That is a wallet address. Choose USDC Wallet for a wallet address.' : 'Enter the email of your Rise account');
+  const label = rail === 'USDC' ? `USDC · Wallet ${raw.slice(0, 6)}…${raw.slice(-4)}` : `Rise · ${raw.toLowerCase().replace(/^(.{1,2})[^@]*@/, '$1•••@')}`;
+  const norm = raw.toLowerCase();
+  if (await db.one('SELECT 1 FROM payout_methods WHERE user_id=$1 AND dest_hash=$2', [req.user.id, I.mac(rail + ':' + norm)])) bad('You already added this payout method');
+  const n = (await db.one('SELECT count(*)::int n FROM payout_methods WHERE user_id=$1', [req.user.id])).n; if (n >= 5) bad('You can keep up to 5 payout methods. Remove one you no longer use first.');
+  // The full wallet address or Rise email is stored encrypted for Finance; traders and other staff only see the masked label. The keyed hash finds one destination saved by several traders.
+  await db.q("INSERT INTO payout_methods(user_id,rail,label,is_default,unlock_at,dest,dest_hash) VALUES($1,$2,$3,$4, now() + interval '48 hours',$5,$6)", [req.user.id, rail, label, n === 0, I.enc(rail === 'USDC' ? raw : norm), I.mac(rail + ':' + norm)]);
   await core.notify(null, req.user.id, 'New payout method added', `${label}. It can be used in 48 hours. If this wasn't you, contact support now.`, 'settings?tab=pay');
-  if (rail === 'Rise') { const r = await flows.riseInvite(req.user); if (r === 'invited') await core.notify(null, req.user.id, 'Check your email for a Rise invite', 'Finish Rise onboarding so we can send your payouts.', 'settings?tab=pay'); }
+  if (rail === 'Rise') { const r = await flows.riseInvite(req.user, norm); if (r === 'invited') await core.notify(null, req.user.id, 'Check your email for a Rise invite', 'Finish Rise onboarding so we can send your payouts.', 'settings?tab=pay'); }
 }));
-T.post('/payout-methods/:id/default', h(async (req) => { await db.q('UPDATE payout_methods SET is_default=(id=$2) WHERE user_id=$1', [req.user.id, +req.params.id]); }));
+// Only the trader's own methods: an id that is not a number is refused, an id that is not theirs is not found (and changes nothing)
+const ownMethod = async (req) => { if (!/^\d{1,9}$/.test(String(req.params.id))) bad('Unknown payout method'); const m = await db.one('SELECT * FROM payout_methods WHERE id=$1 AND user_id=$2', [+req.params.id, req.user.id]); if (!m) bad('Payout method not found', 404); return m; };
+T.post('/payout-methods/:id/default', h(async (req) => { const m = await ownMethod(req); await db.q('UPDATE payout_methods SET is_default=(id=$2) WHERE user_id=$1', [req.user.id, m.id]); }));
+// Remove a method. Not while a payout is on its way to it. If it was the default, the oldest one left becomes the default.
+// Adding the same details again later starts a new 48-hour hold, so removing never shortens the safety check.
+T.post('/payout-methods/:id/remove', h(async (req) => { const m = await ownMethod(req);
+  if (await db.one('SELECT 1 FROM payouts WHERE user_id=$1 AND method=$2 AND status = ANY($3) LIMIT 1', [req.user.id, m.label, core.OPEN_PAY])) bad('A payout is on its way to this method. You can remove it once that payout is finished.');
+  await db.q('DELETE FROM payout_methods WHERE id=$1 AND user_id=$2', [m.id, req.user.id]);
+  if (m.is_default) await db.q('UPDATE payout_methods SET is_default=true WHERE id=(SELECT id FROM payout_methods WHERE user_id=$1 ORDER BY created_at, id LIMIT 1)', [req.user.id]);
+  await core.notify(null, req.user.id, 'Payout method removed', `${m.label}. If this wasn't you, change your password and contact support now.`, 'settings?tab=pay');
+  await core.audit(req.user.id, 'payout.method.remove', req.user.tid, { label: m.label });
+}));
 T.post('/notifications/read', h(async (req) => { if (req.body.all) await db.q('UPDATE notifications SET read=true WHERE user_id=$1', [req.user.id]); else await db.q('UPDATE notifications SET read=true WHERE user_id=$1 AND id=$2', [req.user.id, +req.body.id]); }));
+// Ticket ids are whole numbers; anything else is not a ticket
+T.use('/tickets/:id', (req, res, next) => (/^\d{1,9}$/.test(req.params.id) ? next() : res.status(404).json({ error: 'Ticket not found' })));
 T.post('/tickets', h(async (req) => {
-  const s = clean(req.body.subject, 160); if (!s) bad('Add a subject');
-  const t = await db.one('INSERT INTO tickets(user_id,subject,category,channel) VALUES($1,$2,$3,$4) RETURNING id', [req.user.id, s, clean(req.body.category, 60) || 'General', 'Web']);
-  const body = clean(req.body.body, 5000) || s;
-  await db.q('INSERT INTO ticket_msgs(ticket_id,author_id,body) VALUES($1,$2,$3)', [t.id, req.user.id, body]);
-  const SUP = require('./support'); const r = await SUP.onTraderMessage(t.id, body, { isNew: true }); const ss = await SUP.settings();
+  const SUP = require('./support');
+  if (req.body.subject != null && typeof req.body.subject !== 'string') bad('Add a subject'); const s = clean(req.body.subject, 160); if (!s) bad('Add a subject');
+  if (req.body.body != null && typeof req.body.body !== 'string') bad('Add a few details so we can help'); const body = clean(req.body.body, 5000); if (!body) bad('Add a few details so we can help');
+  const cat = await SUP.topic(req.body.category); if (!cat) bad('Pick a topic from the list');
+  // The ticket and its first message are saved together, so a ticket can never exist without a message
+  const t = await db.tx(async (c) => { const x = await c.one('INSERT INTO tickets(user_id,subject,category,channel) VALUES($1,$2,$3,$4) RETURNING id', [req.user.id, s, cat, 'Web']); await c.q('INSERT INTO ticket_msgs(ticket_id,author_id,body) VALUES($1,$2,$3)', [x.id, req.user.id, body]); return x; });
+  const r = await SUP.onTraderMessage(t.id, body, { isNew: true }); const ss = await SUP.settings();
   require('./mail').t('ticket', req.user.id, { ticket: t.id, subject: s, reply_time: r.afterHours ? (ss.ahText || SUP.replyText(ss)) : SUP.replyText(ss), url: require('./auth').BASE() + '/app#support?tkt=' + t.id });
   I.alert('ticket', `:speech_balloon: New ticket #${t.id}${r.urgent ? ' (urgent)' : ''}: ${s}`);
   return { id: t.id };
 }));
 T.post('/tickets/:id/reply', h(async (req) => {
   const t = await db.one('SELECT * FROM tickets WHERE id=$1 AND user_id=$2', [+req.params.id, req.user.id]); if (!t) bad('Ticket not found', 404);
-  await db.q('INSERT INTO ticket_msgs(ticket_id,author_id,body) VALUES($1,$2,$3)', [t.id, req.user.id, clean(req.body.body, 5000)]);
+  const body = typeof req.body.body === 'string' ? clean(req.body.body, 5000) : ''; if (!body) bad('Write a reply first');
+  await db.q('INSERT INTO ticket_msgs(ticket_id,author_id,body) VALUES($1,$2,$3)', [t.id, req.user.id, body]);
   await db.q("UPDATE tickets SET status='open', updated_at=now() WHERE id=$1", [t.id]);
-  await require('./support').onTraderMessage(t.id, clean(req.body.body, 5000));
+  await require('./support').onTraderMessage(t.id, body);
 }));
 T.post('/tickets/:id/rate', h(async (req) => {
   const t = await db.one('SELECT * FROM tickets WHERE id=$1 AND user_id=$2', [+req.params.id, req.user.id]); if (!t) bad('Ticket not found', 404);
@@ -146,7 +179,7 @@ T.post('/tickets/:id/rate', h(async (req) => {
 T.post('/privacy-request', h(async (req) => {
   const type = req.body.type === 'delete' ? 'Delete My Account' : req.body.type === 'marketing' ? 'Stop Marketing' : 'Copy of My Data';
   const all = ((await db.one("SELECT v FROM kv WHERE k='store.users.datareq'")) || {}).v || [];
-  if (all.some((x) => x.uid === req.user.id && x.type === type && x.st !== 'done')) bad('You already asked for this. We will email you within 30 days.');
+  if (all.some((x) => x.uid === req.user.id && x.type === type && x.st !== 'done')) bad('You already asked for this. We will email you within 30 days of your request.');
   const subj = type === 'Delete My Account' ? 'Close My Account' : type === 'Stop Marketing' ? 'Stop Marketing Emails' : 'Data Export Request';
   const t = await db.one("INSERT INTO tickets(user_id,subject,category,channel) VALUES($1,$2,'Account Changes','Web') RETURNING id", [req.user.id, subj]);
   await db.q('INSERT INTO ticket_msgs(ticket_id,author_id,body) VALUES($1,$2,$3)', [t.id, req.user.id, type === 'Delete My Account' ? 'Please close my Funded Sky account and delete my personal data.' : type === 'Stop Marketing' ? 'Please stop all marketing emails.' : 'Please send me a copy of my data.']);
@@ -156,46 +189,99 @@ T.post('/privacy-request', h(async (req) => {
   if (type === 'Stop Marketing') await db.q("UPDATE users SET settings = settings || $2::jsonb WHERE id=$1", [req.user.id, JSON.stringify({ nMkt: false, nNews: false })]);
   return { id, ticket: t.id };
 }));
-T.post('/articles/stat', h(async (req) => { await require('./support').articleStat(req.body.t, req.body.kind); }));
+T.post('/articles/stat', h(async (req) => { await require('./support').articleStat(req.body.t, req.body.kind, req.user.id); }));
 const SETTING_KEYS = ['nEmail', 'nSms', 'nPush', 'nNews', 'nMkt', 'nComp', 'mfaPay'];
 T.post('/settings', h(async (req) => { const o = {}; for (const k of SETTING_KEYS) if (k in req.body) o[k] = !!req.body[k]; await db.q('UPDATE users SET settings = settings || $2 WHERE id=$1', [req.user.id, JSON.stringify(o)]); }));
 T.post('/profile', h(async (req) => { const ph = require('./phone').parse(req.body.phoneIso, req.body.phone); if (ph.err) bad(ph.err); await db.q("UPDATE users SET phone=$2, settings=COALESCE(settings,'{}'::jsonb)||jsonb_build_object('phoneIso',$3::text) WHERE id=$1", [req.user.id, ph.phone, ph.iso]); return { ok: true, phone: ph.phone }; }));
 T.post('/password', h((req) => auth.changePassword(req)));
-T.post('/sessions/:prefix/revoke', h(async (req) => { const p = String(req.params.prefix || ''); if (!/^[A-Za-z0-9_-]{6,20}$/.test(p)) bad('Unknown session'); await db.q("DELETE FROM sessions WHERE user_id=$1 AND left(token, length($2)) = $2 AND token<>$3", [req.user.id, p, req.sess]); }));
+// The id is the hash shown in the sessions list (util.sessId), never part of the token itself
+T.post('/sessions/:id/revoke', h(async (req) => { const p = String(req.params.id || ''); if (!/^[a-f0-9]{16}$/.test(p)) bad('Unknown session'); const { sessId } = require('./util');
+  const hit = (await db.all('SELECT token FROM sessions WHERE user_id=$1 AND token<>$2', [req.user.id, req.sess])).filter((s) => sessId(s.token) === p);
+  for (const s of hit) await db.q('DELETE FROM sessions WHERE user_id=$1 AND token=$2', [req.user.id, s.token]); }));
 T.post('/sessions/revoke-all', h(async (req) => { await db.q('DELETE FROM sessions WHERE user_id=$1 AND token<>$2', [req.user.id, req.sess]); }));
 T.post('/journal/note', h(async (req) => {
-  const day = clean(req.body.day, 10); if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) bad('Pick a day first');
+  const day = typeof req.body.day === 'string' ? req.body.day.trim() : ''; if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) bad('Pick a day first');
+  // a real calendar day (no Feb 30), not in the future and not older than two years
+  const dt = new Date(day + 'T12:00:00Z'); if (isNaN(dt) || dt.toISOString().slice(0, 10) !== day) bad('That is not a real date');
+  if (day > require('./util').tradeDate()) bad('You can only add notes for days up to today');
+  if (dt.getTime() < Date.now() - 731 * 86400000) bad('Notes can be added for the last two years');
   await db.q("UPDATE users SET settings = jsonb_set(settings, '{notes}', COALESCE(settings->'notes','{}'::jsonb) || jsonb_build_object($2::text, $3::text)) WHERE id=$1", [req.user.id, day, clean(req.body.text, 2000)]);
 }));
 T.post('/courses/:id/lesson', needFlag('education', 'Courses are switched off right now'), h(async (req) => {
-  const C = await content.all(); const c = C.courses.find((x) => x.id === req.params.id); if (!c) bad('Course not found', 404);
-  const prog = (req.user.settings && req.user.settings.courses) || {}; const done = Math.min(c.l, (prog[c.id] || 0) + 1);
-  await db.q("UPDATE users SET settings = jsonb_set(settings, '{courses}', COALESCE(settings->'courses','{}'::jsonb) || jsonb_build_object($2::text, $3::int)) WHERE id=$1", [req.user.id, c.id, done]);
-  if (done === c.l && (prog[c.id] || 0) < c.l) await core.points(null, req.user.id, 100, 'Finished ' + c.n);
-  return { done };
-}));
-T.post('/rewards/:id/redeem', needFlag('rewards', 'Rewards are switched off right now'), h(async (req) => {
-  const C = await content.all(); const r = C.rewards.find((x) => x.id === req.params.id); if (!r) bad('Reward not found', 404);
-  return db.tx(async (c) => {
-    const u = await c.one('SELECT points FROM users WHERE id=$1 FOR UPDATE', [req.user.id]); if (u.points < r.pts) bad('You need more credits for this reward');
-    const map = { r1: ['discount', 10], r2: ['free_reset', 0], r3: ['discount', 25], r4: ['free_eval', 0], r5: ['split', 0], r6: ['merch', 0] };
-    const [kind, pct] = map[r.id] || ['discount', 0];
-    const code = 'FS-' + r.id.toUpperCase() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase();
-    await c.q('INSERT INTO coupons(code,user_id,pct,label,kind) VALUES($1,$2,$3,$4,$5)', [code, req.user.id, pct, 'Reward: ' + r.n, kind]);
-    await c.q('INSERT INTO points_log(user_id,label,delta) VALUES($1,$2,$3)', [req.user.id, 'Redeemed ' + r.n, -r.pts]);
-    await c.q('UPDATE users SET points=points-$2 WHERE id=$1', [req.user.id, r.pts]);
-    if (kind === 'merch' || kind === 'split') { const t = await c.one('INSERT INTO tickets(user_id,subject,category,channel) VALUES($1,$2,$3,$4) RETURNING id', [req.user.id, 'Reward redeemed: ' + r.n, 'Account Changes', 'Web']); await c.q('INSERT INTO ticket_msgs(ticket_id,author_id,body) VALUES($1,$2,$3)', [t.id, req.user.id, `I redeemed ${r.n} (code ${code}). Please help me use it.`]); }
-    return { code };
+  // Only courses traders can see (published, with lessons). Progress and the 100 credits are settled under a lock on the
+  // trader's row, so two requests at once cannot both count. The credits are paid once per trader per course, ever:
+  // settings.coursesPaid remembers it, and the ledger has one row per course (unique ref 'course:<id>').
+  const c = content.liveCourses(await content.all()).find((x) => x.id === req.params.id); if (!c) bad('Course not found', 404);
+  const want = req.body && req.body.lesson != null ? parseInt(req.body.lesson, 10) : null;
+  return db.tx(async (t) => {
+    const u = await t.one('SELECT settings FROM users WHERE id=$1 FOR UPDATE', [req.user.id]); const st = (u && u.settings) || {};
+    const prev = Math.max(0, Math.min(c.l, parseInt((st.courses || {})[c.id], 10) || 0));
+    // The page says which lesson it is marking, so a repeated click or a retry does not skip ahead
+    if (want != null && want !== prev + 1) return { done: prev, paid: false };
+    const done = Math.min(c.l, prev + 1); const pay = done >= c.l && prev < c.l && !(st.coursesPaid || {})[c.id];
+    await t.q("UPDATE users SET settings = jsonb_set(COALESCE(settings,'{}'::jsonb), '{courses}', COALESCE(settings->'courses','{}'::jsonb) || jsonb_build_object($2::text, $3::int)) WHERE id=$1", [req.user.id, c.id, done]);
+    let paid = false;
+    if (pay) {
+      await t.q("UPDATE users SET settings = jsonb_set(settings, '{coursesPaid}', COALESCE(settings->'coursesPaid','{}'::jsonb) || jsonb_build_object($2::text, true)) WHERE id=$1", [req.user.id, c.id]);
+      const row = await t.one("INSERT INTO points_log(user_id,label,delta,kind,ref) VALUES($1,$2,100,'earned',$3) ON CONFLICT (user_id, ref) WHERE ref LIKE 'course:%' DO NOTHING RETURNING id", [req.user.id, clean('Finished ' + c.n, 160), 'course:' + c.id]);
+      if (row) { await t.q('UPDATE users SET points=points+100 WHERE id=$1', [req.user.id]); paid = true; }
+    }
+    return { done, paid };
   });
 }));
-T.post('/competitions/:id/join', h(async (req) => { const fl = ((await db.one("SELECT v FROM kv WHERE k='settings.flags'")) || {}).v || {}; if (fl.competitions === false) bad('Competitions are not open right now', 403); const comp = ((await content.all()).competitions || []).find((x) => x.id === req.params.id); if (!comp) bad('Competition not found', 404); if (comp.st === 'ended') bad('This competition has ended'); await db.q("UPDATE users SET settings = jsonb_set(settings, '{comps}', COALESCE(settings->'comps','{}'::jsonb) || jsonb_build_object($2::text, true)) WHERE id=$1", [req.user.id, clean(req.params.id, 20)]); const acct = await require('./comps').joined(comp.id, req.user.id); return { account: acct }; }));
+T.post('/rewards/:id/redeem', needFlag('rewards', 'Rewards are switched off right now'), h(async (req) => {
+  // what a reward gives comes from the reward itself (type and value in the catalog); one with no usable effect is not in this list
+  const r = (await content.rewards()).find((x) => x.id === req.params.id); if (!r) bad('Reward not found', 404);
+  const b = req.body || {}; const uid = req.user.id; let ship = null;
+  if (r.type === 'merch') { const need = (k, n, lab) => { const v = clean(b[k], n); if (!v) bad('Add ' + lab); return v; }; if (!['S', 'M', 'L', 'XL', 'XXL'].includes(b.size)) bad('Pick a size');
+    ship = { size: b.size, name: need('name', 80, 'the name for the parcel'), line1: need('line1', 120, 'your street address'), line2: clean(b.line2, 120), city: need('city', 80, 'your city'), region: clean(b.region, 80), postal: need('postal', 20, 'your postal code'), country: need('country', 60, 'your country') }; }
+  return db.tx(async (c) => {
+    const u = await c.one('SELECT points FROM users WHERE id=$1 FOR UPDATE', [uid]); if (u.points < r.pts) bad('You need more credits for this reward');
+    let ref = ''; let out = {};
+    if (r.type === 'split') { // a split boost goes on a funded account the trader picks, for its next payout
+      const a = await c.one("SELECT * FROM accounts WHERE id=$1 AND user_id=$2 AND kind='funded' AND phase='active' FOR UPDATE", [clean(b.account, 40), uid]); if (!a) bad('Pick one of your funded accounts');
+      const now = require('./rules').rulesFor(await core.catalog(), a).split; if (now >= r.value) bad(`${a.id} already pays you ${now}% on its next payout`);
+      await c.q('UPDATE accounts SET perks=$2 WHERE id=$1', [a.id, JSON.stringify(Object.assign({}, a.perks || {}, { splitOnce: r.value }))]);
+      await core.notify(c, uid, `${r.value}% split on your next payout`, `Your next payout from ${a.id} is paid at a ${r.value}% split.`, 'account?acct=' + a.id); ref = 'acct:' + a.id; out = { account: a.id, split: r.value };
+    } else if (r.type === 'merch') { // merchandise: a support ticket the trader can see, with the size and where to ship
+      const t = await c.one('INSERT INTO tickets(user_id,subject,category,channel) VALUES($1,$2,$3,$4) RETURNING id', [uid, `Reward: ${r.n} (size ${ship.size})`, 'Account Changes', 'Web']);
+      await c.q('INSERT INTO ticket_msgs(ticket_id,author_id,body) VALUES($1,$2,$3)', [t.id, uid, `I redeemed ${r.n} for ${r.pts.toLocaleString('en-US')} credits.\nSize: ${ship.size}\nShip to: ${[ship.name, ship.line1, ship.line2, [ship.city, ship.region, ship.postal].filter(Boolean).join(', '), ship.country].filter(Boolean).join('\n')}`]);
+      await core.notify(c, uid, `We are getting your ${r.n} ready`, `Follow it in support ticket #${t.id}. We reply there with tracking.`, 'support'); ref = 'ticket:' + t.id; out = { ticket: t.id };
+    } else {
+      let code; do { code = 'FS-' + r.id.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8) + '-' + require('crypto').randomBytes(3).toString('hex').toUpperCase(); } while (await c.one('SELECT 1 FROM coupons WHERE code=$1', [code]));
+      const meta = Object.assign({ reward: r.id }, r.type === 'free_eval' ? { size: r.value } : {}, r.resets ? { resets: true } : {});
+      await c.q("INSERT INTO coupons(code,user_id,pct,label,kind,source,meta,size) VALUES($1,$2,$3,$4,$5,'reward',$6,$7)", [code, uid, r.type === 'discount' ? r.value : 0, 'Reward: ' + r.n, r.type, JSON.stringify(meta), r.type === 'free_eval' ? r.value : null]); ref = code; out = { code };
+    }
+    await c.q("INSERT INTO points_log(user_id,label,delta,kind,ref) VALUES($1,$2,$3,'redeem',$4)", [uid, 'Redeemed ' + r.n, -r.pts, r.id + '|' + ref]);
+    await c.q('UPDATE users SET points=points-$2 WHERE id=$1', [uid, r.pts]);
+    return Object.assign({ type: r.type, name: r.n }, out);
+  });
+}));
+// Credits History, a page at a time (the first page and the all-time totals come with the dashboard data)
+T.get('/points', h(async (req) => trader.pointsPage(req.user.id, req.query.page)));
+T.post('/competitions/:id/join', h(async (req) => { const fl = ((await db.one("SELECT v FROM kv WHERE k='settings.flags'")) || {}).v || {}; if (fl.competitions === false) bad('Competitions are not open right now', 403); const acct = await require('./comps').join(clean(req.params.id, 30), req.user.id); return { account: acct }; }));
+// A link made before certificate IDs were unique (CF- and five digits): it still opens when only one certificate ever had that number
+async function findCertOld(id) {
+  const tr = require('./trader'); id = clean(id, 20); if (!/^CF-\d{5}$/.test(id)) return null; const hits = [];
+  for (const p of await db.all("SELECT code FROM payouts WHERE status='paid'")) if (tr.certIdOld('o' + p.code) === id) hits.push(tr.certId('o' + p.code));
+  for (const a of await db.all('SELECT id, kind, funded_at, passed_at FROM accounts WHERE funded_at IS NOT NULL OR passed_at IS NOT NULL')) {
+    if (a.kind === 'funded' && a.funded_at && tr.certIdOld('f' + a.id) === id) hits.push(tr.certId('f' + a.id));
+    if (a.passed_at && tr.certIdOld('p' + a.id) === id) hits.push(tr.certId('p' + a.id));
+  }
+  return hits.length === 1 ? findCert(hits[0]) : null;
+}
 // Certificates: find one by its public ID
 async function findCert(id) {
-  const tr = require('./trader'); id = clean(id, 20);
-  for (const p of await db.all("SELECT p.code, p.amount, p.paid_at, p.user_id FROM payouts p WHERE p.status='paid'")) if (tr.certId('o' + p.code) === id) return { id, user: p.user_id, k: 'Payout Certificate', v: '$' + Math.round(p.amount).toLocaleString('en-US'), when: p.paid_at };
+  const tr = require('./trader'); id = clean(id, 20); const off = await tr.certOff();
+  if (!off.Payout) for (const p of await db.all("SELECT p.code, p.amount, p.paid_at, p.user_id FROM payouts p WHERE p.status='paid'")) if (tr.certId('o' + p.code) === id) return { id, user: p.user_id, k: 'Payout Certificate', v: '$' + Math.round(p.amount).toLocaleString('en-US'), when: p.paid_at };
   for (const a of await db.all('SELECT id, user_id, size, kind, funded_at, passed_at FROM accounts WHERE funded_at IS NOT NULL OR passed_at IS NOT NULL')) {
-    if (a.kind === 'funded' && a.funded_at && tr.certId('f' + a.id) === id) return { id, user: a.user_id, k: 'Funded Trader', v: '$' + a.size / 1000 + 'K Funded Account', when: a.funded_at };
-    if (a.passed_at && tr.certId('p' + a.id) === id) return { id, user: a.user_id, k: 'Evaluation Passed', v: '$' + a.size / 1000 + 'K Evaluation', when: a.passed_at };
+    if (!off.Funded && a.kind === 'funded' && a.funded_at && tr.certId('f' + a.id) === id) return { id, user: a.user_id, k: 'Funded Trader', v: '$' + a.size / 1000 + 'K Funded Account', when: a.funded_at };
+    if (!off.Passed && a.passed_at && tr.certId('p' + a.id) === id) return { id, user: a.user_id, k: 'Evaluation Passed', v: '$' + a.size / 1000 + 'K Evaluation', when: a.passed_at };
+  }
+  // Lifetime Payouts: one certificate each time a trader's paid payouts pass $10K, $25K, $50K and $100K
+  if (!off['Lifetime Payouts']) for (const u of await db.all("SELECT user_id FROM payouts WHERE status='paid' GROUP BY user_id HAVING sum(amount) >= $1", [tr.LIFE[0]])) {
+    const hit = tr.lifeCerts(u.user_id, await db.all("SELECT amount, paid_at FROM payouts WHERE status='paid' AND user_id=$1", [u.user_id])).find((x) => x.id === id);
+    if (hit) return { id, user: u.user_id, k: 'Lifetime Payouts', v: hit.v, when: hit.when };
   }
   return null;
 }
@@ -213,6 +299,7 @@ T.post('/tax/form', h((req) => flows.taxForm(req.user, req.body || {})));
 const ID_TYPES = ['Passport', "Driver's License", 'National ID Card'];
 T.post('/kyc', h(async (req) => {
   const b = req.body || {}; if (req.user.kyc_status === 'verified') bad('Your identity is already verified. Nothing more to send.');
+  if (req.user.kyc_status === 'submitted') bad('Your details are in review. Contact support if something needs to change.');
   const name = clean(b.name, 120); if (name.length < 3 || !/\s/.test(name)) bad('Enter your full legal name, first and last, as it is on your ID');
   const dob = clean(b.dob, 12); const dm = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dob); const dd = dm && new Date(Date.UTC(+dm[1], +dm[2] - 1, +dm[3]));
   if (!dd || dd.getUTCMonth() !== +dm[2] - 1 || dd.getUTCDate() !== +dm[3]) bad('Enter your date of birth');
@@ -222,9 +309,9 @@ T.post('/kyc', h(async (req) => {
   const idType = ID_TYPES.find((x) => x === clean(b.idType, 40)); if (!idType) bad('Choose your ID type');
   const idn = clean(b.idNumber, 40).replace(/[\s-]/g, ''); if (!/^[A-Za-z0-9]{5,20}$/.test(idn) || !/\d/.test(idn)) bad('Enter the ID number exactly as it is on the document (5 to 20 letters and numbers)');
   const k = { name, dob, country: crow[0], idType, idLast4: idn.slice(-4), at: new Date().toISOString() };
-  await db.q("UPDATE users SET kyc=$2, kyc_status='submitted' WHERE id=$1 AND kyc_status<>'verified'", [req.user.id, k]);
+  await db.q("UPDATE users SET kyc=$2, kyc_status='submitted' WHERE id=$1 AND kyc_status NOT IN ('verified','submitted')", [req.user.id, k]);
 }));
-T.post('/affiliate/apply', needFlag('affiliates', 'The affiliate program is not taking applications right now'), h(async (req) => { const b = req.body || {}; await db.q("UPDATE users SET settings = settings || $2 WHERE id=$1", [req.user.id, JSON.stringify({ affApplied: true, affAt: new Date().toISOString(), affWhere: clean(b.where, 120), affAudience: clean(b.audience, 200) })]); }));
+T.post('/affiliate/apply', needFlag('affiliates', 'The affiliate program is not taking applications right now'), h((req) => require('./affiliates').apply(req.user, req.body || {}, core)));
 app.use('/api', T);
 
 // ---------- back office ----------
@@ -274,7 +361,9 @@ app.get('/', async (req, res) => {
   if (req.query.ref) {
     const code = clean(req.query.ref, 40); res.append('Set-Cookie', `fs_ref=${encodeURIComponent(code)}; Path=/; Max-Age=${30 * 86400}; SameSite=Lax`);
     const d = new Date().toISOString().slice(0, 10);
-    if (/^[A-Za-z0-9_-]{2,40}$/.test(code)) await db.q("INSERT INTO kv(k,v) VALUES($1, jsonb_build_object($2::text, 1)) ON CONFLICT (k) DO UPDATE SET v = kv.v || jsonb_build_object($2::text, COALESCE((kv.v->>$2)::int,0)+1), updated_at=now()", ['refclicks.' + code, d]).catch(() => {});
+    // Clicks are counted under the code in capital letters, and never for the owner opening their own link
+    const own = req.user && (String(req.user.ref_code || '').toUpperCase() === code.toUpperCase() || await require('./affiliates').list().then((L) => L.some((x) => x.user === req.user.id && require('./affiliates').up(x.code) === code.toUpperCase())).catch(() => false));
+    if (/^[A-Za-z0-9_-]{2,40}$/.test(code) && !own) await db.q("INSERT INTO kv(k,v) VALUES($1, jsonb_build_object($2::text, 1)) ON CONFLICT (k) DO UPDATE SET v = kv.v || jsonb_build_object($2::text, COALESCE((kv.v->>$2)::int,0)+1), updated_at=now()", ['refclicks.' + code.toUpperCase(), d]).catch(() => {});
     return res.redirect(req.user ? '/app' : '/signup?ref=' + encodeURIComponent(code));
   }
   res.redirect(req.user ? '/app' : '/checkout');
@@ -300,19 +389,19 @@ async function unsub(req, res) {
   const uid = parseInt(req.query.u, 10); const ok = uid && (await require('./mail').unsubCheck(uid, String(req.query.t || '')));
   if (ok) await db.q('UPDATE users SET settings = settings || $2::jsonb WHERE id=$1', [uid, JSON.stringify({ nMkt: false })]);
   if (req.method === 'POST') return res.status(ok ? 200 : 400).end();
-  res.status(ok ? 200 : 400).send(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Email Preferences · Funded Sky</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#08080A;color:#F4F2F1;font:15px/1.55 "Mona Sans",system-ui,sans-serif;padding:24px;box-sizing:border-box}.c{max-width:440px;background:#18181A;border:1px solid #26262A;border-radius:12px;padding:32px}h1{margin:0 0 10px;font-size:24px}p{margin:0 0 14px;color:#D4CFCD}a{color:#7CC4FF}</style></head><body><div class="c"><h1>${ok ? 'You Are Unsubscribed.' : 'This Link Is Not Valid.'}</h1><p>${ok ? 'You will not get offers or sales emails any more. Receipts, payout updates and security emails still come, because they are about your account.' : 'Open the latest email from us and use its link, or change your emails in Settings.'}</p><p><a href="/app#settings?tab=notif">Manage All Emails</a></p></div></body></html>`);
+  res.setHeader('Vary', 'Cookie'); res.status(ok ? 200 : 400).send(`<!doctype html><html lang="en"${PO.light(req) ? ' class="lt"' : ''}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Email Preferences · Funded Sky</title><style>${PO.VARS}body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--bg);color:var(--hd);font:15px/1.55 "Mona Sans",system-ui,sans-serif;padding:24px;box-sizing:border-box}.c{max-width:440px;background:var(--cd);border:1px solid var(--ln);border-radius:12px;padding:32px}h1{margin:0 0 10px;font-size:24px}p{margin:0 0 14px;color:var(--tx)}a{color:var(--lk)}</style></head><body><div class="c"><h1>${ok ? 'You Are Unsubscribed.' : 'This Link Is Not Valid.'}</h1><p>${ok ? 'You will not get offers or sales emails any more. Receipts, payout updates and security emails still come, because they are about your account.' : 'Open the latest email from us and use its link, or change your emails in Settings.'}</p><p><a href="/app#settings?tab=notif">Manage All Emails</a></p></div></body></html>`);
 }
 app.get('/unsubscribe', unsub); app.post('/unsubscribe', express.urlencoded({ extended: false }), unsub);
 app.get('/cert/:id', async (req, res) => {
   const e = (x) => String(x || '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  const c = await findCert(req.params.id).catch(() => null); const rev = ((await db.one("SELECT v FROM kv WHERE k='store.rewards.revoked'").catch(() => null)) || {}).v || [];
+  const c = await findCert(req.params.id).then((x) => x || findCertOld(req.params.id)).catch(() => null); const rev = ((await db.one("SELECT v FROM kv WHERE k='store.rewards.revoked'").catch(() => null)) || {}).v || [];
   let u = null; if (c) { u = await db.one('SELECT first, last FROM users WHERE id=$1', [c.user]); db.q("INSERT INTO kv(k,v) VALUES('certviews', jsonb_build_object($1::text, 1)) ON CONFLICT (k) DO UPDATE SET v = kv.v || jsonb_build_object($1::text, COALESCE((kv.v->>$1)::int,0)+1)", [c.id]).catch(() => {}); }
   const bad2 = !c || rev.includes(c.id);
   const when = c ? new Date(c.when).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '';
-  res.status(c ? 200 : 404).send(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Funded Sky Certificate ${e(req.params.id)}</title>
-<meta property="og:title" content="${bad2 ? 'Funded Sky certificate' : e(c.k + ': ' + c.v)}"><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#08080A;color:#F4F2F1;font-family:"Mona Sans",system-ui,sans-serif;padding:24px;box-sizing:border-box}
-.c{width:min(640px,100%);border:1px solid #26262A;border-radius:16px;padding:40px;background:radial-gradient(120% 120% at 100% 0,#13202E,#111113 60%);box-sizing:border-box}.lg{font-weight:700;font-size:20px}.lg i{font-style:normal;background:#7CC4FF;color:#08080A;border-radius:4px;padding:1px 6px;margin-left:6px;font-size:14px}
-.k{margin-top:36px;color:#7CC4FF;font-size:14px;letter-spacing:.12em;text-transform:uppercase}.v{font-size:40px;font-weight:700;margin:8px 0}.n{color:#D4CFCD;font-size:16px}.id{margin-top:32px;font-family:"Geist Mono",monospace;color:#9C9693;font-size:13px}.no{color:#F2777F;font-size:18px;margin-top:28px}</style></head>
+  res.setHeader('Vary', 'Cookie'); res.status(c ? 200 : 404).send(`<!doctype html><html lang="en"${PO.light(req) ? ' class="lt"' : ''}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Funded Sky Certificate ${e(req.params.id)}</title>
+<meta property="og:title" content="${bad2 ? 'Funded Sky certificate' : e(c.k + ': ' + c.v)}"><style>${PO.VARS}body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--bg);color:var(--hd);font-family:"Mona Sans",system-ui,sans-serif;padding:24px;box-sizing:border-box}
+.c{width:min(640px,100%);border:1px solid var(--ln);border-radius:16px;padding:40px;background:radial-gradient(120% 120% at 100% 0,var(--ac),var(--cd2) 60%);box-sizing:border-box}.lg{font-weight:700;font-size:20px}.lg i{font-style:normal;background:var(--lgb);color:var(--lgt);border-radius:4px;padding:1px 6px;margin-left:6px;font-size:14px}
+.k{margin-top:36px;color:var(--lk);font-size:14px;letter-spacing:.12em;text-transform:uppercase}.v{font-size:40px;font-weight:700;margin:8px 0}.n{color:var(--tx);font-size:16px}.id{margin-top:32px;font-family:"Geist Mono",monospace;color:var(--mu);font-size:13px}.no{color:var(--er);font-size:18px;margin-top:28px}</style></head>
 <body><div class="c"><div class="lg">fundedsky<i>futures</i></div>${bad2 ? `<p class="no">${c ? 'This certificate is no longer valid.' : 'Certificate not found.'}</p>` : `<div class="k">${e(c.k)}</div><div class="v">${e(c.v)}</div><div class="n">${e(u.first)} ${e((u.last || '').slice(0, 1))}. · ${e(when)}</div>`}<div class="id">${e(req.params.id)} · Simulated trading. Funded Sky pays performance rewards from simulated accounts.</div></div></body></html>`);
 });
 app.get('/status', async (req, res) => {
@@ -321,7 +410,8 @@ app.get('/status', async (req, res) => {
   const list = (await require('./integrations').list()).filter((x) => x.enabled);
   const open = inc.filter((x) => x.st !== 'resolved');
   const rows = [['Website and Checkout', 'ok'], ['Trader Dashboard', 'ok']].concat(list.filter((x) => ['tailoredpay', 'stripe', 'confirmo', 'rise', 'sumsub', 'resend'].includes(x.id)).map((x) => [x.name, x.status === 'live' ? 'ok' : 'w']));
-  res.send(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Funded Sky Status</title><meta http-equiv="refresh" content="60"><style>body{margin:0;background:#08080A;color:#D4CFCD;font-family:"Mona Sans",system-ui;line-height:1.5}main{max-width:720px;margin:0 auto;padding:56px 24px}h1{color:#F4F2F1;font-size:28px;margin:0 0 18px}.bar{padding:14px 18px;border-radius:12px;background:${open.length ? '#2A2113' : '#10241A'};color:${open.length ? '#F2C46D' : '#5FD39A'};font-weight:600;margin-bottom:22px}.r{display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid #26262A}.ok{color:#5FD39A}.w{color:#F2C46D}h2{color:#F4F2F1;font-size:17px;margin:30px 0 8px}.i{padding:12px 0;border-bottom:1px solid #26262A}.n{color:#9C9693;font-size:13px}a{color:#7CC4FF}</style></head><body><main><p><a href="/">← Funded Sky</a></p><h1>System Status</h1><div class="bar">${open.length ? e(open[0].t) : 'Everything is working'}</div>${rows.map(([n, st]) => `<div class="r"><span>${e(n)}</span><span class="${st}">${st === 'ok' ? 'Normal' : 'Slower than usual'}</span></div>`).join('')}<h2>Recent Incidents</h2>${inc.map((x) => `<div class="i"><b>${e(x.t)}</b> <span class="n">· ${x.st === 'resolved' ? 'Resolved' : 'Ongoing'} · ${e(new Date(x.at).toUTCString().slice(0, 22))} UTC</span>${(x.upd || []).slice(-1).map((u) => `<div class="n">${e(typeof u === 'string' ? u : u.text)}</div>`).join('')}</div>`).join('') || '<p class="n">No incidents reported.</p>'}</main></body></html>`);
+  res.setHeader('Vary', 'Cookie');
+  res.send(`<!doctype html><html lang="en"${PO.light(req) ? ' class="lt"' : ''}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Funded Sky Status</title><meta http-equiv="refresh" content="60"><style>${PO.VARS}body{margin:0;background:var(--bg);color:var(--tx);font-family:"Mona Sans",system-ui;line-height:1.5}main{max-width:720px;margin:0 auto;padding:56px 24px}h1{color:var(--hd);font-size:28px;margin:0 0 18px}.bar{padding:14px 18px;border-radius:12px;background:${open.length ? 'var(--wnb)' : 'var(--okb)'};color:${open.length ? 'var(--wn)' : 'var(--ok)'};font-weight:600;margin-bottom:22px}.r{display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--ln)}.ok{color:var(--ok)}.w{color:var(--wn)}h2{color:var(--hd);font-size:17px;margin:30px 0 8px}.i{padding:12px 0;border-bottom:1px solid var(--ln)}.i b{color:var(--hd)}.n{color:var(--mu);font-size:13px}a{color:var(--lk)}</style></head><body><main><p><a href="/">← Funded Sky</a></p><h1>System Status</h1><div class="bar">${open.length ? e(open[0].t) : 'Everything is working'}</div>${rows.map(([n, st]) => `<div class="r"><span>${e(n)}</span><span class="${st}">${st === 'ok' ? 'Normal' : 'Slower than usual'}</span></div>`).join('')}<h2>Recent Incidents</h2>${inc.map((x) => `<div class="i"><b>${e(x.t)}</b> <span class="n">· ${x.st === 'resolved' ? 'Resolved' : 'Ongoing'} · ${e(new Date(x.at).toUTCString().slice(0, 22))} UTC</span>${(x.upd || []).slice(-1).map((u) => `<div class="n">${e(typeof u === 'string' ? u : u.text)}</div>`).join('')}</div>`).join('') || '<p class="n">No incidents reported.</p>'}</main></body></html>`);
 });
 app.get('/terms', editable('terms'));
 app.get('/privacy', editable('privacy'));
@@ -331,12 +421,23 @@ app.get('/rules', async (req, res, next) => {
   const pg = ((await db.one("SELECT v FROM kv WHERE k='content.pages'").catch(() => null)) || {}).v || {}; if (pg.rules && pg.rules.status === 'Published' && pg.rules.txt) return editable('rules')(req, res, next);
   try { const c = await core.catalog(); const RR = require('./rules'); const e = (x) => String(x == null ? '' : x).replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch])); const m = (v) => '$' + Number(v || 0).toLocaleString('en-US');
     const RT = require('./ruletable');
-    const tables = c.plans.filter((p) => p.active).map((p) => { const t = RT.planTable(c, p.id); if (!t || !t.sizes.length) return '';
-      return `<h2>${e(p.name || p.short)}</h2><p>${e(p.desc || '')}</p><div class="tw"><table><thead><tr><th></th>${t.sizes.map((z) => `<th>$${z / 1000}K</th>`).join('')}</tr></thead><tbody>${t.rows.map((r) => (r.length === 1 ? `<tr class="g"><th colspan="${t.sizes.length + 1}">${e(r[0])}</th></tr>` : `<tr><th>${e(r[0])}</th>${r.slice(1).map((v) => `<td>${e(v)}</td>`).join('')}</tr>`)).join('')}</tbody></table></div>`; }).join('');
+    const tables = c.plans.filter((p) => p.active).map((p, pi) => { const t = RT.planTable(c, p.id); if (!t || !t.sizes.length) return '';
+      // On a phone the table shows one size at a time, picked with the size buttons (radio inputs, so it works without scripts)
+      return `<h2>${e(p.name || p.short)}</h2><p>${e(p.desc || '')}</p><div class="rs">${t.sizes.map((z, i) => `<input type="radio" name="rs${pi}" id="rs${pi}_${i}"${i ? '' : ' checked'}><label for="rs${pi}_${i}">$${z / 1000}K</label>`).join('')}<div class="tw"><table><thead><tr><th></th>${t.sizes.map((z) => `<th>$${z / 1000}K</th>`).join('')}</tr></thead><tbody>${t.rows.map((r) => (r.length === 1 ? `<tr class="g"><th colspan="${t.sizes.length + 1}">${e(r[0])}</th></tr>` : `<tr><th>${e(r[0])}</th>${r.slice(1).map((v) => `<td>${e(v)}</td>`).join('')}</tr>`)).join('')}</tbody></table></div></div>`; }).join('');
     const sup = e((await require('./mail').company()).support); res.setHeader('Vary', 'Cookie');
-    res.send(PO.page({ req, wide: true, title: 'Trading Rules', note: `The rules every new account starts with, straight from our live catalog. Your own accounts show their rules in the dashboard. Questions: <a href="mailto:${sup}">${sup}</a>`, css: 'h2{font-size:21px;margin:36px 0 4px}.tw{overflow-x:auto;border:1px solid var(--ln);border-radius:10px;margin-top:12px}table{border-collapse:collapse;width:100%;font-size:14px;min-width:560px}th,td{padding:10px 14px;border-bottom:1px solid var(--ln2);text-align:right;white-space:nowrap}tbody th{text-align:left;color:var(--mu);font-weight:500}thead th{color:var(--hd)}tr:last-child th,tr:last-child td{border-bottom:0}tr.g th{color:var(--hd);font-weight:600;padding-top:18px;text-align:left}td{white-space:normal;min-width:120px}', body: `${tables}<p style="margin-top:32px"><a href="/checkout">Choose an Account</a> · <a href="/terms">Terms of Service</a></p>` })); } catch (err) { next(err); }
+    res.send(PO.page({ req, wide: true, title: 'Trading Rules', note: `The rules every new account starts with, straight from our live catalog. Your own accounts show their rules in the dashboard. Questions: <a href="mailto:${sup}">${sup}</a>`, css: 'h2{font-size:21px;margin:36px 0 4px}.tw{overflow-x:auto;border:1px solid var(--ln);border-radius:10px;margin-top:12px}table{border-collapse:collapse;width:100%;font-size:14px;min-width:560px}th,td{padding:10px 14px;border-bottom:1px solid var(--ln2);text-align:right;white-space:nowrap}tbody th{text-align:left;color:var(--mu);font-weight:500}thead th{color:var(--hd)}tr:last-child th,tr:last-child td{border-bottom:0}tr.g th{color:var(--hd);font-weight:600;padding-top:18px;text-align:left}td{white-space:normal;min-width:120px}.rs>input{position:absolute;opacity:0;pointer-events:none}.rs>label{display:none}@media (max-width:700px){main{padding:40px 16px}.rs{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}.rs>label{display:block;flex:1;text-align:center;padding:9px 0;border:1px solid var(--ln);border-radius:8px;font-size:14px;font-weight:500;color:var(--mu);cursor:pointer}.rs>input:checked+label{color:var(--hd);border-color:var(--lk);box-shadow:inset 0 0 0 1px var(--lk)}.rs>input:focus-visible+label{outline:2px solid var(--lk);outline-offset:2px}.rs .tw{flex:1 0 100%;margin-top:6px;overflow:visible}table,tbody{display:block;min-width:0}thead{display:none}tr{display:flex;gap:14px;border-bottom:1px solid var(--ln2)}tr:last-child{border-bottom:0}th,td{border-bottom:0;display:block;flex:1 1 0;white-space:normal;min-width:0;overflow-wrap:break-word}tbody th{flex:1.4 1 0}' + [1, 2, 3, 4, 5, 6].map((i) => `.rs>input:nth-of-type(${i}):checked~.tw td:not(:nth-child(${i + 1}))`).join(',') + '{display:none}}', body: `${tables}<p style="margin-top:32px"><a href="/checkout">Choose an Account</a> · <a href="/terms">Terms of Service</a></p>` })); } catch (err) { next(err); }
 });
 app.get('/faq', editable('faq'));
+// Public competition leaderboard (Back Office > Competitions > Leaderboard > Settings switches it on and off)
+app.get('/leaderboard', async (req, res, next) => {
+  try { const fl = ((await db.one("SELECT v FROM kv WHERE k='settings.flags'")) || {}).v || {}; const d = fl.competitions === false ? null : await require('./comps').forPublic();
+    if (!d) return res.status(404).sendFile(path.join(DIST, '404.html'), (e) => e && res.status(404).send('Not found'));
+    const e = PO.esc; const m = (v) => (v < 0 ? '−' : v > 0 ? '+' : '') + '$' + Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const tbl = (c) => (c.lb && c.lb.length ? `<div class="tw"><table><thead><tr><th>Rank</th><th>Trader</th><th>Country</th><th>Return</th><th>Profit</th></tr></thead><tbody>${c.lb.map((x) => `<tr><td>#${x.rank}</td><th>${e(x.name)}</th><td>${e(x.country)}</td><td>${x.pct}%</td><td>${m(x.pnl)}</td></tr>`).join('')}</tbody></table></div>${c.total.ranked > c.lb.length ? `<p class="n">Showing the top ${c.lb.length} of ${c.total.ranked} ranked traders.</p>` : ''}` : '<p class="n">Nobody has traded yet.</p>');
+    const sec = (c) => `<h2>${e(c.n)}</h2><p class="n">${c.st === 'live' ? 'Live now' : c.st === 'ended' ? 'Finished' : 'Coming up'} · ${e(c.start)} to ${e(c.end)} · ${e(c.size)} · ${e(c.prize)}</p>${c.st === 'ended' && c.winners && c.winners.length ? `<p>${c.winners.map((w) => `<b>${e(w.place)}</b> ${e(w.name)}, ${e(w.prize)}`).join(' · ')}</p>` : ''}${c.st === 'upcoming' ? '' : tbl(c)}`;
+    const L = d.comps.filter((c) => c.st === 'live').concat(d.comps.filter((c) => c.st === 'upcoming'), d.comps.filter((c) => c.st === 'ended').slice(0, 5)); res.setHeader('Vary', 'Cookie');
+    res.send(PO.page({ req, wide: true, title: 'Competition Leaderboard', note: 'Free trading competitions on practice accounts. Ranked by profit, updated every minute.', css: 'h2{font-size:21px;margin:36px 0 4px}.n{color:var(--mu);font-size:14px;margin:4px 0 0}.tw{overflow-x:auto;border:1px solid var(--ln);border-radius:10px;margin-top:12px}table{border-collapse:collapse;width:100%;font-size:14px;min-width:480px}th,td{padding:10px 14px;border-bottom:1px solid var(--ln2);text-align:right;white-space:nowrap}th:nth-child(-n+3),td:nth-child(-n+3){text-align:left}tbody th{font-weight:500;color:var(--hd)}thead th{color:var(--mu);font-weight:500}tr:last-child th,tr:last-child td{border-bottom:0}', body: `${L.length ? L.map(sec).join('') : '<p>No competitions right now.</p>'}<h2>How Ranking Works</h2><ul>${d.rules.map((x) => `<li>${e(x)}</li>`).join('')}</ul><p style="margin-top:32px"><a href="/app/competitions">Join a Competition</a></p>` })); } catch (err) { next(err); }
+});
 app.get('/logout', async (req, res) => { await auth.logout(req, res); const n = String(req.query.next || '/login'); res.redirect(/^\/(?![\/\\])/.test(n) && !/[\u0000-\u001f\\]/.test(n) ? n : '/login'); });
 app.get('/forgot-password', (req, res) => themed('forgot.html')(req, res));
 app.get('/reset-password', (req, res) => themed('reset-password.html')(req, res));
@@ -344,7 +445,7 @@ app.get('/verify-email', (req, res) => themed('verify.html')(req, res));
 app.get('/reset', needPage(false), (req, res, next) => themed('reset.html')(req, res, next));
 app.get('/app/packs', async (req, res, next) => { if (!(await require('./packs').enabled())) return res.redirect('/app'); next(); });
 app.get(['/app', '/app/*'], needPage(false), page('app.html'));
-app.get(['/admin', '/admin/*'], needPage(true), (req, res) => { const b = ((req.params[0] || 'home').split('/')[0] || 'home').replace(/[^a-z]/g, ''); const f = path.join(DIST, 'admin', b + '.html'); if (fs.existsSync(f)) return res.sendFile(f); res.redirect('/admin/home'); });
+app.get(['/admin', '/admin/*'], needPage(true), (req, res) => { const dc = /^Admin([A-Za-z]+?)(?:Light)?\.dc\.html$/.exec((req.params[0] || '').split('/')[0]); if (dc) return res.redirect('/admin/' + dc[1].toLowerCase()); const b = ((req.params[0] || 'home').split('/')[0] || 'home').replace(/[^a-z]/g, ''); const f = path.join(DIST, 'admin', b + '.html'); if (fs.existsSync(f)) return res.sendFile(f); res.redirect('/admin/home'); });
 app.use((req, res) => res.status(404).sendFile(path.join(DIST, '404.html'), (e) => e && res.status(404).send('Not found')));
 
 const PORT = process.env.PORT || 3000;
@@ -352,6 +453,7 @@ migrate().then(async () => {
   // Accounts bought before rule snapshots existed keep the rules in force today from now on
   try { const cat = await core.catalog(true); const RR = require('./rules'); for (const a of await db.all('SELECT id, plan, size FROM accounts WHERE rs IS NULL')) await db.q('UPDATE accounts SET rs=$2 WHERE id=$1', [a.id, RR.snapshot(cat, a.plan, a.size)]); } catch (e) { console.error('rules backfill', e.message); }
   try { if (await require('./planmigr').run()) console.log('Catalog updated: full rule sets'); } catch (e) { console.error('plan update', e.message); }
+  try { const n = await flows.taxEncryptOld(); if (n) console.log('Tax forms encrypted: ' + n); } catch (e) { console.error('tax form encryption', e.message); }
   app.listen(PORT, () => console.log('Funded Sky listening on ' + PORT + (pay.enabled() ? ' (Stripe on)' : ' (test payments)')));
   sim.start(); require('./riskscan').start(); require('./automations').start();
 }).catch((e) => { console.error('Startup failed', e); process.exit(1); });

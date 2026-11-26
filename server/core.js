@@ -56,12 +56,14 @@ function normPromo(p) {
 }
 const liveOn = (p, d) => p.active && !(p.starts && d < p.starts) && !(p.ends && d > p.ends);
 // Price a cart. items: [{plan,size,platform,addons:[...],qty}]. Same rules as the back office Live Preview.
-async function priceCart(items, { promo, coupon, userId, country, kind } = {}) {
+async function priceCart(items, { promo, coupon, userId, country, kind, ref, noCard, anyUse } = {}) {
   const cat = await catalog(); const today = new Date().toISOString().slice(0, 10);
   if (!Array.isArray(items) || !items.length) bad('Your cart is empty');
   if (items.length > 10) bad('Too many accounts in one order');
   const comps = []; const accts = []; const norm = []; const notes = []; let count = 0;
   items.forEach((it, li) => {
+    if (!it || typeof it !== 'object') bad('Your cart could not be read. Start again from the plans page.');
+    it = Object.assign({}, it, { addons: [...new Set(Array.isArray(it.addons) ? it.addons : [])] }); // each add-on once per line
     const p = planDef(cat, it.plan); if (!p || !p.active) bad('Unknown plan');
     const s = sizeDef(cat, it.plan, it.size); if (!s) bad('That size is not offered on the ' + p.name);
     const qty = Math.max(1, Math.min(5, parseInt(it.qty, 10) || 1));
@@ -105,6 +107,11 @@ async function priceCart(items, { promo, coupon, userId, country, kind } = {}) {
   const autos = (cat.autos || []).map((p) => Object.assign(normPromo(p), { auto: true })).filter((p) => liveOn(p, today) && (!p.first || firstBuy) && (!p.minCart || sub >= p.minCart) && (!p.countries.length || p.countries.includes(ctry))).sort((a, b) => a.priority - b.priority);
   // the code a trader typed: a catalog promotion, or an affiliate's code
   const AFF = require('./affiliates'); let codeP = null; let affRow = null; let promoRow = null;
+  // one code field at checkout: a promo code, an affiliate's code, or one of the trader's own reward or card codes. Work out which it is here.
+  if (promo && !coupon && !(cat.promos || []).some((x) => String(x.code).toUpperCase() === String(promo).trim().toUpperCase())) {
+    const own = await db.one('SELECT code FROM coupons WHERE upper(code)=upper($1)', [String(promo).trim()]);
+    if (own) { if (!userId) bad('Log in to use your reward code'); coupon = own.code; promo = null; }
+  }
   if (promo) {
     promoRow = (cat.promos || []).find((x) => String(x.code).toUpperCase() === String(promo).toUpperCase());
     if (promoRow) { const pr = normPromo(promoRow);
@@ -118,13 +125,16 @@ async function priceCart(items, { promo, coupon, userId, country, kind } = {}) {
       if (pr.perTrader && userId) { const mine = (await db.one("SELECT count(*)::int n FROM orders WHERE user_id=$1 AND upper(promo)=$2 AND status='paid'", [userId, pr.code])).n; if (mine >= pr.perTrader) bad(pr.perTrader === 1 ? 'You have already used this code' : 'You have used this code the maximum number of times'); }
       codeP = pr;
     } else { affRow = await AFF.byCode(promo); if (!affRow) bad('That promo code is not valid'); if (userId && affRow.user === userId) bad('You cannot use your own affiliate code');
-      const t = await AFF.tierOf(affRow); if (!t.disc) bad('That code has no discount right now'); codeP = Object.assign(normPromo({ code: affRow.code, pct: t.disc, name: 'Code ' + affRow.code }), { aff: affRow.user }); }
+      const t = await AFF.tierOf(affRow); if (!t.disc) bad('That code has no discount right now'); affRow = Object.assign({}, affRow, { code: AFF.up(affRow.code) }); codeP = Object.assign(normPromo({ code: affRow.code, pct: t.disc, name: 'Code ' + affRow.code }), { aff: affRow.user }); }
   }
   // no code: a referred trader's first order gets the referral discount
   let refP = null; const RS = await referralSettings();
-  if (!codeP && u && u.referred_by && u.n === 0) { const af = await AFF.byUser(u.referred_by);
-    if (af) { const t = await AFF.tierOf(af); if (t.disc) refP = Object.assign(normPromo({ code: af.code, pct: t.disc }), { label: `Code ${af.code}: ${t.disc}% off`, ref: true }); }
-    else if (RS.on && RS.pct) refP = Object.assign(normPromo({ code: '', pct: RS.pct }), { label: `Friend referral: ${RS.pct}% off your first order`, ref: true }); }
+  // (a guest who came through a referral link sees the same discount before signing up: ref is the referrer from the link)
+  const refBy = u ? (u.n === 0 ? u.referred_by : null) : (ref || null);
+  if (!codeP && refBy) { const af = await AFF.any(refBy);
+    if (af) { if (af.status === 'active') { const t = await AFF.tierOf(af); if (t.disc) refP = Object.assign(normPromo({ code: AFF.up(af.code), pct: t.disc }), { label: `Code ${AFF.up(af.code)}: ${t.disc}% off`, ref: true }); } }
+    // buying for yourself through your own link doesn't count: no friend discount when the buyer and the referrer share a device, phone or card
+    else if (RS.on && RS.pct && (!userId || !(await AFF.selfSignals(userId, refBy)).length)) refP = Object.assign(normPromo({ code: '', pct: RS.pct }), { label: `Friend referral: ${RS.pct}% off your first order`, ref: true }); }
   const one = codeP || refP;
   // run the cart with or without the bundle and keep the cheaper result for the trader
   const run = (useBundle) => { const C = comps.map((c) => Object.assign({}, c)); const sav = []; let bun = null;
@@ -140,23 +150,27 @@ async function priceCart(items, { promo, coupon, userId, country, kind } = {}) {
   let discount = round2(R.sav.reduce((n, x) => n + x.amount, 0)); let applied = R.sav.length ? { type: R.sav[R.sav.length - 1].type, label: R.sav.map((x) => x.label).join(' + ') } : null;
   if (codeP && codeP.aff) applied = Object.assign(applied || {}, { type: 'affiliate', code: affRow.code, affiliate: affRow.user });
   // reward code from the rewards store (credits)
+  let autoCard = false;
   if (coupon) {
-    const c = await db.one("SELECT * FROM coupons WHERE code=$1 AND user_id=$2 AND used=false", [coupon, userId || 0]);
-    if (!c) bad('That reward code is not valid');
+    const c = await db.one("SELECT * FROM coupons WHERE upper(code)=upper($1) AND user_id=$2 AND (used=false OR $3)", [String(coupon).trim(), userId || 0, !!anyUse]); // anyUse: the caller already checked this order may use the code (payments.js repriceCart)
+    if (!c) bad('That reward code is not valid'); coupon = c.code;
     if (c.expires_at ? new Date(c.expires_at) < new Date() : new Date(c.created_at) < new Date(Date.now() - 90 * 86400000)) bad(c.expires_at ? 'That code has expired' : 'That reward code has expired (codes last 90 days)');
     const left = round2(sub - discount);
     if (c.kind === 'discount') { const d = round2(left * Number(c.pct) / 100); discount += d; lines.push({ label: c.label, amount: -d, kind: 'coupon' }); }
-    else if (c.kind === 'free_eval') { const first = norm[0]; if (first.size !== 25000) bad('This reward is for a $25K account'); const d = Math.min(left, first.unit); discount += d; lines.push({ label: c.label, amount: -d, kind: 'coupon' }); }
+    else if (c.kind === 'free_eval') { // one free account of the reward's size, on whichever cart line has that size
+      const size = Number(c.size) || Number((c.meta || {}).size) || 25000; const li = norm.findIndex((x) => x.size === size); if (li < 0) bad(`This reward is for a ${kLabel(size)} account. Add one to your cart to use it.`);
+      const b = R.C.find((x) => x.type === 'base' && x.li === li); const d = Math.min(left, round2(b.rem / norm[li].qty)); discount += d; lines.push({ label: c.label, amount: -d, kind: 'coupon' }); }
+    else if (c.kind === 'free_reset' || c.kind === 'reset_discount') bad('This code is for a reset. Use it when you reset an account.');
     else bad('This reward can\'t be used at checkout');
     applied = { ...(applied || {}), coupon: c.code };
-  } else if (userId && (await require('./packs').enabled())) {
+  } else if (userId && !noCard && (await require('./packs').enabled())) {
     // a discount card the trader saved for checkout comes off automatically, best one first
     const cc = await db.one("SELECT * FROM coupons WHERE user_id=$1 AND used=false AND source='card' AND kind='discount' AND (expires_at IS NULL OR expires_at > now()) ORDER BY pct DESC, created_at LIMIT 1", [userId]);
     const left = round2(sub - discount);
-    if (cc && left > 0) { const d = round2(left * Number(cc.pct) / 100); discount += d; lines.push({ label: cc.label, amount: -d, kind: 'coupon' }); applied = { ...(applied || {}), coupon: cc.code }; coupon = cc.code; }
+    if (cc && left > 0) { const d = round2(left * Number(cc.pct) / 100); discount += d; lines.push({ label: cc.label, amount: -d, kind: 'coupon' }); applied = { ...(applied || {}), coupon: cc.code }; coupon = cc.code; autoCard = true; }
   }
   const total = Math.max(0, round2(sub - discount));
-  return { items: norm, lines, subtotal: sub, discount: round2(discount), total, applied, promo: codeP && !codeP.aff ? codeP.code : affRow ? String(affRow.code).toUpperCase() : null, affiliate: affRow ? affRow.user : null, coupon: coupon || null, notes };
+  return { items: norm, lines, subtotal: sub, discount: round2(discount), total, applied, promo: codeP && !codeP.aff ? codeP.code : affRow ? String(affRow.code).toUpperCase() : null, affiliate: affRow ? affRow.user : null, coupon: coupon || null, autoCard, notes };
 }
 
 const ordCode = async (c) => 'FS-ORD-' + (await (c || db).one("SELECT nextval('seq_order') AS n")).n;
@@ -183,8 +197,10 @@ async function createAccount(c, { userId, orderId, plan, size, platform, addons,
   return id;
 }
 
+// Traders who switched In-App Notifications off (settings.nPush) get nothing new in the bell: the notice is kept as already read,
+// so it is in their history if they switch the bell back on.
 async function notify(c, userId, title, body, go = 'accounts') {
-  await (c || db).q('INSERT INTO notifications(user_id,title,body,go) VALUES($1,$2,$3,$4)', [userId, title, body, go]);
+  await (c || db).q("INSERT INTO notifications(user_id,title,body,go,read) SELECT u.id,$2,$3,$4, COALESCE(u.settings->>'nPush','true')='false' FROM users u WHERE u.id=$1", [userId, title, body, go]);
 }
 async function points(c, userId, delta, label, kind) {
   if (!delta) return;
@@ -208,45 +224,39 @@ async function fulfilOrder(orderId) {
       for (const id of made) await notify(c, o.user_id, `Your account ${id} is ready`, 'Log in to your platform and place your first trade. Your rules are on the account page.', 'account?acct=' + id);
       for (const id of made) { const ac = await c.one('SELECT plan, size, platform FROM accounts WHERE id=$1', [id]); M('ready', o.user_id, { account: id, plan: await pName(ac.plan), size: kLabel(ac.size), platform: ac.platform, login: id, server: 'Funded Sky Simulated Feed', url: require('./auth').BASE() + '/app#account?acct=' + id }); }
     } else if (o.kind === 'reset') {
-      await resetAccount(c, o.meta.account, o.user_id, o.total);
+      await resetAccount(c, o.meta.account, o.user_id, o.total, o.meta.addons);
       made.push(o.meta.account);
     } else if (o.kind === 'activation') {
       made.push(await activateFunded(c, o.meta.account, o.user_id, o.id));
     } else if (o.kind === 'credits') {
       await require('./packs').fulfilCredits(c, o);
+      await require('./affiliates').onPaid(c, o, module.exports);
       await c.q("UPDATE orders SET meta = meta || $2 WHERE id=$1", [o.id, JSON.stringify({ fulfilled: true, accounts: [] })]);
       return { ...o, accounts: [] };
     }
     // free packs for orders with several accounts (Back Office › Packs › Checkout Rewards)
     if (made.length && (o.kind === 'evaluation' || o.kind === 'instant' || o.kind === 'mixed')) await require('./packs').grantForOrder(c, o);
-    if (o.coupon || (o.meta && o.meta.coupon)) await c.q('UPDATE coupons SET used=true WHERE code=$1', [o.meta.coupon || o.coupon]);
+    // the order's one-use code is used up now (it was held for this order when the order was created)
+    if (o.meta && o.meta.coupon) await c.q('UPDATE coupons SET used=true, order_id=$2 WHERE code=$1 AND used=false AND (order_id IS NULL OR order_id=$2)', [o.meta.coupon, o.id]);
     const pts = Math.floor(Number(o.total));
     await points(c, o.user_id, pts, o.kind === 'reset' ? 'Reset ' + o.meta.account : o.kind === 'activation' ? 'Activation fee' : 'Bought ' + o.items.map((x) => kLabel(x.size)).join(', ') + ' account' + (made.length > 1 ? 's' : ''));
-    // referral reward on first purchase
-    const u = await c.one('SELECT referred_by FROM users WHERE id=$1', [o.user_id]);
-    if (u.referred_by) {
-      const af = await require('./affiliates').byUser(u.referred_by);
-      if (af) { // affiliates earn cash commission on every paid order from people they referred
-        const t = await require('./affiliates').tierOf(af); const amt = round2(Number(o.total) * t.rate / 100);
-        if (amt > 0) { await notify(c, u.referred_by, `You earned ${money(amt)} commission`, `${t.rate}% of order ${o.code}. It's paid after the 30-day refund window.`, 'affiliates'); M('commission', u.referred_by, { amount: money(amt), order: o.code, order_total: money(o.total), code: af.code, rate: t.rate + '%', url: require('./auth').BASE() + '/app#affiliates' }); }
-      } else if (o.kind !== 'reset') {
-        const RS = await referralSettings();
-        const prev = await c.one("SELECT count(*)::int n FROM orders WHERE user_id=$1 AND status='paid' AND id<>$2", [o.user_id, o.id]);
-        if (prev.n === 0 && RS.on && RS.pts > 0) { await points(c, u.referred_by, RS.pts, 'Friend bought an account'); await notify(c, u.referred_by, 'A friend you referred bought an account', `You earned ${RS.pts.toLocaleString('en-US')} credits.`, 'affiliates'); }
-      }
-    }
+    // who earns from this order: an affiliate's commission or the referrer's one-time reward (server/affiliates.js)
+    await require('./affiliates').onPaid(c, o, module.exports);
     await c.q("UPDATE orders SET meta = meta || $2 WHERE id=$1", [o.id, JSON.stringify({ fulfilled: true, accounts: made })]);
     return { ...o, accounts: made };
   });
 }
 
-async function resetAccount(c, accountId, userId, paid = 0) {
+// addons: add-ons bought with the reset (reset checkout). 'reset' adds one free reset to the account, 'daily' turns on Daily Payouts.
+async function resetAccount(c, accountId, userId, paid = 0, addons = []) {
   const a = await c.one('SELECT * FROM accounts WHERE id=$1 AND user_id=$2 FOR UPDATE', [accountId, userId]);
   if (!a) bad('Account not found', 404);
   if (a.kind !== 'evaluation') bad('Only evaluations can be reset');
   const cat = await catalog(); const st = R.initialState(cat, a);
   await c.q(`UPDATE accounts SET phase='active', balance=$2, peak_eod=$3, floor=$4, today_pnl=0, halted_today=false, days_traded=0, best_day=0, breach_reason=NULL, breached_at=NULL, reset_count=reset_count+1, scalp_profit=0, cycle_scalp=0, last_trade_at=now(), today_date=$5, steps='{}' WHERE id=$1`,
     [a.id, st.balance, st.peak_eod, st.floor, tradeDate()]);
+  { const got = [...new Set(Array.isArray(addons) ? addons : [])]; const keep = [...new Set((a.addons || []).concat(got.filter((x) => x === 'daily')))];
+    if (got.includes('reset') || keep.length !== (a.addons || []).length) await c.q('UPDATE accounts SET free_resets=free_resets+$2, addons=$3 WHERE id=$1', [a.id, got.includes('reset') ? 1 : 0, JSON.stringify(keep)]); }
   await c.q('DELETE FROM days WHERE account_id=$1', [a.id]);
   await c.q("UPDATE trades SET note='before reset' WHERE account_id=$1 AND note=''", [a.id]);
   await c.q('DELETE FROM trades WHERE account_id=$1', [a.id]);
@@ -299,10 +309,19 @@ async function payStop(c, a) {
   return R.payoutStop(a, R.cbFor(a, os)) || (['closed', 'breached'].includes(a.phase) ? `This account is ${a.phase}${a.breach_reason ? ' (' + a.breach_reason + ')' : ''}. Deny the payout instead.` : '');
 }
 const etDay = (d) => new Date(d || Date.now()).toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+// The held gross is already out of accounts.balance, so the balance is what is left once the payout is paid. Paying must leave the
+// rule's buffer above the max loss floor (after a payout the floor is at most the starting balance). The quote guarantees this at
+// request time; if the trader lost money since, the payout is denied instead (which returns it) and they can ask again for less.
+async function leaveCheck(a, p) {
+  const r = R.rulesFor(await catalog(), a); const buf = Number(r.buffer != null ? r.buffer : r.cushion || 0);
+  const fl = r.ddType === 'static' ? Number(a.floor) : Math.min(Number(a.floor), Number(a.start_bal)); const left = round2(Number(a.balance));
+  if (left < fl + buf) bad(`The account lost money after this payout was requested. Paying ${money(p.amount)} would leave ${money(left)}, ${left <= fl ? `at or under the max loss floor of ${money(fl)}` : `less than the ${money(buf)} buffer above the ${money(fl)} floor`}. Deny the payout instead: the full amount goes back to the balance and the trader can request again.`);
+}
 // Checks before money is sent (Mark Sent, a batch, Rise): status, account, the Pause Payouts switch and Finance's daily limit
 async function sendCheck(c, p, a) {
   if (p.status !== 'approved') bad('Approve the payout first');
   const st = await payStop(c, a); if (st) bad(st);
+  await leaveCheck(a, p);
   if (((await kvv(c, 'store.risk.switches')) || {}).payouts) bad('Payouts are paused in Risk, Platform Health. Turn Pause Payouts off to send.');
   const cap = Number(((await kvv(c, 'store.finance.settings')) || {}).dailyCap || 50000);
   if (cap > 0) { const sent = (await c.one("SELECT COALESCE(sum(amount),0)::float n FROM payouts WHERE status='paid' AND (paid_at AT TIME ZONE 'America/New_York')::date = $1::date", [etDay()])).n;
@@ -342,7 +361,8 @@ async function requestPayout(userId, accountId, amount, methodId) {
     const code = 'PO-' + (await c.one("SELECT nextval('seq_payout') n")).n;
     await c.q(`INSERT INTO payouts(code,account_id,user_id,number,gross,split,amount,method,rail,dest) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
       [code, a.id, userId, qd.number, gross, qd.split, net, m.label, m.rail, m.dest || null]);
-    // Hold the gross amount out of the account while in review
+    // Hold the gross amount out of the account while in review. Until it is paid the held money still counts as in the account for
+    // the max loss floor (sim.ingestTrade adds it back), so a hold never causes a breach; a denied payout returns it in full.
     await c.q('UPDATE accounts SET balance=balance-$2 WHERE id=$1', [a.id, gross]);
     M('payreq', userId, { amount: money(net), account: a.id, time: etTime(), url: require('./auth').BASE() + '/app#payouts' });
     await notify(c, userId, `Payout ${code} requested`, `${money(net)} to ${m.label}. Reviewed in 1 to 2 business days.`, 'payouts');
@@ -363,6 +383,7 @@ async function reviewPayout(actorId, code, action, note, batchId, opt = {}) {
       const u = await c.one('SELECT kyc_status FROM users WHERE id=$1', [p.user_id]);
       if (u.kyc_status !== 'verified') bad('Verify this trader\'s identity before approving');
       const st = await payStop(c, a); if (st) bad(st);
+      await leaveCheck(a, p);
       const who = await c.one('SELECT first, last FROM users WHERE id=$1', [actorId]);
       const approvers = (opt.first ? [opt.first] : []).concat([{ id: actorId, name: who ? `${who.first} ${who.last || ''}`.trim() : '', note: note || '', at: new Date().toISOString() }]);
       const notes = approvers.map((x) => x.note).filter(Boolean).join(' · ');
@@ -377,7 +398,7 @@ async function reviewPayout(actorId, code, action, note, batchId, opt = {}) {
       const r = R.rulesFor(cat, a);
       const count = a.payout_count + 1;
       const phase = r.reviewAfter && count >= r.reviewAfter ? 'review' : a.phase;
-      await c.q(`UPDATE accounts SET payout_count=$2, paid_total=paid_total+$3, floor=${r.ddType === 'static' ? 'floor' : 'LEAST(floor, start_bal)'}, cycle_profit_start=balance, cycle_win_days=0, cycle_best=0, cycle_scalp=0, last_payout_at=now(), phase=$4, perks = perks - 'payCons' WHERE id=$1`, [a.id, count, p.amount, phase]);
+      await c.q(`UPDATE accounts SET payout_count=$2, paid_total=paid_total+$3, floor=${r.ddType === 'static' ? 'floor' : 'LEAST(floor, start_bal)'}, cycle_profit_start=balance, cycle_win_days=0, cycle_best=0, cycle_scalp=0, last_payout_at=now(), phase=$4, perks = perks - 'payCons' - 'splitOnce' WHERE id=$1`, [a.id, count, p.amount, phase]);
       await points(c, p.user_id, 250, 'Payout ' + p.code);
       M('paysent', p.user_id, { amount: money(p.amount), method: p.method, ref: p.provider_ref || tx || p.code, url });
       await notify(c, p.user_id, `Payout ${p.code} sent`, `${money(p.amount)} sent to ${p.method}.`, 'payouts');
@@ -393,6 +414,7 @@ async function reviewPayout(actorId, code, action, note, batchId, opt = {}) {
     } else if (action === 'retry') {
       if (p.status !== 'failed') bad('Only failed payouts can be retried');
       const st = await payStop(c, a); if (st) bad(st);
+      await leaveCheck(a, p);
       await c.q("UPDATE payouts SET status='approved' WHERE id=$1", [p.id]);
       await syncBatches(c, p.code);
       M('payretry', p.user_id, { amount: money(p.amount), method: p.method, url });

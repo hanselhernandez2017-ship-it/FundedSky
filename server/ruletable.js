@@ -35,4 +35,35 @@ function planTable(cat, planId) {
   const rows = inst ? [['Funded Account'], ...phase(er, false), ['Payouts'], ...pay] : [['Evaluation'], ...phase(er, true), ['Funded Account'], ...phase(fr, false), ['Payouts'], ...pay];
   return { plan: pl, inst, sizes, rows };
 }
-module.exports = { planTable };
+// Sentences that sit around the tables (news rule, consistency, where the floor stops, profit split), built from the same rules so the
+// hand-written copy can never disagree with the engine. byPlan groups plans that share a value: "40% on Essential and Prime, and 20% on Instant".
+const andList = (a) => (a.length > 1 ? a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1] : a[0] || '');
+function summary(cat) {
+  const ev = [], fu = [];
+  cat.plans.filter((p) => p.active !== false).forEach((p) => { const inst = p.id === 'instant' || p.kind === 'funded'; const n = p.short || p.name || p.id;
+    p.sizes.filter((z) => z.active !== false).forEach((z) => { try {
+      if (!inst) ev.push({ n, r: R.rulesFor(cat, { plan: p.id, size: z.size, kind: 'evaluation', payout_count: 0 }) });
+      const r = R.rulesFor(cat, { plan: p.id, size: z.size, kind: 'funded', payout_count: 0 }); const l = R.rulesFor(cat, { plan: p.id, size: z.size, kind: 'funded', payout_count: Math.max(3, r.splitFirstCount || 0) });
+      fu.push({ id: p.id, n, inst, r, split: r.splitFirstCount && r.split !== l.split ? `${r.split}%, then ${l.split}%` : r.split + '%' }); } catch (e) { /* a size with no rules yet is left out, as in the tables */ } }); });
+  const uniq = (a) => [...new Set(a)];
+  const byPlan = (list, f) => { const g = []; list.forEach((x) => { const v = f(x); let e = g.find((y) => y.v === v); if (!e) g.push(e = { v, n: [] }); if (!e.n.includes(x.n)) e.n.push(x.n); }); return g; };
+  const join = (g, show, of = '') => (g.length === 1 ? show(g[0].v) + of : g.map((x, i) => `${i === g.length - 1 ? 'and ' : ''}${show(x.v)}${i ? '' : of} on ${andList(x.n)}`).join(', '));
+  // news
+  const eW = uniq(ev.map((x) => (x.r.news ? x.r.news.win : 0))), fW = uniq(fu.map((x) => (x.r.news ? x.r.news.win : 0))); const all = uniq(eW.concat(fW));
+  const who = fu.some((x) => x.inst) && fu.some((x) => !x.inst) ? 'Funded and Instant accounts' : fu.some((x) => x.inst) ? 'Instant accounts' : 'Funded accounts';
+  const win = Math.max(0, ...all); const mins = (w) => `${w} minute${w === 1 ? '' : 's'}`;
+  const news = !win ? { who: '', text: 'News trading is allowed on every account.' }
+    : all.length === 1 ? { who: 'Every account', text: `No new orders ${mins(win)} before and after high-impact news, on every account.` }
+      : fW.length === 1 && fW[0] && eW.every((w) => !w) ? { who, text: `${who}: no new orders ${mins(win)} before and after high-impact news.${ev.length ? ' Evaluations may trade news.' : ''}` }
+        : { who: 'Restricted accounts', text: 'Some accounts cannot open new orders around high-impact news. Each account shows its own news rule on its Rules tab.' };
+  // consistency
+  const cv = (x) => (x.r.consOff ? 0 : x.r.consistency); const eC = byPlan(ev, cv), fC = byPlan(fu, cv); const pc = (v) => (v ? v + '%' : 'no limit');
+  const cons = [!ev.length ? '' : eC.length === 1 ? (eC[0].v ? `To pass, your best day can be at most ${eC[0].v}% of your profit.` : 'There is no consistency rule to pass.') : `To pass, your best day can be at most ${join(eC, pc, ' of your profit')}.`,
+    !fu.length ? '' : fC.length === 1 ? (fC[0].v ? `For a payout, at most ${fC[0].v}% of the cycle's profit.` : 'Payouts have no consistency rule.') : `For a payout, at most ${join(fC, pc, " of the cycle's profit")}.`].filter(Boolean).join(' ');
+  // where the floor stops on funded accounts
+  const trail = fu.filter((x) => x.r.ddType !== 'static' && x.r.lockAt != null); const lk = byPlan(trail, (x) => x.r.lockAt);
+  const lock = !trail.length ? '' : lk.length === 1 ? `On funded accounts it stops ${fmt(lk[0].v)} above your starting balance.` : uniq(trail.map((x) => x.n)).every((n) => uniq(trail.filter((x) => x.n === n).map((x) => x.r.lockAt)).length === 1) ? `On funded accounts it stops above your starting balance: ${join(lk, fmt)}.` : 'On funded accounts it stops a set amount above your starting balance. The table shows the amount for each size.';
+  const split = {}; fu.forEach((x) => { (split[x.id] = split[x.id] || []).includes(x.split) || split[x.id].push(x.split); });
+  return { news: news.text, newsWho: news.who, newsWin: win, cons, lock, split: Object.fromEntries(Object.entries(split).map(([k, v]) => [k, v.length === 1 ? v[0] : 'By size, see Rules'])) };
+}
+module.exports = { planTable, summary };

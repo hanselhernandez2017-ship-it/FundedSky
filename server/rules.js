@@ -25,6 +25,7 @@ function perked(R, a) {
   if (R.kind === 'funded') {
     if (P.payCons) { R.consOff = true; R.consistency = 100; }
     if (P.splitTo) R.split = Math.max(R.split || 0, P.splitTo); else if (P.splitAdd) R.split = Math.min(100, (R.split || 0) + P.splitAdd);
+    if (P.splitOnce) R.split = Math.max(R.split || 0, Number(P.splitOnce)); // a split-boost reward: this split on the next payout only
   }
   if (P.newsUntil && Date.parse(P.newsUntil) > Date.now()) R.news = null;
   if (P.idleDays && R.inactivity) R.inactivity += P.idleDays;
@@ -142,17 +143,20 @@ function applyTrade(cat, a, t) {
   a.today_pnl = round2(Number(a.today_pnl) + Number(t.pnl));
   a.last_trade_at = t.ts || new Date();
   const lim = allowedContracts(r, { ...a, today_pnl: Number(a.today_pnl) - Number(t.pnl), balance: Number(a.balance) - Number(t.pnl) });
-  if (t.qty > lim) ev.push({ type: 'warn', msg: `Position of ${t.qty} contracts is above the ${lim} contract limit${r.scaling ? ' for your scaling level' : ''}` });
+  // A trade above the max position size breaks the rule: it is recorded on the trade and the trader is told (the account stays open)
+  if (t.qty > lim) ev.push({ type: 'position', qty: t.qty, limit: lim, msg: `Position of ${t.qty} contracts is above the ${lim} contract limit${r.scaling ? ' for your scaling level' : ''}` });
   // Trades held under the scalping minimum: their profit is tracked against the scalping cap
   if (r.scalp && Number(t.pnl) > 0 && Number(t.hold_sec != null ? t.hold_sec : Number(t.hold_min || 0) * 60) < r.scalp.hold) { a.scalp_profit = round2(Number(a.scalp_profit || 0) + Number(t.pnl)); a.cycle_scalp = round2(Number(a.cycle_scalp || 0) + Number(t.pnl)); }
   // Intraday trailing: the floor follows the highest balance after every trade, not just at the close
-  if (r.ddType === 'intraday' && a.phase === 'active') { const peak = Math.max(Number(a.peak_eod), Number(a.balance)); a.peak_eod = round2(peak); a.floor = trailFloor(cat, a, peak); }
-  if (a.balance <= Number(a.floor)) {
-    a.phase = 'breached'; a.breached_at = new Date(); a.breach_reason = `Max loss: balance reached the floor of $${Math.round(a.floor).toLocaleString('en-US')}`;
+  // Money set aside for a payout that is not paid yet (a.held) still counts as in the account, so a hold can never cause a breach
+  const equity = round2(Number(a.balance) + Number(a.held || 0)); const usd = (v) => '$' + (Number.isInteger(round2(v)) ? round2(v).toLocaleString('en-US') : round2(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+  if (r.ddType === 'intraday' && a.phase === 'active') { const peak = Math.max(Number(a.peak_eod), equity); a.peak_eod = round2(peak); a.floor = trailFloor(cat, a, peak); }
+  if (equity <= Number(a.floor)) {
+    a.phase = 'breached'; a.breached_at = new Date(); a.breach_reason = `Max loss: balance fell to ${usd(equity)}, ${equity < Number(a.floor) ? 'below' : 'reaching'} the floor of ${usd(a.floor)} (${usd(r.maxLoss)} max loss)`;
     ev.push({ type: 'breach', msg: a.breach_reason });
   } else if (!r.dllOff && r.dll > 0 && a.today_pnl <= -r.dll && !a.halted_today) {
-    if (r.dllMode === 'breach') { a.phase = 'breached'; a.breached_at = new Date(); a.breach_reason = `Daily loss limit: lost $${r.dll.toLocaleString('en-US')} in one day`; ev.push({ type: 'breach', msg: a.breach_reason }); }
-    else { a.halted_today = true; ev.push({ type: 'dll', msg: `Daily loss limit of $${r.dll.toLocaleString('en-US')} reached. Trading paused until the next session.` }); }
+    if (r.dllMode === 'breach') { a.phase = 'breached'; a.breached_at = new Date(); a.breach_reason = `Daily loss limit: lost ${usd(-a.today_pnl)} in one day, the limit is ${usd(r.dll)}`; ev.push({ type: 'breach', msg: a.breach_reason }); }
+    else { a.halted_today = true; ev.push({ type: 'dll', msg: `Daily loss limit of $${r.dll.toLocaleString('en-US')} reached. Trading is paused until the day resets at 6:00 PM ET.` }); }
   }
   return { a, events: ev };
 }
@@ -167,7 +171,7 @@ function closeDay(cat, a, dayIso, nTrades) {
     if (pnl > Number(a.best_day)) a.best_day = pnl;
   }
   if (a.phase === 'active') {
-    const peak = Math.max(Number(a.peak_eod), Number(a.balance));
+    const peak = Math.max(Number(a.peak_eod), Number(a.balance) + Number(a.held || 0)); // money held for an unpaid payout is still in the account
     a.peak_eod = round2(peak); a.floor = trailFloor(cat, a, peak);
     const r = rulesFor(cat, a);
     if (r.kind === 'funded' && traded) {
@@ -212,7 +216,7 @@ function payoutQuote(cat, a, opts = {}) {
   const cycleProfit = round2(bal + Number(opts.held || 0) - Number(a.cycle_profit_start || start));
   const needDays = daily ? 1 : r.winDays;
   const winOk = (a.cycle_win_days || 0) >= needDays;
-  checks.push({ k: 'win', label: `${needDays} winning day${needDays > 1 ? 's' : ''} of $${r.winDayMin}+ this cycle`, ok: winOk, have: a.cycle_win_days || 0, need: needDays });
+  checks.push({ k: 'win', label: `${needDays} winning day${needDays > 1 ? 's' : ''} of $${r.winDayMin}+ this cycle`, ok: winOk, have: Math.min(a.cycle_win_days || 0, needDays), need: needDays });
   const consPct = cycleProfit > 0 ? Math.round((Number(a.cycle_best) / cycleProfit) * 100) : 0;
   // Daily Payouts: each cycle is one winning day, so the best day is always the whole cycle. The consistency rule does not apply.
   if (!r.consOff && !daily) { const consOk = cycleProfit > 0 && consPct <= r.consistency; checks.push({ k: 'cons', label: `Best day at or under ${r.consistency}% of cycle profit`, ok: consOk, have: consPct, need: r.consistency }); }

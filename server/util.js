@@ -24,7 +24,8 @@ function ago(d) {
   if (s < 60) return 'Just now'; if (s < 3600) return Math.floor(s / 60) + ' min ago'; if (s < 86400) return Math.floor(s / 3600) + (s < 7200 ? ' hour ago' : ' hours ago');
   if (s < 172800) return 'Yesterday'; return shortDate(d);
 }
-const clean = (s, n = 500) => String(s == null ? '' : s).trim().slice(0, n);
+// Text from a request: objects and arrays are not text, and control characters (the database refuses NUL) are dropped; line breaks and tabs stay
+const clean = (s, n = 500) => (s == null || (typeof s === 'object' && !(s instanceof Date)) ? '' : String(s)).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '').trim().slice(0, n);
 const emailOk = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e);
 class HttpError extends Error { constructor(status, msg) { super(msg); this.status = status; } }
 const bad = (msg, status = 400) => { throw new HttpError(status, msg); };
@@ -33,4 +34,6 @@ const uaLabel = (ua) => { ua = String(ua || '');
   const b = /Edg(e|A|iOS)?\//.test(ua) ? 'Edge' : /OPR\//.test(ua) ? 'Opera' : /Firefox\/|FxiOS/.test(ua) ? 'Firefox' : /Chrome\/|CriOS/.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : '';
   const o = /iPhone|iPad/.test(ua) ? 'iPhone' : /Android/.test(ua) ? 'Android' : /Mac OS/.test(ua) ? 'Mac' : /Windows/.test(ua) ? 'Windows' : /CrOS/.test(ua) ? 'Chromebook' : /Linux/.test(ua) ? 'Linux' : '';
   return b && o ? `${b} on ${o}` : b || (o ? `Browser on ${o}` : 'Unknown Device'); };
-module.exports = { uaLabel, rid, money, money2, round2, tradeDate, etParts, shortDate, longDate, dayLabel, ago, clean, emailOk, HttpError, bad, ET };
+// Public id of a session for the Settings list: a hash, so the page never holds any part of the session token
+const sessId = (token) => crypto.createHash('sha256').update('fs-sess:' + String(token)).digest('hex').slice(0, 16);
+module.exports = { sessId, uaLabel, rid, money, money2, round2, tradeDate, etParts, shortDate, longDate, dayLabel, ago, clean, emailOk, HttpError, bad, ET };

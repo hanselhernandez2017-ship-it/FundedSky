@@ -2,6 +2,7 @@
 // this module is where the server acts on them: who gets a ticket, urgent keywords,
 // out-of-hours replies, ratings, auto-close and the hours shown to traders.
 const db = require('./db');
+const { bad } = require('./util');
 
 const DEF = {
   email: true, chatDash: true, chatCheckout: true, discord: true, h247: false, wk: ['08:00', '22:00'], we: ['10:00', '18:00'],
@@ -74,13 +75,25 @@ async function autoClose() { const s = await settings(); const days = parseInt(s
   for (const t of rows) { await db.q('INSERT INTO ticket_msgs(ticket_id,author_id,staff,internal,body) VALUES($1,NULL,true,true,$2)', [t.id, `Closed automatically after ${days} days without a reply from the trader.`]); await onSolved(t); }
   return rows.length; }
 
-// Help Center reading stats
-async function articleStat(title, kind) { if (!['view', 'yes', 'no'].includes(kind)) return; title = String(title || '').slice(0, 200); if (!title) return;
+// Help Center reading stats. Only published articles count, and each trader has one vote per article (they can change it).
+async function articleStat(title, kind, uid) { if (!['view', 'yes', 'no'].includes(kind) || typeof title !== 'string') return; title = title.slice(0, 200); if (!title) return;
+  const arts = ((await require('./content').all()).articles || []).filter((a) => a[3] !== 'Draft'); if (!arts.some((a) => a[1] === title)) bad('Article not found', 404);
   await db.tx(async (c) => { const r = (await c.one("SELECT v FROM kv WHERE k='store.support.articlestats' FOR UPDATE")) || { v: {} }; const v = r.v || {}; const a = Object.assign({ views: 0, yes: 0, no: 0 }, v[title] || {});
-    if (kind === 'view') a.views++; else a[kind]++; a.help = a.yes + a.no ? Math.round(a.yes / (a.yes + a.no) * 100) : null; v[title] = a;
+    if (kind === 'view') a.views++;
+    else { const old = uid ? await c.one('SELECT vote FROM article_votes WHERE user_id=$1 AND title=$2', [uid, title]) : null; if (old && old.vote === kind) return;
+      if (old) a[old.vote] = Math.max(0, (a[old.vote] || 0) - 1); a[kind]++;
+      if (uid) await c.q('INSERT INTO article_votes(user_id,title,vote) VALUES($1,$2,$3) ON CONFLICT (user_id,title) DO UPDATE SET vote=$3, updated_at=now()', [uid, title, kind]); }
+    a.help = a.yes + a.no ? Math.round(a.yes / (a.yes + a.no) * 100) : null; v[title] = a;
     await c.q("INSERT INTO kv(k,v) VALUES('store.support.articlestats',$1) ON CONFLICT (k) DO UPDATE SET v=$1, updated_at=now()", [JSON.stringify(v)]); }); }
+
+// Ticket topics: the list traders pick from plus the board's own topics. Returns the listed name, 'General' when none is given, or null when it is not on the list.
+const BOARD_TOPICS = ['Payouts', 'Breach Dispute', 'Billing and Refunds', 'Identity Check', 'Platform and Login', 'Rules Question', 'Account Changes', 'Affiliates', 'Risk Flag', 'General'];
+async function topic(v) { if (v == null || v === '') return 'General'; if (typeof v !== 'string') return null; const all = BOARD_TOPICS.concat(((await require('./content').all()).topics || []).map(String)); return all.find((x) => x.toLowerCase() === v.trim().toLowerCase()) || null; }
+
+// One-time repair, safe to run on every start: older tickets saved without any message get a placeholder first message, so every list and thread has something to show
+async function fixEmptyTickets() { const r = await db.q("INSERT INTO ticket_msgs(ticket_id,author_id,staff,body,created_at) SELECT t.id, CASE WHEN t.channel='Email' AND t.assignee IS NOT NULL THEN t.assignee ELSE t.user_id END, (t.channel='Email' AND t.assignee IS NOT NULL), '(No message)', t.created_at FROM tickets t WHERE NOT EXISTS (SELECT 1 FROM ticket_msgs m WHERE m.ticket_id=t.id)"); return r.rowCount; }
 
 // Refund limit for a staff member from the Team tab
 async function refundLimit(user) { const a = (await kv('store.support.agents')) || {}; const x = a[user.id]; if (x && x.limit != null) return +x.limit; return user.role === 'admin' ? 500 : user.role === 'risk' ? 0 : 150; }
 
-module.exports = { settings, publicInfo, onTraderMessage, onSolved, autoClose, articleStat, refundLimit, isOpenNow, hoursText, replyText, catKey, setKv };
+module.exports = { settings, publicInfo, onTraderMessage, onSolved, autoClose, articleStat, topic, fixEmptyTickets, refundLimit, isOpenNow, hoursText, replyText, catKey, setKv };

@@ -56,11 +56,13 @@ a:focus-visible{outline:2px solid #7CC4FF;outline-offset:2px}
 <p class="fs-lead" style="margin: 0; font-size: 17px; line-height: 26px; color: #D4CFCD;">{{ lead }}</p>
 </div>
 
+<sc-if value="{{ showSteps }}" hint-placeholder-val="{{ true }}">
 <ol style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; border: 1px solid #26262A; border-radius: 8px; background: #18181A;">
 <li class="fs-step" style="display: flex; gap: 16px; align-items: flex-start; padding: 20px 22px; border-bottom: 1px solid #26262A;"><span style="font-family: 'Geist Mono', monospace; font-size: 13px; line-height: 20px; color: #7CC4FF;">01</span><span style="flex: 1; display: flex; flex-direction: column; gap: 3px;"><span style="font-size: 16px; line-height: 20px; font-weight: 600;">{{ s1t }}</span><span style="font-size: 14px; line-height: 20px; color: #9C9693;">{{ s1d }}</span></span></li>
 <li class="fs-step" style="display: flex; gap: 16px; align-items: flex-start; padding: 20px 22px; border-bottom: 1px solid #26262A;"><span style="font-family: 'Geist Mono', monospace; font-size: 13px; line-height: 20px; color: #9C9693;">02</span><span style="flex: 1; display: flex; flex-direction: column; gap: 3px;"><span style="font-size: 16px; line-height: 20px; font-weight: 600;">{{ s2t }}</span><span style="font-size: 14px; line-height: 20px; color: #9C9693;">{{ s2d }}</span></span></li>
 <li class="fs-step" style="display: flex; gap: 16px; align-items: flex-start; padding: 20px 22px;"><span style="font-family: 'Geist Mono', monospace; font-size: 13px; line-height: 20px; color: #9C9693;">03</span><span style="flex: 1; display: flex; flex-direction: column; gap: 3px;"><span style="font-size: 16px; line-height: 20px; font-weight: 600;">{{ s3t }}</span><span style="font-size: 14px; line-height: 20px; color: #9C9693;">{{ s3d }}</span></span></li>
 </ol>
+</sc-if>
 
 <div class="fs-btns" style="display: flex; flex-wrap: wrap; gap: 12px;">
 <a href="{{ dashHref }}" style="background: #FFFFFF; color: #111113; border-radius: 4px; padding: 14px 22px; font-size: 15px; font-weight: 600; font-stretch: 112%; text-decoration: none;">{{ cta1 }}</a>
@@ -79,7 +81,7 @@ class Component extends DCLogic {
     try {
       const o = await DC.api('/api/orders/' + encodeURIComponent(code) + (DC.qs('session_id') ? '?session_id=' + encodeURIComponent(DC.qs('session_id')) : ''));
       this.setState({ o }); if (o.status === 'paid') FSX.cart.clear();
-      if (o.status === 'pending' && this.state.tries < 10) { this.state.tries++; setTimeout(() => this.poll(), 2000); }
+      if (o.status === 'pending' && this.state.tries < 10) { this.state.tries++; setTimeout(() => this.poll(), 2000); } else if (o.status === 'pending') this.setState({ stopped: true });
     } catch (e) { if (e.status === 401) { location.replace('/login?next=' + encodeURIComponent(location.pathname + location.search)); return; } this.setState({ err: e.message }); }
   }
   renderVals() {
@@ -88,7 +90,14 @@ class Component extends DCLogic {
     const isReset = o && o.kind === 'reset', isAct = o && o.kind === 'activation', isCred = o && o.kind === 'credits';
     const fmt = (v) => Math.round(Number(v) || 0).toLocaleString('en-US');
     const packsLine = o && o.packs ? ` Plus ${o.packs} free with this order, waiting on your Packs page.` : '';
-    if (isCred) return { ...ME,
+    // Not a paid order (still checking, not found, unpaid, cancelled): say so plainly, with the right next step, instead of the success page
+    const blank = { showSteps: false, stepA: isCred ? 'Choose Credits' : 'Choose Account', stepC: isCred ? 'Open Packs' : 'Start Trading', homeHref: '/', s1t: '', s1d: '', s2t: '', s2d: '', s3t: '', s3d: '', email: o ? o.email : 'your email' };
+    if (!o && !this.state.err) return { ...ME, ...blank, eyebrow: 'Checking Your Payment…', h1a: 'One Moment.', h1b: '', lead: '', cta1: 'Go to Dashboard', dashHref: '/app', cta2: 'Contact Support', rulesHref: '/app/support' };
+    if (!o) return { ...ME, ...blank, eyebrow: 'Order Not Found', h1a: 'We Could Not Find ', h1b: 'That Order.', lead: 'This order is not on your account. Your orders are listed in Billing.', cta1: 'Go to Billing', dashHref: '/app/billing', cta2: 'Contact Support', rulesHref: '/app/support' };
+    if (o.status === 'pending') return { ...ME, ...blank, eyebrow: 'Waiting for Payment · Order ' + o.code, h1a: 'Payment ', h1b: 'Not Received Yet.', lead: this.state.stopped ? 'We have not received a payment for this order, so nothing has been added to your account. A crypto payment can take a few minutes: refresh this page to check again. Otherwise, finish the payment.' : 'We have not received the payment yet. Checking again…', cta1: 'Finish Payment', dashHref: '/checkout/payment?order=' + encodeURIComponent(o.code), cta2: 'Go to Dashboard', rulesHref: '/app' };
+    if (!paid) return { ...ME, ...blank, eyebrow: (o.status === 'refunded' ? 'Refunded' : 'Order Cancelled') + ' · Order ' + o.code, h1a: 'This Order Was ', h1b: o.status === 'refunded' ? 'Refunded.' : 'Cancelled.', lead: o.status === 'refunded' ? 'This order was refunded.' : `You have not been charged for it.${o.canceledWhy ? ' Reason: ' + o.canceledWhy + '.' : ''}`, cta1: 'Go to Dashboard', dashHref: '/app', cta2: 'Go to Billing', rulesHref: '/app/billing' };
+    const isInst = o.kind === 'instant', isMixed = o.kind === 'mixed';
+    if (isCred) return { ...ME, showSteps: true,
       homeHref: '/', dashHref: '/app/packs', rulesHref: '/app/packs?tab=col', h1a: 'Credits Added. ', h1b: 'Open a Pack.', cta1: 'Go to Packs', cta2: 'See My Cards', stepA: 'Choose Credits', stepC: 'Open Packs',
       eyebrow: paid ? 'Payment Received · Order ' + o.code : 'Waiting for payment · Order ' + o.code,
       lead: !paid ? 'We have not received the payment yet. This page updates on its own.' : `${fmt(o.credits)} credits are in your account. Your balance is now ${fmt(o.balance)} credits.`,
@@ -97,14 +106,14 @@ class Component extends DCLogic {
       s3t: 'Use Them When You Want', s3d: 'Cards wait in your collection until you pick the account they go on. They never expire.',
       email: o.email
     };
-    return { ...ME,
+    return { ...ME, showSteps: true,
       h1a: "You're In. ", h1b: "Let's Trade.", cta1: 'Go to Dashboard', cta2: 'Read the Rules', stepA: 'Choose Account', stepC: 'Start Trading', rulesHref: '/app/resources?tab=rules',
       homeHref: '/', dashHref: n === 1 && !isReset ? '/app/account?acct=' + encodeURIComponent(o.accounts[0]) : '/app',
       eyebrow: !o ? (this.state.err || 'Checking your payment…') : paid ? 'Payment Received · Order ' + o.code : 'Waiting for payment · Order ' + o.code,
       lead: !o ? '' : !paid ? 'We have not received the payment yet. This page updates on its own.' : isAct ? `Your funded account ${o.accounts[0] || ''} is ready in your dashboard.` : isReset ? `${o.account} is back to its starting balance.` : `${n === 1 ? 'Your ' + (first ? first.label : '') + ' account is' : n + ' accounts are'} ready in your dashboard: ${o.accounts.join(', ')}.${packsLine}`,
       s1t: 'Open Your Dashboard', s1d: 'Every account, its rules and its live progress are there.',
       s2t: 'Start Trading', s2d: 'Trades on your account come from the Funded Sky simulated feed while platform connections are set up.',
-      s3t: isAct ? 'Get Paid' : 'Pass the Evaluation', s3d: isAct ? 'Request a payout after 5 winning days. Verify your identity before your first payout.' : 'Hit the profit target within the rules to get funded. Track it live in your dashboard.',
+      s3t: isAct || isInst ? 'Get Paid' : isMixed ? 'Follow the Rules' : 'Pass the Evaluation', s3d: isAct ? 'Request a payout after 5 winning days. Verify your identity before your first payout.' : isInst ? 'Your account is funded from day one. Reach the profit goal within the rules, then request your first payout. Verify your identity before it.' : isMixed ? 'Evaluations get funded when they hit the profit target. Instant accounts are funded from day one. Track both live in your dashboard.' : 'Hit the profit target within the rules to get funded. Track it live in your dashboard.',
       email: o ? o.email : 'your email'
     };
   }

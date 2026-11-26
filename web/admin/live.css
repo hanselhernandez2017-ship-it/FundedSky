@@ -5,3 +5,26 @@
 /* dropdown arrow: 14px in from the edge */
 select{-webkit-appearance:none!important;-moz-appearance:none!important;appearance:none!important;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239C9693' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")!important;background-repeat:no-repeat!important;background-position:right 14px center!important;background-size:16px 16px!important;padding-right:42px!important;text-overflow:ellipsis;cursor:pointer}select::-ms-expand{display:none}
 .light select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%235E636C' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")!important;background-repeat:no-repeat!important;background-position:right 14px center!important;background-size:16px 16px!important;padding-right:42px!important;text-overflow:ellipsis;cursor:pointer}.light select::-ms-expand{display:none}
+
+/* Readable small text in both themes (4.5:1 or better): hint text, quiet badges, links and status colours */
+.fsbo,.fsgl{--fa:#8F8B87}
+.fsbo.light,.fsgl.light{--fa:#666B73;--sky:#0F66BA;--ok:#0A7245;--no:#C02A3B;--wa:#855700}
+.fsbo .b.ret,.fsbo .b.ended{color:var(--mu)}
+/* funnel track follows the theme */
+.fsbo .fb{background:var(--ln2)}
+/* light theme: the dotted world map is drawn a shade darker so an empty map is still visible */
+.fsbo.light .vzmap{background-image:none!important}
+.fsbo.light .vzmap::before{content:"";position:absolute;inset:0;background:#A3AAB5;-webkit-mask:var(--lmap) center/100% 100% no-repeat;mask:var(--lmap) center/100% 100% no-repeat;pointer-events:none}
+
+/* form drawer shared by every board (FSG.form) and the note shown when a list is cut */
+.fsbo.fsask{position:fixed;inset:0;height:auto!important;min-height:0!important;width:auto!important;display:block!important;background:transparent!important;z-index:300;overflow:visible!important;grid-template-rows:none}
+.fsbo.fsask .drw-bg{position:fixed!important;inset:0!important;z-index:300}
+.fsbo.fsask .drw{position:fixed!important;top:0!important;right:0!important;bottom:0!important;left:auto;width:520px;max-width:100%;z-index:301}
+.fsbo.fsask .askerr{margin:0;color:var(--no);font-size:13px;font-weight:600}
+.fsbo.fsask .askintro{margin:0;font-size:13.5px;line-height:1.5}
+.fsbo.fsask .askcopy{display:flex;gap:8px;align-items:center}.fsbo.fsask .askcopy input{flex:1;min-width:0}
+.fsbo.fsask .fl input,.fsbo.fsask .fl select,.fsbo.fsask .fl textarea{width:100%;box-sizing:border-box}
+@media(max-width:640px){.fsbo.fsask .drw{left:0!important;width:auto}}
+.fsbo .capnote{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin:0 0 14px;padding:10px 14px;border:1px solid var(--ln);border-radius:10px;background:var(--p1);font-size:13px;line-height:1.45;color:var(--mu)}
+.fsbo .capnote b{color:var(--tx)}.fsbo .capnote span{flex:1;min-width:220px}
+.fsbo .main.flowv>.capnote{margin:12px 16px 0}

@@ -35,18 +35,27 @@
       if (!q) { const rec = (ST('recent') || []).slice(0, 5); if (rec.length) out.push(['Recent', rec]);
         out.push(['Jump To', IX.pages.filter((p) => p[1] === 'Board').map((p) => [p[0], 'Board', p[2], 'pg'])]); return out; }
       const m = (s) => String(s).toLowerCase().includes(q);
-      const tr = IX.traders.filter((t) => m(t[0]) || m(t[1])).slice(0, 6).map((t) => [t[1], t[2] + ' · Trader', 'AdminUsers.dc.html#user?name=' + encodeURIComponent(t[0]), 'us']);
+      const tr = IX.traders.filter((t) => m(t[0]) || m(t[1])).slice(0, 6).map((t) => [t[1], t[2] + ' · Trader', '/admin/users#user?id=' + encodeURIComponent(t[3] || t[0]), 'us']);
       const pg = IX.pages.filter((p) => m(p[0]) || m(p[1])).slice(0, 8).map((p) => [p[0], p[1], p[2], 'pg']);
       const ac = IX.accts.filter(m).slice(0, 5).map((a) => [a, 'Trading account · Risk', 'AdminRisk.dc.html#accounts?acct=' + a, 'ac']);
       const po = IX.pos.filter(m).slice(0, 5).map((a) => [a, 'Payout · Risk review', 'AdminRisk.dc.html#payouts?payout=' + a, 'po']);
       const tk = IX.tks.filter((t) => m('#' + t[0]) || m(t[1])).slice(0, 5).map((t) => ['#' + t[0] + ' ' + t[1], 'Support ticket', 'AdminSupport.dc.html#inbox?q=open&t=' + t[0], 'tk']);
       const cb = IX.cbs.filter((c) => m(c[0]) || m(c[1]) || m(c[2])).slice(0, 4).map((c) => [c[0] + ' · ' + c[1], c[2] + ' · Dispute', 'AdminDisputes.dc.html#open?cb=' + c[0], 'cb']);
       const cl = IX.cls.filter((c) => m(c[0]) || m(c[1])).slice(0, 4).map((c) => [c[0], c[1] + ' · Linked accounts', 'AdminFraud.dc.html#network?cl=' + c[0], 'cl']);
+      // Matches found by the server across every trader, account, payout and ticket, not only the rows this board has loaded
+      const sv = G.srv && G.srv.q === q ? G.srv.d : null;
+      if (sv) { const add = (list, row) => { if (!list.some((x) => x[2] === row[2])) list.push(row.concat([1])); }; const nm = (x) => `${x.first || ''} ${x.last || ''}`.trim();
+        (sv.users || []).filter((u) => u.role === 'trader').forEach((u) => add(tr, [nm(u), (u.country || u.email) + ' · Trader', '/admin/users#user?id=' + encodeURIComponent(u.tid), 'us']));
+        (sv.accounts || []).forEach((a) => add(ac, [a.id, nm(a) + ' · Trading account · Risk', '/admin/risk#accounts?acct=' + a.id, 'ac']));
+        (sv.payouts || []).forEach((a) => add(po, [a.code, nm(a) + ' · Payout · Risk review', '/admin/risk#payouts?payout=' + a.code, 'po']));
+        (sv.tickets || []).forEach((t) => add(tk, ['#' + t.id + ' ' + t.subject, 'Support ticket', '/admin/support#inbox?q=open&t=' + t.id, 'tk'])); }
       [['Traders', tr], ['Pages', pg], ['Accounts', ac], ['Payouts', po], ['Tickets', tk], ['Disputes', cb], ['Linked Accounts', cl]].forEach((g) => { if (g[1].length) out.push(g); });
       return out; };
     const TAG = { us: 'Trader', pg: 'Page', ac: 'Account', po: 'Payout', tk: 'Ticket', cb: 'Dispute', cl: 'Cluster' };
     const flat = () => results().flatMap((g) => g[1]);
-    const go = (r) => { const rec = (ST('recent') || []).filter((x) => x[2] !== r[2]); rec.unshift(r); ST('recent', rec.slice(0, 8)); G.open = ''; draw(); location.href = r[2]; };
+    const go = (r) => { const rec = (ST('recent') || []).filter((x) => x[2] !== r[2]); rec.unshift(r); ST('recent', rec.slice(0, 8)); G.open = ''; draw(); const same = new URL(r[2], location.href).pathname === location.pathname; location.href = r[2]; if (r[4] && same) location.reload(); };
+    // Ask the server as the person types (short pause between keystrokes)
+    let findT = null; const findSrv = () => { clearTimeout(findT); const q = G.q.trim().toLowerCase(); if (q.length < 2 || !window.FSG || !window.FSG.find) return; findT = setTimeout(() => { window.FSG.find(q).then((d) => { if (G.q.trim().toLowerCase() !== q || G.open !== 'search') return; G.srv = { q, d }; const el = document.activeElement; const pos = el && el.id === 'glq' ? el.selectionStart : null; draw(); if (pos != null) { const i2 = hostEl().querySelector('#glq'); if (i2) try { i2.setSelectionRange(pos, pos); } catch (e) { /* not text */ } } }).catch(() => {}); }, 220); };
     function draw() { const h = hostEl(); inject(); const bn = root.querySelector('.glbn'); if (bn) bn.classList.toggle('on', G.open === 'bell');
       if (!G.open) { h.innerHTML = ''; h.classList.remove('on'); return; } h.classList.add('on');
       if (G.open === 'search') { const gs = results(); let k = -1; const n = gs.reduce((a, g) => a + g[1].length, 0); G.i = Math.max(0, Math.min(G.i, n - 1));
@@ -67,7 +76,7 @@
         if (!x) return; const k = x.dataset.gx;
         if (k === 'close') { G.open = ''; } else if (k === 'cat') { G.cat = x.dataset.c; } else if (k === 'all') { ST('read', NOTES.map((y) => y.id)); }
         draw(); root.querySelectorAll('.glb').forEach((e) => e.remove()); inject(); });
-      h.addEventListener('input', (ev) => { if (ev.target.id === 'glq') { G.q = ev.target.value; G.i = 0; draw(); } });
+      h.addEventListener('input', (ev) => { if (ev.target.id === 'glq') { G.q = ev.target.value; G.i = 0; draw(); findSrv(); } });
       h.addEventListener('mousemove', (ev) => { const a = ev.target.closest('[data-gi]'); if (a && +a.dataset.gi !== G.i) { h.querySelectorAll('.glkr a.on').forEach((e) => e.classList.remove('on')); a.classList.add('on'); G.i = +a.dataset.gi; } });
     }
     root.addEventListener('click', (ev) => { const b = ev.target.closest('[data-gl]'); if (!b) return; const k = b.dataset.gl; if (k === 'theme') { THEME = THEME === 'light' ? 'dark' : 'light'; applyTheme(); root.querySelectorAll('.glb').forEach((e) => e.remove()); inject(); return; } G.open = G.open === k ? '' : k; if (k === 'search') { G.q = ''; G.i = 0; } draw(); });

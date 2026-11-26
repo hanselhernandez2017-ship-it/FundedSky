@@ -110,25 +110,249 @@
   }
  ],
  "lessons": {
+  "c1": [
+   {
+    "t": "What an Evaluation Is",
+    "x": "An evaluation is a practice account with a set of rules. You trade it like a real futures account, and we measure two things: whether you can reach a profit target, and whether you can do it without breaking a loss limit.\n\nYou pay once for the evaluation. There is no time limit to finish it, but an account that sits unused for a long time can be closed, so check the Inactivity row in Resources, Rules.\n\nTrading here is simulated. Nothing in an evaluation is a promise that you will pass or earn money. Most accounts that fail do so because of risk, not because of bad ideas."
+   },
+   {
+    "t": "The Profit Target",
+    "x": "Each account size has a profit target. It is the amount your balance must be above the starting balance for the account to pass. You can see it on your account page, with a bar that shows how far you are.\n\nThe target counts closed profit across all your trading days. There is no bonus for reaching it quickly. A trader who gets there in small, steady steps passes the same way as one who gets there fast, and usually with far less risk of a breach.\n\nA useful habit: divide the target by the number of days you plan to trade, and treat that as a guide for a normal day, not a goal you must force."
+   },
+   {
+    "t": "Minimum Trading Days",
+    "x": "You need a minimum number of trading days before an evaluation can pass. A trading day is a day on which you placed at least one trade. The number for your plan is in Resources, Rules, and your account page shows how many you have.\n\nThe trading day runs from 6:00 PM to 5:00 PM Eastern Time. A trade at 7:00 PM on Monday belongs to Tuesday's trading day.\n\nIf you reach the target before you have enough days, keep trading small. You only need to stay above the target and inside the rules until the days are done."
+   },
+   {
+    "t": "The Two Loss Limits",
+    "x": "Every account has two loss limits, and they work differently.\n\nThe daily loss limit is the most you can lose in one trading day. If you reach it, trading pauses until the next session opens at 6:00 PM ET. The account is not closed.\n\nThe maximum loss limit is a floor under your balance. If your balance touches the floor at any time, the account is breached and the evaluation ends. The Drawdown, Explained course shows exactly how the floor moves.\n\nBoth numbers are on your account page. Know them before your first trade."
+   },
+   {
+    "t": "The Consistency Rule",
+    "x": "To pass, your best single day can only be a set share of your total profit. The share for your plan is in the Consistency Rule row in Resources, Rules. The rule is there so that a pass shows repeatable trading, not one lucky session.\n\nIf one day is too large a share of your profit, the account does not fail. It simply cannot pass yet. Keep trading: each further profitable day makes the big day a smaller share of the total.\n\nThe easiest way to stay inside the rule is to keep your position size about the same from day to day."
+   },
+   {
+    "t": "Passing and Getting Funded",
+    "x": "When the target, the minimum days and the consistency rule are all met, the account passes. You will get an email and a notification, and your account page will show the next step.\n\nNext you sign the Funded Trader Agreement in your dashboard. Some plans have a one-time activation fee at this point; the plan table in Resources shows which.\n\nYour funded account then opens with its own rules: a profit split, payout rules and a max loss floor that stops trailing just above your starting balance. Funded accounts are simulated too, and payouts are rewards for performance under those rules. Read the funded column of the rules table before you place your first funded trade."
+   }
+  ],
+  "c2": [
+   {
+    "t": "The Max Loss Floor",
+    "x": "The maximum loss limit is easiest to picture as a floor under your account. Your balance can move anywhere above the floor. If it touches the floor, even for a moment, the account is breached.\n\nWhen the account opens, the floor sits below your starting balance by the max loss amount for your size. You can see both the amount and the current floor on your account page.\n\nDo not count on a trade coming back. If a loss takes your balance to the floor, the account is breached, even if the market turns around a minute later."
+   },
+   {
+    "t": "How End-of-Day Trailing Works",
+    "x": "On evaluations the floor trails your highest end-of-day balance. At the end of each trading day, 5:00 PM ET, we look at your closing balance. If it is a new high, the floor moves up by the same amount.\n\nThe floor never moves down. A losing day leaves it where it was.\n\nBecause it only moves at the end of the day, profit you make and give back during the same day does not raise the floor. That is the difference from an intraday trailing drawdown, which follows every new high the moment it happens. The Drawdown Type row in Resources, Rules shows which type your plan uses."
+   },
+   {
+    "t": "A Worked Example",
+    "x": "This example uses round numbers to show the idea. Your own numbers are on your account page.\n\nTake an account that starts at $50,000 with a $2,000 max loss. The floor starts at $48,000. Day 1 closes at $50,600, a new high, so the floor moves to $48,600. Day 2 closes at $50,200. That is not a new high, so the floor stays at $48,600.\n\nNotice what happened to your room. After day 1 you had $2,000 between balance and floor. After day 2 you have $1,600. Losses after a new high cost you room that does not come back until you make another new high."
+   },
+   {
+    "t": "The Daily Loss Limit Is Different",
+    "x": "The daily loss limit and the max loss floor are often confused. The daily limit looks only at today. If your loss for the trading day reaches the limit, trading pauses until the next session opens at 6:00 PM ET, and the account stays open.\n\nThe floor looks at the whole life of the account. Touching it ends the account.\n\nOn a bad day, the daily limit will normally stop you first. That is by design. But the two can be close together after a run of losing days, so check your room to the floor, not only your daily limit, before each session."
+   },
+   {
+    "t": "The Floor on a Funded Account",
+    "x": "On a funded account the floor trails the same way at first, then stops. Once it reaches a small amount above your starting balance it stays there for good. The Drawdown Stops Trailing row in Resources, Rules shows the exact point.\n\nThis matters for payouts. A payout takes money out of your balance, which brings your balance closer to the floor. After a payout the floor can be no higher than your starting balance.\n\nBefore you request a payout, look at how much room you will have left afterward. Leaving a cushion in the account is often the difference between a funded account that lasts and one that ends the week after it pays."
+   }
+  ],
   "c3": [
-   "Who can request a payout",
-   "The 90% split and the payout threshold",
-   "Rise or crypto: which to choose",
-   "What happens after you request"
+   {
+    "t": "Who Can Request a Payout",
+    "x": "Payouts come from funded accounts. To request one you need a set number of winning days in the current payout cycle, and a minimum amount available. A winning day is a day with at least a minimum profit. The numbers for your plan are in the Payouts section of Resources, Rules.\n\nYour best day in the cycle must also be inside the consistency rule for payouts.\n\nYou do not need to work any of this out yourself. The account page shows each requirement with a check mark, and the Request button turns on when all of them are met."
+   },
+   {
+    "t": "The 90% Split and the Payout Threshold",
+    "x": "The profit split is the share of a withdrawal that you keep. It is 90% of every payout, on Instant accounts too. The split for your account is shown on the account page and in the payout window before you confirm.\n\nThere is a minimum payout, so small amounts cannot be requested one by one. There is also a cap per payout by account size, and a lifetime cap per account.\n\nRemember that a payout lowers your balance. After it is paid, your max loss floor can be no higher than your starting balance, so plan what you leave in the account."
+   },
+   {
+    "t": "Rise or Crypto: Which to Choose",
+    "x": "You can be paid in two ways. Rise sends the money to your bank account in your local currency. USDC is sent to a crypto wallet address that you give us.\n\nAdd your payout method under Settings, Payout Methods, before you need it. A new method is held for 48 hours before it can be used. This protects you if someone else gets into your account.\n\nIf you choose USDC, check the wallet address and network carefully. A crypto transfer to a wrong address cannot be reversed. If you are not used to wallets, Rise is the simpler choice."
+   },
+   {
+    "t": "What Happens After You Request",
+    "x": "Before your first payout we check your identity once. You need a passport, driver's license or national ID, and the name must match your payout method. You can do this early under Settings, Identity.\n\nEach request is reviewed by our team, usually within 1 to 2 business days. We check the trading in the cycle against the rules. Then the payout is sent by the method you chose.\n\nYou can follow every step on the Payouts page. When a payout is paid, a new cycle starts: winning days and best day begin again from zero."
+   }
   ],
   "c4": [
-   "Why accounts really fail",
-   "Sizing from your daily loss limit",
-   "Stops that respect drawdown",
-   "Scaling up after a green week",
-   "Red day rules",
-   "Correlated positions",
-   "Review: build your plan"
+   {
+    "t": "Why Accounts Really Fail",
+    "x": "Most accounts do not fail because the trader could not find good trades. They fail on one or two days when size was too big, a stop was moved, or a loss was chased.\n\nLook at any breached account in the journal and the pattern is usually the same: many normal days, then one day several times larger than the rest.\n\nThis course is about removing that day. The rules of the account already tell you how much you can lose. Risk management is the work of making sure no single trade, and no single day, can use up that amount."
+   },
+   {
+    "t": "Sizing From Your Daily Loss Limit",
+    "x": "Start with your daily loss limit and work backward. Decide how many losing trades in a row you want to be able to take before the day is over. Three or four is a common choice.\n\nDivide the daily limit by that number, and then leave some space, because fills are not perfect. The result is the most you should risk on one trade.\n\nAs an example with round numbers: with a $1,000 daily limit and room for four losses, you would risk no more than about $200 per trade. Your position size then comes from your stop distance: the risk per trade divided by what the stop costs per contract."
+   },
+   {
+    "t": "Stops That Respect Drawdown",
+    "x": "A stop that is not in the market is only an intention. Place the stop order when you enter, at a price that makes sense on the chart, and size the trade to fit it. Do not pick the size first and squeeze the stop to match.\n\nCheck your room to the max loss floor before each session. If you have less room than usual, your normal size may be too big even if it fits the daily limit.\n\nDo not widen a stop once the trade is on. In fast markets a stop can fill worse than its price, so keep a margin between your planned loss and your limits."
+   },
+   {
+    "t": "Scaling Up After a Green Week",
+    "x": "A good week is the most common time to raise size, and one of the more dangerous. The max loss floor has moved up with your balance, so you may have less room than you feel you have.\n\nIf you want to trade bigger, raise size in small steps and only after a set number of days at the current size. If the larger size has a losing week, go back down a step.\n\nSome accounts limit how many contracts you can hold until your profit reaches certain levels, and funded accounts may be limited until the first payout. Check the Maximum Position Size and Contract Scaling rows in Resources, Rules."
+   },
+   {
+    "t": "Red Day Rules",
+    "x": "Decide what a bad day looks like before you have one. Write down a personal daily stop that is smaller than the account's daily loss limit, for example half of it, and a maximum number of losing trades.\n\nWhen you reach either one, stop for the day. Close the platform. The market opens again at 6:00 PM ET, and the account will still be there.\n\nA red day that stops early is a normal cost of trading. A red day that reaches the account's limits leaves you with less room for every day after it."
+   },
+   {
+    "t": "Correlated Positions",
+    "x": "Index futures tend to move together. A long position in the S&P 500 contract and another in the Nasdaq contract is, most of the time, one larger bet on the same idea.\n\nCount your risk across everything you hold. If each position risks your full amount per trade, two positions that move together risk double.\n\nThe position size limit on your account applies to all your open contracts together. Trying to cancel out risk with opposite positions across accounts or firms is not allowed and can close an account."
+   },
+   {
+    "t": "Review: Build Your Plan",
+    "x": "Put the course on one page. Write down: your risk per trade in dollars, your personal daily stop, your maximum number of losing trades in a day, and the size you trade now.\n\nAdd the two numbers from your account page that you must never reach: the daily loss limit and the current max loss floor.\n\nThen add one rule for good weeks, such as how many days at one size before you increase. Keep the page where you can see it while you trade, and check your journal each week to see whether you followed it."
+   }
   ],
   "c5": [
-   "What happens at 9:30",
-   "Opening range and volume",
-   "When to sit out"
+   {
+    "t": "What Happens at 9:30",
+    "x": "The US stock market opens at 9:30 AM Eastern Time. Index futures trade almost all day, but volume jumps at this moment because stock orders that built up overnight are filled.\n\nFor the first minutes, prices move quickly and the gap between the bid and the ask can be wider than usual. A market order may fill further away than you expect.\n\nThe open also sets the tone. The high and low made in the first part of the session are prices many traders watch for the rest of the day."
+   },
+   {
+    "t": "Opening Range and Volume",
+    "x": "The opening range is the high and low of the first minutes after 9:30. Traders use different lengths, often 5, 15 or 30 minutes. Pick one and keep it the same so your results can be compared.\n\nA move outside the range with strong volume shows that one side is in control for now. A move outside on weak volume fails more often and comes back inside.\n\nNone of this is a signal by itself. It is a map. Decide beforehand what you will do at the edges of the range and where your stop goes, and size the trade from that stop."
+   },
+   {
+    "t": "When to Sit Out",
+    "x": "Some opens are not worth trading. If a high-impact event is on the news calendar at or near 9:30 or 10:00, funded and Instant accounts cannot open new orders in the window around it. Evaluations may trade, but the minutes on each side are often erratic.\n\nSit out when the first moves are larger than your normal stop can handle. Trading smaller is fine. Trading the same size with a wider stop is how a daily loss limit is reached in ten minutes.\n\nAlso sit out if you are already down for the day from the overnight session. The open rewards a clear head, and a missed open costs nothing."
+   }
+  ],
+  "c6": [
+   {
+    "t": "Why the News Rule Exists",
+    "x": "Scheduled reports such as jobs numbers, inflation data and central bank decisions can move futures prices a long way in a few seconds. In those moments there are few orders in the market, so fills can be far from the price you asked for.\n\nA trade placed into a release is close to a coin flip with a very large stake. It tells us little about how you trade, and it can end an account in one tick.\n\nOn funded and Instant accounts the news rule takes those seconds out. It protects your account as much as it protects the firm. Evaluations may trade through news, but the same risks apply."
+   },
+   {
+    "t": "The Window and What Counts",
+    "x": "On funded and Instant accounts you cannot open new orders from 2 minutes before to 2 minutes after a high-impact event. Evaluations may trade through news. The News Trading row in Resources, Rules shows the rule for every plan, and each account shows its own on its Rules tab.\n\nPositions you already hold can stay open through the event. The rule is about new orders inside the window.\n\nOnly events marked High on the news calendar count. The calendar is in Resources, News Calendar, with times in Eastern Time. Medium events are shown so you know about them, but they do not block orders."
+   },
+   {
+    "t": "Planning Your Day Around News",
+    "x": "Open the news calendar before each session and note the times of the High events. Set an alarm for five minutes before each one.\n\nDecide ahead of time what you will do with open trades. You may hold through the event, but your stop may fill at a worse price if the market jumps. Many traders close or reduce before the window.\n\nAfter the window ends, wait for the market to settle before you place a new order. Be careful with resting orders too: an order that you placed earlier and that is triggered inside the window can still count as a new order."
+   }
+  ],
+  "c7": [
+   {
+    "t": "What the Rule Measures",
+    "x": "The consistency rule compares your best single day with your total profit. Your best day may only be a set share of the total.\n\nThere are two versions. One applies to passing an evaluation. The other applies to each funded payout cycle, and it is stricter. Instant accounts have their own share. The numbers for your plan are in the Consistency Rule rows in Resources, Rules.\n\nThe rule does not close an account. It only decides whether you can pass or request a payout yet. Your account page shows your best day and where you stand."
+   },
+   {
+    "t": "A Worked Example",
+    "x": "This example uses a 40% share to show the idea. Check the share for your own account.\n\nSay your profit in the cycle is $2,000 and your best day made $1,000. That day is 50% of the total, which is over 40%, so a payout cannot be requested yet.\n\nTo bring a $1,000 day down to 40%, the total needs to reach $2,500, because 1,000 divided by 2,500 is 0.40. So you need another $500 of profit from other days, with none of them larger than $1,000."
+   },
+   {
+    "t": "Fixing a Day That Is Too Big",
+    "x": "If one day is too large a share, keep trading at your normal size. Each further profitable day raises the total and lowers the share of the big day. You do not need to do anything special, and you should not take extra risk to hurry it.\n\nTo avoid the problem, keep size steady and consider a personal cap on daily profit. When you reach it, stop for the day.\n\nA very large day usually means size was larger than normal. The same size on a losing day would have done the same damage in the other direction, which is the real reason to avoid it."
+   }
+  ],
+  "c8": [
+   {
+    "t": "Your Login and the Simulated Feed",
+    "x": "Platform connections are being set up. Until yours is ready, your account trades on the Funded Sky simulated feed, and your dashboard shows every trade and checks every rule in the same way.\n\nWhen your connection is ready we email your platform login. Your account number is the one shown on your account page.\n\nKeep your login private. Accounts are for one person, and sharing access can close an account. If you chose the wrong platform, you can switch once per account before your first trade by contacting support."
+   },
+   {
+    "t": "Setting Up Your Layout",
+    "x": "Tradovate runs in a web browser, as a desktop app and on a phone. Use one of them as your main screen and learn it well before you add others.\n\nA simple layout is enough: one chart of the contract you trade, an order ticket or price ladder, and a panel that shows open positions and working orders. Make sure you can always see your position and your stop.\n\nSet the default order quantity to the smallest size you trade. Many oversized trades start with a default nobody checked."
+   },
+   {
+    "t": "Placing a Test Order",
+    "x": "Every order in your account counts. There is no separate practice mode inside an evaluation, so a test trade is a real trade for your rules, your trading days and your balance.\n\nFor your first order, use one micro contract in a quiet part of the session. Place a limit order a little away from the price, check that it appears as a working order, then cancel it.\n\nNext, enter with one contract and place a stop order straight away. Watch the position and the stop appear, then close the trade and confirm that both are gone. Check that the trade shows on your dashboard."
+   },
+   {
+    "t": "Brackets and Closing Out",
+    "x": "A bracket order adds a stop and a target to your entry at the same time. When one of them fills, the other is cancelled. Using a bracket means you are never in a trade without a stop.\n\nLearn where the button that closes all positions and cancels all orders is before you need it. After you close a trade, check that no working orders are left. A forgotten stop can open a new position later.\n\nAt the end of each session, compare the platform with your dashboard. If something does not match, send a ticket with your account number and the time of the trade."
+   }
+  ],
+  "c9": [
+   {
+    "t": "Before You Connect",
+    "x": "NinjaTrader is a desktop program for Windows. With Funded Sky it connects through Tradovate, so the login we send you is the one you use for the connection.\n\nPlatform connections are being set up. Until yours is ready, your account trades on the Funded Sky simulated feed and your dashboard shows every trade. We email your login when the connection is ready.\n\nInstall the program from the official NinjaTrader website and update it before your first session. Do it on a day you are not trading, so that setup problems do not cost you a session."
+   },
+   {
+    "t": "Connecting Your Account",
+    "x": "In NinjaTrader you add a connection once, using the login from our email, and then connect to it at the start of each session. Use the login exactly as we sent it.\n\nAfter you connect, find your Funded Sky account number in the list of accounts. It should match the number on your account page. NinjaTrader also has its own built-in practice accounts. Trades placed there do not count toward your evaluation, so always check which account is selected before you send an order.\n\nIf the connection fails, check your internet and the login first. Then send a ticket with your account number and the exact error text."
+   },
+   {
+    "t": "Charts and the Order Panel",
+    "x": "Open one chart for the contract you trade and pick the current contract month. A chart of an expired month will show no new prices.\n\nYou can place orders from the chart or from a price ladder. Choose one and use it every time, so that entering and closing a trade becomes routine.\n\nSet the default quantity to your smallest size. Set up an order template that attaches a stop and a target to each entry, and test it with one micro contract. Remember that every order in your account is a real trade for your rules."
+   },
+   {
+    "t": "A Safe First Session",
+    "x": "Before the session, check three things: the connection shows as connected, the selected account is your Funded Sky account, and the chart shows the current contract month.\n\nTrade your smallest size for the whole first session. The aim is to learn the platform, not to make progress on the target.\n\nWhen you finish, confirm that you have no open position and no working orders. Then compare the platform with your dashboard. If you ever lose the connection with a trade open, reconnect first, and if that fails contact support right away with your account number."
+   }
+  ],
+  "c10": [
+   {
+    "t": "What the Journal Records",
+    "x": "Your journal is built from your trades without any work from you. Open the Journal page to see a calendar with the result of each trading day, and click a day to see its trades.\n\nFor each day you can add a note. Use it. Write what you planned, what you did, and how you felt, in two or three lines. The numbers show what happened. The note is the only record of why.\n\nWrite the note on the same day. After a week, memory turns every loss into bad luck and every win into skill."
+   },
+   {
+    "t": "Finding the Patterns",
+    "x": "Once you have a few weeks of trades, look for groups, not single trades. Compare your results by time of day, by day of the week, by contract and by position size.\n\nTypical findings: most losses come after a certain hour, the third trade after two losses is nearly always a loser, or larger size has a worse result than normal size.\n\nLook at your biggest losing days one by one and read the notes. Ask what they have in common. Be careful with small samples. Five trades prove nothing. Wait until a pattern has shown up many times before you act on it."
+   },
+   {
+    "t": "One Change at a Time",
+    "x": "Pick the one habit that costs you the most and write a rule for it. For example: no new trades after two losses in a row, or no trades in the last hour.\n\nFollow the rule for two weeks and change nothing else. Then go back to the journal and compare. If you change three things at once you will not know which one made the difference.\n\nSet a fixed time each week for this review. Twenty minutes is enough. Traders who review regularly tend to find that the fix is to stop doing something, not to add something new."
+   }
+  ],
+  "c11": [
+   {
+    "t": "What a Futures Contract Is",
+    "x": "A futures contract is an agreement to buy or sell something at a set price on a future date. The something can be a stock index, oil, gold and many other things. Contracts trade on an exchange with standard sizes and rules.\n\nDay traders do not hold contracts until that date. They buy and sell the contract itself and take the difference in price as a profit or a loss.\n\nYou can sell first as easily as you can buy first. Buying first is called going long and gains when the price rises. Selling first is called going short and gains when the price falls."
+   },
+   {
+    "t": "Ticks and Points",
+    "x": "Each contract moves in steps called ticks. A tick is the smallest price change the exchange allows, and each tick is worth a fixed amount of money.\n\nFor the E-mini S&P 500, symbol ES, one tick is 0.25 index points and is worth $12.50. Four ticks make one point, worth $50. For the E-mini Nasdaq-100, symbol NQ, one tick is 0.25 points and is worth $5, so one point is worth $20.\n\nAlways think of a trade in dollars. A 10 point stop on one ES contract risks $500 before fees. Know the tick value of anything you trade before you place the first order."
+   },
+   {
+    "t": "Minis and Micros",
+    "x": "Micro contracts are one tenth the size of the E-mini contracts. On the Micro E-mini S&P 500, symbol MES, a point is worth $5. On the Micro E-mini Nasdaq-100, symbol MNQ, a point is worth $2.\n\nMicros let you choose your risk in small steps. Ten micros equal one mini, so three micros is a size you cannot reach with minis at all.\n\nIf you are new, or your room to the max loss floor is small, trade micros. Check how micros count toward the position limit for your account in Resources, Rules."
+   },
+   {
+    "t": "Margin and Leverage",
+    "x": "In a normal futures account, margin is the deposit a broker holds while you have a position open. It is much smaller than the value of the contract, which is why futures are called leveraged: a small price move is a large move compared with the deposit.\n\nIn a Funded Sky account you do not post margin. The limits that matter are your maximum position size, your daily loss limit and your max loss floor.\n\nLeverage works in both directions. The same size that makes a good day large makes a bad day large. Size is the one thing fully under your control."
+   },
+   {
+    "t": "The Trading Day and Sessions",
+    "x": "Futures trade almost around the clock from Sunday evening to Friday afternoon. The trading day runs from 6:00 PM to 5:00 PM Eastern Time, with a one-hour break from 5:00 to 6:00 PM.\n\nYour daily loss limit and your trading day follow the same clock. They reset at 5:00 PM ET, not at midnight.\n\nActivity changes through the day. The evening and overnight hours are usually quieter. The New York session, from 9:30 AM to 4:00 PM ET, has the most volume. The hours for each session and the market holidays are in Resources, Hours."
+   },
+   {
+    "t": "Order Types",
+    "x": "A market order fills right away at the best price available. You are sure to get in or out, but not sure of the price.\n\nA limit order fills only at your price or better. You are sure of the price, but not sure it will fill.\n\nA stop order waits until the market reaches a price and then becomes a market order. It is most often used to close a losing trade. In a fast market it can fill beyond the stop price. That difference is called slippage, and it is why you leave space between your planned loss and your limits."
+   },
+   {
+    "t": "Expiration and Rollover",
+    "x": "Each futures contract has an expiration month. Index futures expire four times a year, in March, June, September and December. The month is part of the symbol.\n\nShortly before a contract expires, most trading moves to the next month. This is called the roll. After the roll the old contract has little volume and wide gaps between bid and ask.\n\nTrade the month with the most volume, often called the front month. Around roll dates, check that your chart and your order ticket show the same month, and do not hold a position in a contract that is about to expire."
+   },
+   {
+    "t": "Reading Price and Volume",
+    "x": "A quote has two prices. The bid is the best price someone will pay. The ask is the best price someone will sell at. The gap between them is the spread. A market order to buy fills at the ask, and one to sell fills at the bid.\n\nVolume is the number of contracts traded. High volume usually means a narrow spread and fills close to the price you see. Low volume means the opposite.\n\nBefore you trade any contract, look at its spread and volume at the time of day you plan to trade. A good idea in a thin market can still be a bad trade."
+   }
+  ],
+  "c12": [
+   {
+    "t": "What Tilt Looks Like",
+    "x": "Tilt is trading from emotion instead of from your plan. It usually starts after a loss that feels unfair, a missed move, or a string of small losses.\n\nThe signs are easy to see in others and hard to see in yourself: trades come faster, size grows, stops get moved, and setups you would normally skip start to look good enough.\n\nLearn your own early signs and write them down. The moment you notice one is the moment to step away, because your judgment will not get better while you stay in the chair."
+   },
+   {
+    "t": "Revenge Trading",
+    "x": "Revenge trading is trying to win a loss back right away, often with more size. It feels like taking control. In practice it turns one planned loss into several unplanned ones.\n\nThe market does not know what you lost. The next trade has the same odds as any other, and your state of mind makes those odds worse.\n\nTwo rules help. After two losses in a row, take a break of at least fifteen minutes away from the screen. And never raise size on the same day as a loss. Both are simple to follow if you decide them before the session and not during it."
+   },
+   {
+    "t": "Use the Limits as a Plan",
+    "x": "The daily loss limit pauses your trading when it is reached. Do not treat it as your stop for the day. If you trade until the account stops you, every bad day costs the maximum.\n\nSet your own daily stop below it, and a maximum number of trades. When you reach either, the day is over.\n\nKeep your account's numbers in front of you: the daily loss limit, the max loss floor and your room to each. Decisions are calmer when the facts are on the screen and you are not working them out in the middle of a trade."
+   },
+   {
+    "t": "After a Big Win",
+    "x": "A large win can do as much harm as a large loss. It brings a feeling that you cannot be wrong, and the next trades are often bigger and less careful.\n\nOn an end-of-day trailing account, a big day also lifts the max loss floor at the close. If you give part of it back the next day, you have less room than before. A big day can also be too large a share of your profit under the consistency rule.\n\nAfter a win well above your normal day, stop for the day. Come back the next session at your normal size."
+   },
+   {
+    "t": "A Routine That Holds",
+    "x": "A routine takes decisions out of the moments when you make them badly. Before the session: check the news calendar, your room to the daily limit and the floor, and your plan for the day.\n\nDuring the session: one size, a stop on every trade, and a break after two losses. After the session: a short journal note on what you did and whether you followed your rules.\n\nJudge each day by whether you followed the plan, not by the profit or loss. Results over a week or a month come from doing the same sound things each day. No routine can promise a profit, but it removes the mistakes that end most accounts."
+   }
   ]
  },
  "rewards": [
@@ -136,37 +360,47 @@
    "id": "r1",
    "n": "10% Off Any Evaluation",
    "d": "One use, any plan and size.",
-   "pts": 1500
+   "pts": 1500,
+   "type": "discount",
+   "value": 10
   },
   {
    "id": "r2",
    "n": "Free Reset",
    "d": "Reset a breached or struggling evaluation.",
-   "pts": 3000
+   "pts": 3000,
+   "type": "free_reset"
   },
   {
    "id": "r3",
    "n": "25% Off Any Evaluation",
    "d": "One use, any plan and size.",
-   "pts": 4000
+   "pts": 4000,
+   "type": "discount",
+   "value": 25
   },
   {
    "id": "r4",
    "n": "Free $25K Evaluation",
    "d": "Any plan with a $25K size, your choice of platform.",
-   "pts": 6000
+   "pts": 6000,
+   "type": "free_eval",
+   "value": 25000
   },
   {
    "id": "r5",
    "n": "Payout Split Up to 95%",
    "d": "For one payout on any funded account.",
-   "pts": 9000
+   "pts": 9000,
+   "type": "split",
+   "value": 95
   },
   {
    "id": "r6",
    "n": "Funded Sky Hoodie",
    "d": "Shipped to you. Sizes S to XXL.",
-   "pts": 12000
+   "pts": 12000,
+   "type": "merch"
   }
  ],
  "earn": [
@@ -191,25 +425,25 @@
    "50 credits, once a week"
   ],
   [
-   "Leave a Review",
-   "200 credits, once"
+   "Finish a Course",
+   "100 credits"
   ]
  ],
  "articles": [
   [
    "Rules",
    "How the Max Drawdown Works",
-   "Every account has a max loss floor. On evaluations it trails your highest end-of-day balance by the max loss for your size ($1,000 on 25K, $2,000 on 50K, $3,000 on 100K, $4,500 on 150K). It only moves at the end of the trading day, never down. On funded accounts it stops $100 above your starting balance. If your balance touches the floor at any time, the account is breached."
+   "Every account has a max loss floor. It trails your highest end-of-day balance by the max loss for your plan and size. It only moves at the end of the trading day, never down. On funded and Instant accounts it stops trailing a set amount above your starting balance. If your balance touches the floor at any time, the account is breached. The amounts for every plan and size, Instant included, are in Resources, Rules. Each account also shows its own floor on its Rules tab."
   ],
   [
    "Rules",
    "The Daily Loss Limit",
-   "If you lose more than your daily loss limit in one trading day ($500 on 25K, $1,000 on 50K, $2,000 on 100K, $3,000 on 150K), trading pauses until the next session opens at 6:00 PM ET. The account is not closed. The trading day runs from 6:00 PM to 5:00 PM ET."
+   "If you lose more than your daily loss limit in one trading day, trading pauses until the next session opens at 6:00 PM ET. The account is not closed. The limit depends on your plan and size, and Instant accounts have their own limits. See Resources, Rules for every size, or the Rules tab of your account for yours. The trading day runs from 6:00 PM to 5:00 PM ET."
   ],
   [
    "Rules",
    "Trading Around High-Impact News",
-   "You cannot open new orders from 2 minutes before to 2 minutes after a high-impact event on the news calendar. Positions you already hold can stay open. The calendar is on the Resources page."
+   "Evaluations may trade through news. On funded and Instant accounts you cannot open new orders from 2 minutes before to 2 minutes after a high-impact event on the news calendar. Positions you already hold can stay open. The calendar is in Resources, News Calendar, and each account shows its own news rule on its Rules tab."
   ],
   [
    "Rules",
@@ -217,9 +451,14 @@
    "To pass an evaluation, your best day can be at most 50% of your total profit. For a funded payout, your best day in the cycle can be at most 40% of that cycle's profit (20% on Instant accounts). If one big day breaks the rule, keep trading: more profitable days bring the share down."
   ],
   [
+   "Rules",
+   "Scalping, Holding Positions and Inactivity",
+   "Three more rules apply to every account. Scalping: profit from trades held for only a few seconds can make up only part of the profit you withdraw. Holding: positions must be closed before the end of the trading day, so nothing is held overnight or over the weekend. Inactivity: an account with no trades for about a month is closed. The exact limits for every plan and size are in Resources, Rules, and the Rules tab of your account shows the ones that apply to you."
+  ],
+  [
    "Payouts",
    "How and When You Get Paid",
-   "Funded accounts can request a payout after 5 winning days of $100 or more in the cycle, with at least $250 available. You keep 90% (Instant: 80% for the first 3 payouts, then 90%). Each payout has a cap by size, and there is a lifetime cap per account. Requests are reviewed in 1 to 2 business days, then sent by Rise or USDC."
+   "Funded accounts can request a payout after 5 winning days of $100 or more in the cycle, with at least $250 available. You keep 90% of every payout, on Instant accounts too. A small buffer stays in every funded account, and an Instant account must also reach its profit goal before the first payout. Each payout has a cap by size, and there is a lifetime cap per account. The Rules tab of your account shows each of these and where you are. Requests are reviewed in 1 to 2 business days, then sent by Rise or USDC."
   ],
   [
    "Payouts",
@@ -244,7 +483,7 @@
   [
    "Billing",
    "Resets: What Happens to Your Account",
-   "A reset puts your evaluation back to its starting balance with the same rules. Your trading days, best day and history start over. A reset costs 55% of the plan price. If you bought the Free Reset add-on, your first reset is free."
+   "A reset puts your evaluation back to its starting balance with the same rules. Your trading days, best day and history start over. Each plan and size has its own reset price. You see the price for your account on the reset page before you pay, and Resources, Plans and Prices lists the range for each plan. If you bought the Free Reset add-on, your first reset is free."
   ],
   [
    "Getting Funded",
@@ -317,7 +556,51 @@
    "entry": "Free",
    "players": 0,
    "prize": "$150K Funded Account + 9 more",
-   "rule": "Best return in 4 days"
+   "rule": "Best return in 4 days",
+   "startAt": "2026-11-27",
+   "endAt": "2026-11-30",
+   "prizes": [
+    {
+     "type": "funded",
+     "size": 150000
+    },
+    {
+     "type": "funded",
+     "size": 100000
+    },
+    {
+     "type": "funded",
+     "size": 50000
+    },
+    {
+     "type": "eval",
+     "size": 50000
+    },
+    {
+     "type": "eval",
+     "size": 50000
+    },
+    {
+     "type": "eval",
+     "size": 25000
+    },
+    {
+     "type": "eval",
+     "size": 25000
+    },
+    {
+     "type": "eval",
+     "size": 25000
+    },
+    {
+     "type": "eval",
+     "size": 25000
+    },
+    {
+     "type": "eval",
+     "size": 25000
+    }
+   ]
   },
   {
    "id": "C-09",
@@ -329,7 +612,23 @@
    "entry": "Free",
    "players": 0,
    "prize": "3 \u00d7 $50K Funded Accounts",
-   "rule": "Best profit with no day above 30% of total"
+   "rule": "Best profit with no day above 30% of total",
+   "startAt": "2026-12-01",
+   "endAt": "2026-12-31",
+   "prizes": [
+    {
+     "type": "funded",
+     "size": 50000
+    },
+    {
+     "type": "funded",
+     "size": 50000
+    },
+    {
+     "type": "funded",
+     "size": 50000
+    }
+   ]
   }
  ],
  "cprizes": [

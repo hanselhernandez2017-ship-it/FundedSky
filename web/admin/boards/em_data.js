@@ -108,7 +108,7 @@
     affpaid: { n: 'Commission Paid', w: 'When commission is sent.', req: 1, fr: 'partners', s: '$1,113 commission sent', p: 'Paid through Rise.', e: 'Affiliates', h: '$1,113', a: 'is on its way.', r: [['Amount', '$1,113.00'], ['Method', 'Rise']], sent: 3 },
 
     // Support
-    ticket: { n: 'We Got Your Message', w: 'When a trader opens a support ticket.', req: 1, fr: 'support', s: '[#4812] We got your message', p: 'We usually reply within 4 hours.', e: 'Support', h: 'We got', a: 'your message.', b: ['We usually reply within 4 hours, every day. Reply to this email to add anything.'], r: [['Ticket', '#4812'], ['Subject', 'Payout timing']], sent: 230 },
+    ticket: { n: 'We Got Your Message', w: 'When a trader opens a support ticket.', req: 1, fr: 'support', s: '[#4812] We got your message', p: 'We usually reply within 4 hours.', e: 'Support', h: 'We got', a: 'your message.', b: ['We usually reply within 4 hours, every day. To add anything, reply from your dashboard.'], r: [['Ticket', '#4812'], ['Subject', 'Payout timing']], cta: 'Reply from Your Dashboard', sent: 230 },
     reply: { n: 'New Reply from Support', w: 'When support replies to a ticket.', req: 1, fr: 'support', s: '[#4812] New reply from [Support Agent]', p: 'Hi Jane, your payout was approved this morning...', e: 'Support', h: 'New reply', a: 'on ticket #4812.', b: ['"Hi Jane, your payout was approved this morning and goes out through Rise today."'], cta: 'View Conversation', sent: 410 },
     closed: { n: 'Was This Solved?', w: 'When a ticket is closed.', fr: 'support', s: '[#4812] Was this solved?', p: 'One click tells us.', e: 'Support', h: 'Did we solve it?', a: '', b: ['Your ticket is closed. One click tells us how we did.'], cta: 'Yes, Solved', sent: 200 },
 
