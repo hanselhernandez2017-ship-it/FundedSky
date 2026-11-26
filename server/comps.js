@@ -200,7 +200,7 @@ async function leaderboard(compId) { return (await board(compId)).rows; }
 // Who gets which prize: place N goes to the trader in position N of the ranking, as long as they finished in profit
 function pickWinners(c, B) {
   const ranked = B.rows.filter((x) => x.state === 'ranked' && x.pnl > 0);
-  return c.prizes.slice(0, ranked.length).map((p, i) => { const x = ranked[i]; return { place: ordinal(i + 1), pos: i + 1, rank: x.rank, prize: prizeLabel(p), type: p.type, size: p.size, amount: p.amount, note: p.note, uid: x.uid, pnl: x.pnl, status: 'Waiting' }; });
+  return c.prizes.slice(0, ranked.length).map((p, i) => { const x = ranked[i]; return { place: ordinal(i + 1), pos: i + 1, rank: x.rank, prize: prizeLabel(p), type: p.type, size: p.size, amount: p.amount, note: p.note, uid: x.uid, pnl: x.pnl, status: 'Waiting', of: B.total ? B.total.ranked : ranked.length }; }); // of: ranked traders, printed on the winner's certificate (server/certs.js reads these records)
 }
 const nameOf = (x, set) => `${x.first} ${set.hideName === false ? x.last : (x.last || '').slice(0, 1) + '.'}`.trim();
 

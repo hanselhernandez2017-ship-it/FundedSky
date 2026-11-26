@@ -192,7 +192,7 @@ T.post('/privacy-request', h(async (req) => {
   return { id, ticket: t.id };
 }));
 T.post('/articles/stat', h(async (req) => { await require('./support').articleStat(req.body.t, req.body.kind, req.user.id); }));
-const SETTING_KEYS = ['nEmail', 'nSms', 'nPush', 'nNews', 'nMkt', 'nComp', 'mfaPay'];
+const SETTING_KEYS = ['nEmail', 'nSms', 'nPush', 'nNews', 'nMkt', 'nComp', 'mfaPay', 'certFull']; // certFull: full name on certificates (Settings › Privacy)
 T.post('/settings', h(async (req) => { const o = {}; for (const k of SETTING_KEYS) if (k in req.body) o[k] = !!req.body[k]; await db.q('UPDATE users SET settings = settings || $2 WHERE id=$1', [req.user.id, JSON.stringify(o)]); }));
 T.post('/profile', h(async (req) => { const ph = require('./phone').parse(req.body.phoneIso, req.body.phone); if (ph.err) bad(ph.err); await db.q("UPDATE users SET phone=$2, settings=COALESCE(settings,'{}'::jsonb)||jsonb_build_object('phoneIso',$3::text) WHERE id=$1", [req.user.id, ph.phone, ph.iso]); return { ok: true, phone: ph.phone }; }));
 T.post('/password', h((req) => auth.changePassword(req)));
@@ -262,31 +262,8 @@ T.post('/rewards/:id/redeem', needFlag('rewards', 'Rewards are switched off righ
 // Credits History, a page at a time (the first page and the all-time totals come with the dashboard data)
 T.get('/points', h(async (req) => trader.pointsPage(req.user.id, req.query.page)));
 T.post('/competitions/:id/join', h(async (req) => { const fl = ((await db.one("SELECT v FROM kv WHERE k='settings.flags'")) || {}).v || {}; if (fl.competitions === false) bad('Competitions are not open right now', 403); const acct = await require('./comps').join(clean(req.params.id, 30), req.user.id); return { account: acct }; }));
-// A link made before certificate IDs were unique (CF- and five digits): it still opens when only one certificate ever had that number
-async function findCertOld(id) {
-  const tr = require('./trader'); id = clean(id, 20); if (!/^CF-\d{5}$/.test(id)) return null; const hits = [];
-  for (const p of await db.all("SELECT code FROM payouts WHERE status='paid'")) if (tr.certIdOld('o' + p.code) === id) hits.push(tr.certId('o' + p.code));
-  for (const a of await db.all('SELECT id, kind, funded_at, passed_at FROM accounts WHERE funded_at IS NOT NULL OR passed_at IS NOT NULL')) {
-    if (a.kind === 'funded' && a.funded_at && tr.certIdOld('f' + a.id) === id) hits.push(tr.certId('f' + a.id));
-    if (a.passed_at && tr.certIdOld('p' + a.id) === id) hits.push(tr.certId('p' + a.id));
-  }
-  return hits.length === 1 ? findCert(hits[0]) : null;
-}
-// Certificates: find one by its public ID
-async function findCert(id) {
-  const tr = require('./trader'); id = clean(id, 20); const off = await tr.certOff();
-  if (!off.Payout) for (const p of await db.all("SELECT p.code, p.amount, p.paid_at, p.user_id FROM payouts p WHERE p.status='paid'")) if (tr.certId('o' + p.code) === id) return { id, user: p.user_id, k: 'Payout Certificate', v: '$' + Math.round(p.amount).toLocaleString('en-US'), when: p.paid_at };
-  for (const a of await db.all('SELECT id, user_id, size, kind, funded_at, passed_at FROM accounts WHERE funded_at IS NOT NULL OR passed_at IS NOT NULL')) {
-    if (!off.Funded && a.kind === 'funded' && a.funded_at && tr.certId('f' + a.id) === id) return { id, user: a.user_id, k: 'Funded Trader', v: '$' + a.size / 1000 + 'K Funded Account', when: a.funded_at };
-    if (!off.Passed && a.passed_at && tr.certId('p' + a.id) === id) return { id, user: a.user_id, k: 'Evaluation Passed', v: '$' + a.size / 1000 + 'K Evaluation', when: a.passed_at };
-  }
-  // Lifetime Payouts: one certificate each time a trader's paid payouts pass $10K, $25K, $50K and $100K
-  if (!off['Lifetime Payouts']) for (const u of await db.all("SELECT user_id FROM payouts WHERE status='paid' GROUP BY user_id HAVING sum(amount) >= $1", [tr.LIFE[0]])) {
-    const hit = tr.lifeCerts(u.user_id, await db.all("SELECT amount, paid_at FROM payouts WHERE status='paid' AND user_id=$1", [u.user_id])).find((x) => x.id === id);
-    if (hit) return { id, user: u.user_id, k: 'Lifetime Payouts', v: hit.v, when: hit.when };
-  }
-  return null;
-}
+// Certificates: found by their public ID in server/certs.js
+const findCert = (id) => require('./certs').find(id);
 // Sharing a certificate earns 50 credits, at most once a week
 T.post('/certs/:id/share', h(async (req) => {
   const c = await findCert(req.params.id); if (!c || c.user !== req.user.id) bad('Certificate not found', 404);
@@ -394,18 +371,8 @@ async function unsub(req, res) {
   res.setHeader('Vary', 'Cookie'); res.status(ok ? 200 : 400).send(`<!doctype html><html lang="en"${PO.light(req) ? ' class="lt"' : ''}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Email Preferences · Funded Sky</title><style>${PO.VARS}body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--bg);color:var(--hd);font:15px/1.55 "Mona Sans",system-ui,sans-serif;padding:24px;box-sizing:border-box}.c{max-width:440px;background:var(--cd);border:1px solid var(--ln);border-radius:12px;padding:32px}h1{margin:0 0 10px;font-size:24px}p{margin:0 0 14px;color:var(--tx)}a{color:var(--lk)}</style></head><body><div class="c"><h1>${ok ? 'You Are Unsubscribed.' : 'This Link Is Not Valid.'}</h1><p>${ok ? 'You will not get offers or sales emails any more. Receipts, payout updates and security emails still come, because they are about your account.' : 'Open the latest email from us and use its link, or change your emails in Settings.'}</p><p><a href="/app#settings?tab=notif">Manage All Emails</a></p></div></body></html>`);
 }
 app.get('/unsubscribe', unsub); app.post('/unsubscribe', express.urlencoded({ extended: false }), unsub);
-app.get('/cert/:id', async (req, res) => {
-  const e = (x) => String(x || '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  const c = await findCert(req.params.id).then((x) => x || findCertOld(req.params.id)).catch(() => null); const rev = ((await db.one("SELECT v FROM kv WHERE k='store.rewards.revoked'").catch(() => null)) || {}).v || [];
-  let u = null; if (c) { u = await db.one('SELECT first, last FROM users WHERE id=$1', [c.user]); db.q("INSERT INTO kv(k,v) VALUES('certviews', jsonb_build_object($1::text, 1)) ON CONFLICT (k) DO UPDATE SET v = kv.v || jsonb_build_object($1::text, COALESCE((kv.v->>$1)::int,0)+1)", [c.id]).catch(() => {}); }
-  const bad2 = !c || rev.includes(c.id);
-  const when = c ? new Date(c.when).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '';
-  res.setHeader('Vary', 'Cookie'); res.status(c ? 200 : 404).send(`<!doctype html><html lang="en"${PO.light(req) ? ' class="lt"' : ''}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Funded Sky Certificate ${e(req.params.id)}</title>
-<meta property="og:title" content="${bad2 ? 'Funded Sky certificate' : e(c.k + ': ' + c.v)}"><style>${PO.VARS}body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--bg);color:var(--hd);font-family:"Mona Sans",system-ui,sans-serif;padding:24px;box-sizing:border-box}
-.c{width:min(640px,100%);border:1px solid var(--ln);border-radius:16px;padding:40px;background:radial-gradient(120% 120% at 100% 0,var(--ac),var(--cd2) 60%);box-sizing:border-box}.lg{font-weight:700;font-size:20px}.lg i{font-style:normal;background:var(--lgb);color:var(--lgt);border-radius:4px;padding:1px 6px;margin-left:6px;font-size:14px}
-.k{margin-top:36px;color:var(--lk);font-size:14px;letter-spacing:.12em;text-transform:uppercase}.v{font-size:40px;font-weight:700;margin:8px 0}.n{color:var(--tx);font-size:16px}.id{margin-top:32px;font-family:"Geist Mono",monospace;color:var(--mu);font-size:13px}.no{color:var(--er);font-size:18px;margin-top:28px}</style></head>
-<body><div class="c"><div class="lg">fundedsky<i>futures</i></div>${bad2 ? `<p class="no">${c ? 'This certificate is no longer valid.' : 'Certificate not found.'}</p>` : `<div class="k">${e(c.k)}</div><div class="v">${e(c.v)}</div><div class="n">${e(u.first)} ${e((u.last || '').slice(0, 1))}. · ${e(when)}</div>`}<div class="id">${e(req.params.id)} · Simulated trading. Funded Sky pays performance rewards from simulated accounts.</div></div></body></html>`);
-});
+// Public certificate page: the real certificate, proof it is genuine, and ways to share or print it
+app.get('/cert/:id', (req, res, next) => require('./certs').page(req, res).catch(next));
 app.get('/status', async (req, res) => {
   const e = (x) => String(x || '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const inc = (((await db.one("SELECT v FROM kv WHERE k='list.incidents'").catch(() => null)) || {}).v || []).filter((x) => x.pub !== false).slice(0, 10);

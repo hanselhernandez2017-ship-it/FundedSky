@@ -1,0 +1,26 @@
+/* Rewards › Certificates. The certificate itself is drawn by web/runtime/cert.js (its own CSS, always dark); this is only the page around it. */
+.fsbo .certg{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr));gap:26px 22px}
+.fsbo .certt{min-width:0;display:flex;flex-direction:column;gap:12px}
+.fsbo .certm{all:unset;box-sizing:border-box;display:block;width:100%;cursor:pointer;border-radius:8px;transition:transform .18s ease}
+.fsbo .certm:hover{transform:translateY(-3px)}.fsbo .certm:focus-visible{outline:2px solid var(--sky);outline-offset:4px}
+/* small ones stay still until pointed at, so a page full of them is calm; the shadow is tighter than on the big one */
+.fsbo .certm .fsc .fsc-glint{animation-play-state:paused}.fsbo .certm:hover .fsc .fsc-glint,.fsbo .certm:focus-visible .fsc .fsc-glint{animation-play-state:running}
+.fsbo .certm .fsc .fsc-pg,.fsbo .certsm .fsc .fsc-pg{box-shadow:0 1.6cqw 3.6cqw rgba(0,0,0,.34),0 .8cqw 2.4cqw var(--g)}
+.fsbo.light .certm .fsc .fsc-pg,.fsbo.light .certsm .fsc .fsc-pg,.fsbo.light .certl .fsc .fsc-pg{box-shadow:0 1.4cqw 3.2cqw rgba(16,24,40,.22)}
+.fsbo .certi{display:flex;align-items:center;gap:12px;min-width:0}.fsbo .certi>span{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
+.fsbo .certi b{font-size:14.5px;font-weight:600;color:var(--tx)}.fsbo .certi small{font-size:12.5px;color:var(--mu);overflow-wrap:anywhere}
+.fsbo .certf+.certg{margin-top:22px}.fsbo .certf button em{font-style:normal;margin-left:6px;opacity:.7;font-size:11.5px}
+.fsbo .certx{margin-top:28px;max-width:420px}.fsbo .certlife{justify-content:center}
+.fsbo .certe{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:40px;align-items:center}
+.fsbo .certe h3{margin:0 0 8px;font-size:22px;font-weight:600;letter-spacing:-.02em;color:var(--tx)}.fsbo .certe p.mu{margin:0 0 10px;line-height:1.55}
+.fsbo .certsm{margin:0;position:relative}.fsbo .certsm figcaption{margin-top:14px;font-size:13px;color:var(--mu)}
+.fsbo .certsb{position:absolute;z-index:2;left:50%;top:50%;transform:translate(-50%,-50%) rotate(-12deg);padding:6px 22px;border:2px solid rgba(255,255,255,.85);border-radius:8px;background:rgba(8,8,10,.55);color:#fff;font-size:clamp(16px,3.2vw,30px);font-weight:700;letter-spacing:.22em;text-transform:uppercase;pointer-events:none}
+.fsbo .certsm .fsc{opacity:.9}.fsbo .certsm .fsc .fsc-glint,.fsbo .certsm .fsc .fsc-holo{animation:none}
+/* the large view: the app's drawer, centred and wide on a desktop, the usual bottom sheet on a phone */
+.fsbo .drw.cview .certmeta{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;margin-top:20px;font-size:13.5px}.fsbo .drw.cview .certmeta .mono{font-size:14px;color:var(--tx);overflow-wrap:anywhere}
+.fsbo .drw.cview .certl{padding:4px 2px 10px}.fsbo .drw.cview .df{flex-wrap:wrap}
+@media (min-width:761px){.fsbo .ov:has(>.drw.cview){justify-content:center;align-items:center;padding:24px}
+  .fsbo .drw.cview{width:min(940px,100%);height:auto;max-height:100%;border:1px solid var(--ln);border-radius:16px;animation:none}
+  .fsbo .drw.cview .certl{max-width:calc((100vh - 330px) * 1.4144);min-width:min(100%,420px);margin:0 auto}}
+@media (max-width:760px){.fsbo .certe{grid-template-columns:minmax(0,1fr);gap:26px}.fsbo .certg{gap:24px}.fsbo .certx{max-width:none}.fsbo .drw.cview .df .btn{flex:1 1 40%}.fsbo .certm:hover{transform:none}}
+@media (prefers-reduced-motion: reduce){.fsbo .certm{transition:none}.fsbo .certm:hover{transform:none}}

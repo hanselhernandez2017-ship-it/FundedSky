@@ -751,7 +751,10 @@ function router(h) {
       db.one("SELECT v FROM kv WHERE k='certviews'")]);
     return { redemptions: red.map((x) => { const what = String(x.ref || '').split('|')[1] || ''; return { when: x.created_at, user: x.user_id, name: `${x.first} ${(x.last || '').charAt(0)}.`, reward: x.label.replace(/^Redeemed:?\s*/i, ''), cost: -x.delta, what,
       status: what.startsWith('ticket:') ? 'Support Ticket #' + what.slice(7) : what.startsWith('acct:') ? 'On ' + what.slice(5) : x.used ? 'Used' + (x.order_code ? ' on ' + x.order_code : '') : x.used === false ? (x.order_code && x.order_status === 'pending' ? 'Held for ' + x.order_code : 'Code Not Used Yet') : 'Done' }; }),
-      counts: byRw, month: month.n, refEarned: Object.fromEntries(refs.map((x) => [x.user_id, x.n])), views: (cv && cv.v) || {}, refSet: await core.referralSettings(), types: require('./content').RW_TYPES, life: require('./trader').LIFE };
+      counts: byRw, month: month.n, refEarned: Object.fromEntries(refs.map((x) => [x.user_id, x.n])), views: (cv && cv.v) || {}, refSet: await core.referralSettings(), types: require('./content').RW_TYPES, life: require('./trader').LIFE,
+      // competition certificates (one per recorded prize place), in the row shape the board lists: id, trader, type, for, issued, user id, what the design draws
+      compCerts: (await require('./certs').compAll()).map((c) => ({ row: [c.id, c.staffName, 'Competition', c.v, c.when, c.user], d: c.d })),
+      certFull: (await db.all("SELECT id FROM users WHERE (settings->>'certFull')='true'")).map((x) => x.id), certHost: require('./certs').host() };
   }));
   // A code issued by staff always belongs to one trader (only its owner can use it) and must be new
   r.post('/coupons', h(async (req) => { need(req.user, 'support'); const b = req.body; const kind = ['discount', 'free_reset', 'free_eval'].includes(b.kind) ? b.kind : 'discount'; const pctv = Math.min(100, Math.max(0, Number(b.pct) || 0)); const code = (clean(b.code, 24) || ('FS-' + require('crypto').randomBytes(4).toString('hex'))).toUpperCase(); const uid = b.user ? +b.user : null;

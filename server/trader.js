@@ -2,11 +2,8 @@
 const db = require('./db');
 const core = require('./core');
 const R = require('./rules');
-// Certificate IDs are built from what the certificate is for, which is already unique: a payout code (oPO-3544 -> CF-O3544) or an
-// account ID (fFS-50K-2105 -> CF-F50K2105, pFS-50K-2105 -> CF-P50K2105). Two certificates can never share an ID. The back office builds the same IDs.
-const certId = (s) => { s = String(s); return 'CF-' + s.charAt(0).toUpperCase() + s.slice(1).replace(/^(PO|FS)-/, '').replace(/:/g, '-').replace(/[^A-Za-z0-9-]/g, '').replace(/^(\d+K)-/, '$1'); };
-// The short hash used before (CF-12345). Two certificates could land on the same number, so it is only used to keep old links working.
-const certIdOld = (s) => 'CF-' + (Array.from(String(s)).reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % 90000 + 10000);
+// Certificates (IDs, on/off switches, who holds which) live in server/certs.js; the names below are kept here for older callers
+const { certId, certIdOld, certOff, LIFE, lifeCerts } = require('./certs');
 const content = require('./content');
 const I = require('./integrations');
 const flows = require('./flows');
@@ -16,15 +13,6 @@ const K = (s) => s / 1000 + 'K';
 const uaLabel = require('./util').uaLabel;
 const tLabel = (ts) => new Date(ts).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' });
 
-// Certificates: types switched off in Back Office › Rewards › Templates are not issued or shown
-const certOff = async () => { const v = ((await db.one("SELECT v FROM kv WHERE k='store.rewards.templates'")) || {}).v || {}; return Object.fromEntries(Object.entries(v).filter(([, on]) => on === false).map(([k]) => [k, true])); };
-// Lifetime Payouts certificates: one each time a trader's paid payouts pass these totals, dated the day the payout that crossed it was paid
-const LIFE = [10000, 25000, 50000, 100000];
-function lifeCerts(uid, paid) {
-  const out = []; let sum = 0; let i = 0;
-  paid.slice().sort((a, b) => new Date(a.paid_at) - new Date(b.paid_at)).forEach((p) => { sum += Number(p.amount); while (i < LIFE.length && sum >= LIFE[i]) { out.push({ id: certId('l' + uid + ':' + LIFE[i]), v: '$' + LIFE[i].toLocaleString('en-US') + ' Paid Out', when: p.paid_at }); i++; } });
-  return out;
-}
 // A trader's reward and card codes. co: works at checkout, rs: works on a reset. Expired codes are left out.
 async function myCodes(uid, rewardsOn = true) {
   const rows = await db.all("SELECT * FROM coupons WHERE user_id=$1 AND COALESCE(expires_at, created_at + interval '90 days') > now() ORDER BY created_at DESC", [uid]);
@@ -176,12 +164,9 @@ async function boot(user, sessToken, host) {
   const LEGAL = require('./legal'); const VERS = await LEGAL.versions(); const REACCEPT = await LEGAL.pending(user);
   const AGREE = VERS.filter((d) => ag[d.key]).map((d) => [d.name, 'v' + d.v, (REACCEPT.some((x) => x.key === d.key) ? 'New version to accept · last accepted ' : 'Accepted ') + longDate(ag[d.key]), d.url]);
   const PTS_LOG = plog.map(ptsRow); const PTS_TOT = await pointsTotals(uid, user.points);
-  const CERTS = []; const COFF = await certOff();
-  const CV = ((await db.one("SELECT v FROM kv WHERE k='certviews'")) || {}).v || {}; const REVK = ((await db.one("SELECT v FROM kv WHERE k='store.rewards.revoked'")) || {}).v || [];
-  if (!COFF.Payout) pays.filter((p) => p.status === 'paid').forEach((p) => { const cidv = certId('o' + p.code); if (!REVK.includes(cidv)) CERTS.push({ id: cidv, k: 'Payout', v: '$' + Math.round(p.amount).toLocaleString('en-US'), n: 'Paid ' + longDate(p.paid_at), views: CV[cidv] || 0 }); });
-  if (!COFF.Funded) accts.filter((a) => a.kind === 'funded' && a.funded_at).forEach((a) => { const cidv = certId('f' + a.id); if (!REVK.includes(cidv)) CERTS.push({ id: cidv, k: 'Funded', v: '$' + K(a.size) + ' Funded Account', n: 'Funded ' + longDate(a.funded_at), views: CV[cidv] || 0 }); });
-  if (!COFF.Passed) accts.filter((a) => a.passed_at).forEach((a) => { const cidv = certId('p' + a.id); if (!REVK.includes(cidv)) CERTS.push({ id: cidv, k: 'Passed', v: '$' + K(a.size) + ' Evaluation', n: 'Passed ' + longDate(a.passed_at), views: CV[cidv] || 0 }); });
-  if (!COFF['Lifetime Payouts']) lifeCerts(uid, pays.filter((p) => p.status === 'paid')).forEach((x) => { if (!REVK.includes(x.id)) CERTS.push({ id: x.id, k: 'Lifetime', v: x.v, n: 'Reached ' + longDate(x.when), views: CV[x.id] || 0 }); });
+  // Certificates, newest first. d is what the shared design (web/runtime/cert.js) draws; revoked ones are left out.
+  const COFF = await certOff(); const CV = ((await db.one("SELECT v FROM kv WHERE k='certviews'")) || {}).v || {}; const REVK = await require('./certs').revoked();
+  const CERTS = (await require('./certs').forUser(user, accts, pays, cat)).filter((c) => !REVK.includes(c.id)).map((c) => ({ id: c.id, k: c.k, v: c.v, n: c.n + ' ' + (c.day ? require('./util').dayLabel(c.day) + ', ' + c.day.slice(0, 4) : longDate(c.when)), views: CV[c.id] || 0, d: c.d }));
 
   const C = await content.all();
   const prog = (user.settings && user.settings.courses) || {};
@@ -212,7 +197,7 @@ async function boot(user, sessToken, host) {
     now: new Date().toISOString(), today, payMode: require('./payments').mode(), payCfg: (() => { const m = require('./payments').methods() || {}; return { card: m.card || 'test', wallets: String(m.card || '').startsWith('stripe') || m.backup === 'stripe', crypto: !!m.crypto }; })(), flags: Object.assign({ competitions: true, rewards: true, affiliates: true, education: true, cryptoPayouts: true, packs: true }, ((await db.one("SELECT v FROM kv WHERE k='settings.flags'")) || {}).v || {}), integ: { sumsub: await I.on('sumsub'), track1099: await I.on('track1099'), rise: await I.on('rise'), crisp: await I.on('crisp') },
     ME: { aff: await require('./affiliates').summary(user.id), first: user.first, last: (user.last || '').slice(0, 1) + '.', lastFull: user.last, full: `${user.first} ${user.last}`, ini: ([user.first, user.last].map((x) => (String(x || '').match(/[\p{L}\p{N}]/u) || [''])[0]).join('').toUpperCase() || '?'), email: user.email, country: user.country, phone: user.phone || '', phoneSplit: require('./phone').split(user.phone, (user.settings || {}).phoneIso, user.country), dials: require('./phone').DIAL, since: new Date(user.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }), tid: user.tid, ref: `${host}/?ref=${user.ref_code}`, refCode: user.ref_code, verified: user.verified, kyc: user.kyc_status, kycReason: user.kyc_status === 'rejected' ? ((user.kyc || {}).rejectReason || '') : '', status: user.status, tax: await flows.taxSync(user), taxSelf: /^self:/.test(user.tax_ref || '') ? String(user.tax_ref).slice(5) : '', rise: user.rise_status, role: user.role, pts: user.points, settings: user.settings || {}, affAgain: (user.settings || {}).affDeclined ? new Date(new Date(user.settings.affDeclined).getTime() + AFFM.REAPPLY_DAYS * 86400000).toISOString() : null, refs: { n: refN.n, bought: refN.b, clicksAll: Object.values(clicksMap).reduce((a, v) => a + v, 0), list: refs.map((r) => ({ n: (r.first || '?')[0] + '•••• ' + (r.last || '?')[0] + '.', joined: shortDate(r.created_at), bought: r.bought ? shortDate(r.bought) : '', rw: refRw(r) })), clicks: Array.from({ length: 30 }, (_, i) => { const d = new Date(Date.now() - (29 - i) * 86400000).toISOString().slice(0, 10); return clicksMap[d] || 0; }), pts: refPts.n } },
     PLANS, RULESET, RULE_ALL, INSTSIZES, ADDONS: Object.fromEntries(Object.entries(cat.addons).map(([k, a]) => [k, [a.name, a.flat != null && Number(a.flat) > 0 ? '+$' + Number(a.flat) : '+' + a.pct + '%', a.desc]])), PROMOS, BUNDLES: (cat.bundles || []).map((b) => [b.buy, b.get]),
-    ACC, HIST, DAYS, TRADES, PAYOUTS, ORDERS, NOTES, COURSES, RELNOTES: (C.notes || []).filter((n) => n && n.st === 'published' && n.t).sort((a, b) => String(b.at || '').localeCompare(String(a.at || ''))).slice(0, 5).map((n) => ({ t: String(n.t), items: [].concat(n.items || []).map(String).slice(0, 8), d: n.at ? shortDate(n.at) : '' })), LESSONS, EDUPTS: eduPts, REWARDS: await content.rewards(), EARN: C.earn, PTS_LOG, PTS_TOT, PTS_PER: PTS_PAGE, CERTS, CERT_LIFE: !COFF['Lifetime Payouts'],
+    ACC, HIST, DAYS, TRADES, PAYOUTS, ORDERS, NOTES, COURSES, RELNOTES: (C.notes || []).filter((n) => n && n.st === 'published' && n.t).sort((a, b) => String(b.at || '').localeCompare(String(a.at || ''))).slice(0, 5).map((n) => ({ t: String(n.t), items: [].concat(n.items || []).map(String).slice(0, 8), d: n.at ? shortDate(n.at) : '' })), LESSONS, EDUPTS: eduPts, REWARDS: await content.rewards(), EARN: C.earn, PTS_LOG, PTS_TOT, PTS_PER: PTS_PAGE, CERTS, CERT_LIFE: !COFF['Lifetime Payouts'], CERT_COMP: !COFF.Competition, CERT_FULL: (user.settings || {}).certFull === true,
     LB: C.leaderboard, COMPS: await require('./comps').forTrader(uid), CPRIZES: C.cprizes, ARTICLES: (C.articles || []).filter((a) => a[3] !== 'Draft'), REACCEPT, SUPPORT: await require('./support').publicInfo(), PAYRAILS: await (async () => { const off = ((await db.one("SELECT v FROM kv WHERE k='store.finance.rails'")) || {}).v || {}; const fl = ((await db.one("SELECT v FROM kv WHERE k='settings.flags'")) || {}).v || {}; return { Rise: off.rise !== false, USDC: off.usdc !== false && fl.cryptoPayouts !== false }; })(), TOPICS: C.topics, TICKETS, SESS, AGREE, NEWS, NEWSWK: content.newsWeek(C.news), PLANRULES, RULESETS, INSTRULES, AFFTIERS: (await require('./affiliates').tiers()).map((t) => [t.name, t.how, t.rate + '%', t.disc + '%']), AFFSET: await require('./affiliates').settings(), REFSET: RSET,
     METHODS: methods.map((m) => ({ id: m.id, rail: m.rail, label: m.label, def: m.is_default, locked: new Date(m.unlock_at) > new Date(), unlock: new Date(m.unlock_at).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }) + ' ET' })),
     PACKS: await require('./packs').traderData(uid),

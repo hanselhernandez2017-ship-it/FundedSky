@@ -11,18 +11,22 @@ for (const f of fs.readdirSync(RT)) if (/\.(js|css|svg|png|ico|woff2)$/.test(f) 
 const FONT = '<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mona+Sans:wdth,wght@100..125,400..700&family=Geist+Mono:wght@400;500&display=swap"><style>@font-face{font-family:"Flag Emoji";src:url(/static/flags.woff2) format("woff2");unicode-range:U+1F1E6-1F1FF,U+1F3F4,U+E0062-E007F;font-display:swap}#dial,#pdial,#dial option,#pdial option{font-family:"Flag Emoji","Mona Sans",system-ui,sans-serif!important}</style>';
 // Flag Emoji font: Twemoji Country Flags (country-flag-emoji-polyfill, MIT); flag art from Twemoji, CC-BY 4.0. Windows has no flag emoji of its own.
 const HEAD = (title, extra = '') => `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>${title}</title><link rel="icon" href="/static/favicon.svg" type="image/svg+xml"><meta name="theme-color" content="#08080A">${FONT}${extra}</head>`;
+// The certificate design (web/runtime/cert.js, also required by the server for /cert/:id) is copied to /static/cert.js above with the
+// other runtime files and loaded by the trader app and the Back Office Rewards board. Its name is set in a serif italic and its
+// headline in weights up to 800, so pages that draw certificates load these on top of the site fonts.
+const CERT_FONT = '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mona+Sans:wdth,wght@100..125,400..800&family=Instrument+Serif:ital@1&display=swap">';
 // Files under /static are cached by browsers for an hour, so every page asks for them with this build's stamp and a new deploy shows at once
 const STAMP = Date.now().toString(36);
 const out = (f, s) => { if (/\.html$/.test(f)) s = s.replace(/((?:src|href)="\/static\/[\w./-]+\.(?:js|css))"/g, `$1?v=${STAMP}"`); fs.writeFileSync(path.join(DIST, f), s); console.log('built', f, Math.round(s.length / 1024) + 'KB'); };
 
 // ---------- trader app (one page, routes by path) ----------
 {
-  const css = ['tr.css', 'viz.css', 'tr_panel.css', 'tr_shell.css', 'tr_fix.css', 'tr_light.css', 'tr_packs.css', 'tr_art.css'].map(rd).join('\n') + (fs.existsSync(path.join(SRC, 'tr_live.css')) ? rd('tr_live.css') : '');
+  const css = ['tr.css', 'viz.css', 'tr_panel.css', 'tr_shell.css', 'tr_fix.css', 'tr_light.css', 'tr_packs.css', 'tr_art.css', 'tr_cert.css'].map(rd).join('\n') + (fs.existsSync(path.join(SRC, 'tr_live.css')) ? rd('tr_live.css') : '');
   const js = ['viz.js', 'tr_data.js', 'tr_app.js', 'tr_art.js', 'tr_viz.js', 'tr_pages1.js', 'tr_pages2.js', 'tr_pages4.js', 'tr_pages5.js', 'tr_pages6.js', 'tr_pages3.js'].map(rd).join('\n');
   const html = `${HEAD('Funded Sky', `<style>html,body{margin:0;background:#08080A}html[data-theme=light],html[data-theme=light] body{background:#F6F5F3}${css}
-.fsload{position:fixed;inset:0;display:grid;place-items:center;font:500 14px 'Mona Sans',system-ui;color:#9C9693}</style>`)}
+.fsload{position:fixed;inset:0;display:grid;place-items:center;font:500 14px 'Mona Sans',system-ui;color:#9C9693}</style>${CERT_FONT}`)}
 <body><div class="fsbo" id="fsbo"></div><div class="fsload" id="fsload">Loading your dashboard…</div>
-<script src="/static/pay.js"></script><script src="/static/morphdom.js"></script><script src="/static/packart.js"></script>
+<script src="/static/pay.js"></script><script src="/static/morphdom.js"></script><script src="/static/packart.js"></script><script src="/static/cert.js"></script>
 <script>
 (function () {
   var t = 'dark'; try { t = localStorage.getItem('fs_theme') || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'); } catch (e) {}
