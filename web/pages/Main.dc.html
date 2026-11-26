@@ -148,8 +148,8 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px;"><h2 style="margin: 0; font-size: 18px; line-height: 24px; font-weight: 600; letter-spacing: -0.01em;">Bundles</h2><span style="font-size: 13px; color: #9C9693;">Buy More, Pay Less</span></div>
 <div class="fs-g3" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px;">
 <sc-for list="{{ bundles }}" as="b" hint-placeholder-count="3">
-<button type="button" class="fs-opt" aria-pressed="{{ b.on }}" onClick="{{ b.pick }}" style="min-height: 76px; text-align: left; background: {{ b.bg }}; border: 1px solid {{ b.bd }}; border-radius: 8px; padding: 16px; box-sizing: border-box; color: #F4F2F1; font: inherit; display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer;">
-<span style="display: flex; flex-direction: column; gap: 4px; min-width: 0;"><span style="font-size: 16px; line-height: 20px; font-weight: 600;">{{ b.buy }}</span><span style="font-size: 13px; line-height: 18px; color: #5FD39B;">{{ b.get }}</span></span>
+<button type="button" class="fs-opt" aria-pressed="{{ b.on }}" onClick="{{ b.pick }}" style="min-height: 76px; text-align: left; background: {{ b.bg }}; border: 1px solid {{ b.bd }}; border-radius: 8px; padding: 16px; box-sizing: border-box; color: #F4F2F1; font: inherit; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; cursor: pointer;">
+<span style="display: flex; flex-direction: column; gap: 4px; white-space: nowrap;"><span style="font-size: 16px; line-height: 20px; font-weight: 600;">{{ b.buy }}</span><span style="font-size: 13px; line-height: 18px; color: #5FD39B;">{{ b.get }}</span></span>
 <span style="flex: none; font-size: 12px; font-weight: 600; color: {{ b.cta }};">{{ b.state }}</span>
 </button>
 </sc-for>
@@ -316,7 +316,7 @@ class Component extends DCLogic {
     const count = st.cart.reduce((n, c) => n + c.qty, 0);
     // a bundle only says Applied when its saving is in the summary (a promo code that saves more replaces it)
     const prB = st.priced; const bunNames = (cat.bundles || []).map((b) => b.buy).filter(Boolean).concat([cat.bundleName || 'Multi-Account Savings']); const bunIn = !prB || prB.lines.some((l) => l.amount < 0 && bunNames.some((n) => String(l.label).indexOf(n + ':') === 0));
-    const bundles = (cat.bundles || []).map((b) => { const ok = count >= b.min; const used = ok && bunIn; return Object.assign({ buy: b.buy, get: b.get }, used ? on : off, { on: used, state: used ? 'Applied' : ok ? (st.promoOk ? 'Not Combined With Your Code' : 'Not Applied') : `Add ${b.min - count} More`, cta: used ? '#7CC4FF' : '#9C9693', pick: () => { if (!ok) this.setCart(st.cart.map((c) => (c.id === cur.id ? Object.assign({}, c, { qty: c.qty + (b.min - count) }) : c))); } }); });
+    const bundles = (cat.bundles || []).map((b) => { const ok = count >= b.min; const used = ok && bunIn; return Object.assign({ buy: b.buy, get: b.get }, used ? on : off, { on: used, state: used ? 'Applied' : ok ? (st.promoOk ? 'Not With Your Code' : 'Not Applied') : `Add ${b.min - count} More`, cta: used ? '#7CC4FF' : '#9C9693', pick: () => { if (!ok) this.setCart(st.cart.map((c) => (c.id === cur.id ? Object.assign({}, c, { qty: c.qty + (b.min - count) }) : c))); } }); });
     const many = st.cart.length > 1;
     const cart = st.cart.map((c) => {
       const editing = c.id === st.active; const p = P(c.plan);
