@@ -126,7 +126,7 @@ async function priceCart(items, { promo, coupon, userId, country, kind } = {}) {
   const lines = comps.map((c) => ({ label: c.label, amount: c.amt, kind: c.type === 'base' ? 'plan' : 'addon' })).concat(R.sav.map((x) => ({ label: x.label, amount: -x.amount, kind: 'discount' })));
   let discount = round2(R.sav.reduce((n, x) => n + x.amount, 0)); let applied = R.sav.length ? { type: R.sav[R.sav.length - 1].type, label: R.sav.map((x) => x.label).join(' + ') } : null;
   if (codeP && codeP.aff) applied = Object.assign(applied || {}, { type: 'affiliate', code: affRow.code, affiliate: affRow.user });
-  // reward coupon from points
+  // reward code from the rewards store (credits)
   if (coupon) {
     const c = await db.one("SELECT * FROM coupons WHERE code=$1 AND user_id=$2 AND used=false", [coupon, userId || 0]);
     if (!c) bad('That reward code is not valid');
@@ -136,6 +136,11 @@ async function priceCart(items, { promo, coupon, userId, country, kind } = {}) {
     else if (c.kind === 'free_eval') { const first = norm[0]; if (first.size !== 25000) bad('This reward is for a $25K account'); const d = Math.min(left, first.unit); discount += d; lines.push({ label: c.label, amount: -d, kind: 'coupon' }); }
     else bad('This reward can\'t be used at checkout');
     applied = { ...(applied || {}), coupon: c.code };
+  } else if (userId && (await require('./packs').enabled())) {
+    // a discount card the trader saved for checkout comes off automatically, best one first
+    const cc = await db.one("SELECT * FROM coupons WHERE user_id=$1 AND used=false AND source='card' AND kind='discount' AND (expires_at IS NULL OR expires_at > now()) ORDER BY pct DESC, created_at LIMIT 1", [userId]);
+    const left = round2(sub - discount);
+    if (cc && left > 0) { const d = round2(left * Number(cc.pct) / 100); discount += d; lines.push({ label: cc.label, amount: -d, kind: 'coupon' }); applied = { ...(applied || {}), coupon: cc.code }; coupon = cc.code; }
   }
   const total = Math.max(0, round2(sub - discount));
   return { items: norm, lines, subtotal: sub, discount: round2(discount), total, applied, promo: codeP && !codeP.aff ? codeP.code : affRow ? String(affRow.code).toUpperCase() : null, affiliate: affRow ? affRow.user : null, coupon: coupon || null };
@@ -168,9 +173,9 @@ async function createAccount(c, { userId, orderId, plan, size, platform, addons,
 async function notify(c, userId, title, body, go = 'accounts') {
   await (c || db).q('INSERT INTO notifications(user_id,title,body,go) VALUES($1,$2,$3,$4)', [userId, title, body, go]);
 }
-async function points(c, userId, delta, label) {
+async function points(c, userId, delta, label, kind) {
   if (!delta) return;
-  await (c || db).q('INSERT INTO points_log(user_id,label,delta) VALUES($1,$2,$3)', [userId, label, delta]);
+  await (c || db).q('INSERT INTO points_log(user_id,label,delta,kind) VALUES($1,$2,$3,$4)', [userId, label, delta, kind || (delta > 0 ? 'earned' : 'refund')]);
   await (c || db).q('UPDATE users SET points=points+$1 WHERE id=$2', [delta, userId]);
 }
 async function audit(actorId, action, target, meta) {
@@ -194,7 +199,13 @@ async function fulfilOrder(orderId) {
       made.push(o.meta.account);
     } else if (o.kind === 'activation') {
       made.push(await activateFunded(c, o.meta.account, o.user_id, o.id));
+    } else if (o.kind === 'credits') {
+      await require('./packs').fulfilCredits(c, o);
+      await c.q("UPDATE orders SET meta = meta || $2 WHERE id=$1", [o.id, JSON.stringify({ fulfilled: true, accounts: [] })]);
+      return { ...o, accounts: [] };
     }
+    // free packs for orders with several accounts (Back Office › Packs › Checkout Rewards)
+    if (made.length && (o.kind === 'evaluation' || o.kind === 'instant' || o.kind === 'mixed')) await require('./packs').grantForOrder(c, o);
     if (o.coupon || (o.meta && o.meta.coupon)) await c.q('UPDATE coupons SET used=true WHERE code=$1', [o.meta.coupon || o.coupon]);
     const pts = Math.floor(Number(o.total));
     await points(c, o.user_id, pts, o.kind === 'reset' ? 'Reset ' + o.meta.account : o.kind === 'activation' ? 'Activation fee' : 'Bought ' + o.items.map((x) => kLabel(x.size)).join(', ') + ' account' + (made.length > 1 ? 's' : ''));
@@ -208,7 +219,7 @@ async function fulfilOrder(orderId) {
       } else if (o.kind !== 'reset') {
         const RS = await referralSettings();
         const prev = await c.one("SELECT count(*)::int n FROM orders WHERE user_id=$1 AND status='paid' AND id<>$2", [o.user_id, o.id]);
-        if (prev.n === 0 && RS.on && RS.pts > 0) { await points(c, u.referred_by, RS.pts, 'Friend bought an account'); await notify(c, u.referred_by, 'A friend you referred bought an account', `You earned ${RS.pts.toLocaleString('en-US')} points.`, 'affiliates'); }
+        if (prev.n === 0 && RS.on && RS.pts > 0) { await points(c, u.referred_by, RS.pts, 'Friend bought an account'); await notify(c, u.referred_by, 'A friend you referred bought an account', `You earned ${RS.pts.toLocaleString('en-US')} credits.`, 'affiliates'); }
       }
     }
     await c.q("UPDATE orders SET meta = meta || $2 WHERE id=$1", [o.id, JSON.stringify({ fulfilled: true, accounts: made })]);
@@ -313,7 +324,7 @@ async function reviewPayout(actorId, code, action, note, batchId) {
       const r = R.rulesFor(cat, a);
       const count = a.payout_count + 1;
       const phase = r.reviewAfter && count >= r.reviewAfter ? 'review' : a.phase;
-      await c.q(`UPDATE accounts SET payout_count=$2, paid_total=paid_total+$3, floor=${r.ddType === 'static' ? 'floor' : 'LEAST(floor, start_bal)'}, cycle_profit_start=balance, cycle_win_days=0, cycle_best=0, cycle_scalp=0, last_payout_at=now(), phase=$4 WHERE id=$1`, [a.id, count, p.amount, phase]);
+      await c.q(`UPDATE accounts SET payout_count=$2, paid_total=paid_total+$3, floor=${r.ddType === 'static' ? 'floor' : 'LEAST(floor, start_bal)'}, cycle_profit_start=balance, cycle_win_days=0, cycle_best=0, cycle_scalp=0, last_payout_at=now(), phase=$4, perks = perks - 'payCons' WHERE id=$1`, [a.id, count, p.amount, phase]);
       await points(c, p.user_id, 250, 'Payout ' + p.code);
       M('paysent', p.user_id, { amount: money(p.amount), method: p.method, ref: p.provider_ref || p.code, url: require('./auth').BASE() + '/app#payouts' });
       await notify(c, p.user_id, `Payout ${p.code} sent`, `${money(p.amount)} sent to ${p.method}.`, 'payouts');

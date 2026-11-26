@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Funded Sky admin: packs and credits</title>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mona+Sans:wdth,wght@100..125,400..700&amp;family=Geist+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0}
+.ap{--bg:#08080A;--p1:#0D0D10;--p2:#111113;--p3:#18181A;--ln:#26262A;--tx:#F4F2F1;--t2:#D4CFCD;--mu:#9C9693;--fa:#6E6A67;--sky:#7CC4FF;--skyt:rgba(124,196,255,.14);--ok:#5FD39B;--okt:rgba(95,211,155,.14);--no:#F2777F;--not:rgba(242,119,127,.14);--wa:#F2C46D;--wat:rgba(242,196,109,.14);--pri:#FFFFFF;--onpri:#111113;--ov:rgba(4,4,6,.7);
+  --r1:#9C9693;--r2:#5FD39B;--r3:#7CC4FF;--r4:#B79CFF;--r5:#F2C46D;--r6:#F2777F;
+  background:var(--bg);color:var(--tx);font-family:'Mona Sans',system-ui,sans-serif;font-size:14px;font-variant-numeric:tabular-nums;line-height:1.45;-webkit-font-smoothing:antialiased;min-height:100%}
+.ap.light{--bg:#F7F6F5;--p1:#FFFFFF;--p2:#FFFFFF;--p3:#F2F0EE;--ln:#E4E1DF;--tx:#111113;--t2:#3A3735;--mu:#5E5956;--fa:#7A7572;--sky:#1F6FB8;--skyt:#E3F1FF;--ok:#167A4C;--okt:#DDF3E8;--no:#C2303D;--not:#FBE4E6;--wa:#9A6400;--wat:#FBF0D9;--pri:#111113;--onpri:#FFFFFF;--ov:rgba(17,17,19,.45);
+  --r1:#5E5956;--r2:#167A4C;--r3:#1F6FB8;--r4:#6B4BD8;--r5:#9A6400;--r6:#C2303D}
+.ap *{box-sizing:border-box}
+.ap a{color:var(--sky);text-decoration:none}
+.ap button{font:inherit;color:inherit;cursor:pointer}
+.ap .mono{font-family:'Geist Mono',ui-monospace,monospace}
+.ap .pill{height:34px;padding:0 14px;border-radius:999px;border:1px solid var(--ln);background:transparent;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+.ap .pill:hover{border-color:var(--mu)}
+.ap .pill.pri{background:var(--pri);color:var(--onpri);border-color:var(--pri)}
+.ap .pill.sm{height:28px;padding:0 10px;font-size:12px}
+.ap .pill[disabled]{opacity:.45;cursor:not-allowed}
+.ap .ni{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;justify-content:space-between;width:100%;height:36px;padding:0 12px;border-radius:8px;color:var(--mu);font-weight:500;font-size:13.5px}
+.ap .ni:hover{background:var(--p3);color:var(--tx)}
+.ap :focus-visible{outline:2px solid var(--sky);outline-offset:2px}
+.ap .card{background:var(--p2);border:1px solid var(--ln);border-radius:12px}
+.ap table{border-collapse:collapse;width:100%}
+.ap th{font-size:12px;font-weight:500;color:var(--mu);text-align:left;padding:10px 14px;border-bottom:1px solid var(--ln);white-space:nowrap}
+.ap td{padding:11px 14px;border-bottom:1px solid var(--ln);font-size:13.5px;white-space:nowrap}
+.ap tr.lk{cursor:pointer}.ap tr.lk:hover td{background:var(--p3)}
+.ap .b{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:999px;font-size:11.5px;font-weight:600}
+.ap .fl{display:flex;flex-direction:column;gap:6px}
+.ap .fl label{font-size:12.5px;color:var(--mu);font-weight:500}
+.ap input,.ap select{font:inherit;color:var(--tx);background:var(--bg);border:1px solid var(--ln);border-radius:8px;height:36px;padding:0 10px;width:100%}
+.ap input:focus,.ap select:focus{border-color:var(--sky);outline:none}
+.ap .mini{width:18px;height:25px;border-radius:3px;flex:none}
+.ap .bar{height:8px;border-radius:4px;background:var(--p3);overflow:hidden}
+.ap .hint{font-size:12.5px;color:var(--mu)}
+.ap textarea{font:inherit;color:var(--tx);background:var(--bg);border:1px solid var(--ln);border-radius:8px;padding:8px 10px;width:100%;min-height:64px}
+.ap input[type=checkbox]{width:18px;height:18px;padding:0;accent-color:var(--sky)}
+.ap .note{border:1px solid var(--ln);border-radius:10px;padding:12px 14px;font-size:13px;color:var(--t2);background:var(--p2)}
+.ap .err{color:var(--no);font-weight:600;font-size:13px;margin:0}
+.ap .ok{color:var(--ok);font-weight:600;font-size:13px;margin:0}
+.ap .chipx{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 6px 0 8px;border:1px solid var(--ln);border-radius:999px;font-size:12px;font-weight:600;background:var(--p2)}
+.ap .chipx button{all:unset;cursor:pointer;width:18px;height:18px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:var(--mu)}
+.ap .chipx button:hover{color:var(--no)}
+.ap .tog{display:flex;align-items:center;gap:10px;font-weight:600;cursor:pointer}
+.ap .sticky-save{position:sticky;bottom:0;display:flex;gap:10px;justify-content:flex-end;align-items:center;padding:12px 0;background:linear-gradient(180deg,transparent,var(--bg) 30%)}
+</style>
+</helmet>
+<div class="ap {{ themeCls }}" style="min-height: 100vh; display: flex; flex-direction: column;">
+
+<header style="min-height: 56px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; padding: 10px 16px; border-bottom: 1px solid var(--ln); background: var(--p1);">
+<a href="/admin" class="pill" style="color: var(--tx);"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"></path></svg>Back to Admin</a>
+<span style="font-size: 17px; font-weight: 600; letter-spacing: -0.02em;">Packs</span>
+<div style="flex: 1; display: flex; justify-content: center; min-width: 0;">
+<sc-if value="{{ desk }}" hint-placeholder-val="{{ true }}">
+<div style="display: flex; align-items: center; height: 38px; border: 1px solid var(--ln); border-radius: 10px; background: var(--p2); white-space: nowrap;">
+<sc-for list="{{ topStats }}" as="s" hint-placeholder-count="4"><div style="display: flex; align-items: baseline; gap: 8px; padding: 0 16px; border-left: {{ s.bl }};"><span style="font-size: 12.5px; color: var(--mu);">{{ s.k }}</span><b style="font-size: 15px; font-weight: 600;">{{ s.v }}</b></div></sc-for>
+</div>
+</sc-if>
+</div>
+<span class="b" style="background: {{ saleBg }}; color: {{ saleFg }};">{{ saleTxt }}</span>
+<button type="button" class="pill" onClick="{{ toggleSale }}">{{ saleBtn }}</button>
+</header>
+
+<div style="display: flex; flex-wrap: wrap; flex: 1; min-height: 0;">
+<nav aria-label="Packs areas" style="flex: 1 1 220px; max-width: {{ navMax }}; border-right: 1px solid var(--ln); padding: 16px 12px; display: flex; flex-direction: {{ navDir }}; flex-wrap: wrap; gap: 2px; background: var(--p1);">
+<sc-for list="{{ areas }}" as="a" hint-placeholder-count="7"><button type="button" class="ni" onClick="{{ a.go }}" aria-current="{{ a.cur }}" style="{{ a.style }}"><span>{{ a.label }}</span><span class="mono" style="font-size: 12px; color: var(--mu);">{{ a.n }}</span></button></sc-for>
+</nav>
+
+<main style="flex: 999 1 560px; min-width: 0; padding: 24px {{ padX }} 48px;">
+<sc-if value="{{ isOff }}"><div class="note" style="margin-bottom: 18px; border-color: var(--wa); background: var(--wat); color: var(--tx);"><b>Packs are switched off.</b> Traders don't see the Packs page, the credits balance, the credits checkout or free packs at checkout, and every packs and credits request is refused. Their credits, packs and cards are kept for when you switch them back on.</div></sc-if>
+<sc-if value="{{ msg }}"><div class="note" role="status" style="margin-bottom: 18px; border-color: var(--ok); color: var(--ok); font-weight: 600;">{{ msg }}</div></sc-if>
+<sc-if value="{{ loading }}"><p class="hint">Loading…</p></sc-if>
+
+<sc-if value="{{ vOv }}" hint-placeholder-val="{{ true }}">
+<div style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; margin-bottom: 20px;"><div style="flex: 1 1 300px;"><h1 style="margin: 0 0 4px; font-size: 24px; font-weight: 600; letter-spacing: -0.02em;">Overview</h1><p class="hint" style="margin: 0;">Last 30 days. Credits are money traders have paid for; unused cards are perks you still owe.</p></div></div>
+<div style="display: grid; grid-template-columns: repeat({{ tileCols }}, minmax(0, 1fr)); gap: 12px; margin-bottom: 20px;">
+<sc-for list="{{ tiles }}" as="t" hint-placeholder-count="6"><div class="card" style="padding: 16px;"><div class="hint">{{ t.k }}</div><div class="mono" style="font-size: 24px; font-weight: 500; margin: 4px 0;">{{ t.v }}</div><div style="font-size: 12px; color: {{ t.c }};">{{ t.d }}</div></div></sc-for>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 16px;">
+<div class="card" style="flex: 2 1 520px; min-width: 0; padding: 18px;">
+<div style="display: flex; justify-content: space-between; margin-bottom: 14px;"><b style="font-weight: 600;">Packs Opened per Day</b><span class="hint">{{ chartNote }}</span></div>
+<div style="display: flex; align-items: flex-end; gap: 4px; height: 180px;">
+<sc-for list="{{ chart }}" as="d" hint-placeholder-count="30"><div title="{{ d.t }}" style="flex: 1; display: flex; flex-direction: column; justify-content: flex-end; gap: 2px; height: 100%;"><div style="height: {{ d.f }}; background: var(--ok); border-radius: 2px; opacity: .8;"></div><div style="height: {{ d.p }}; background: var(--sky); border-radius: 2px;"></div></div></sc-for>
+</div>
+</div>
+<div class="card" style="flex: 1 1 340px; min-width: 0; padding: 18px;">
+<b style="font-weight: 600;">Fairness Check</b>
+<p class="hint" style="margin: 4px 0 14px;">{{ fairNote }}</p>
+<div style="display: flex; flex-direction: column; gap: 10px;">
+<sc-for list="{{ fair }}" as="f" hint-placeholder-count="6"><div style="display: grid; grid-template-columns: 90px minmax(0, 1fr) 120px; gap: 10px; align-items: center; font-size: 13px;"><span style="display: flex; align-items: center; gap: 8px;"><i style="width: 8px; height: 8px; border-radius: 50%; background: {{ f.c }};"></i>{{ f.r }}</span><div class="bar"><div style="height: 100%; width: {{ f.w }}; background: {{ f.c }};"></div></div><span class="mono" style="text-align: right; color: var(--mu);">{{ f.got }} · {{ f.exp }}</span></div></sc-for>
+</div>
+</div>
+</div>
+<div class="card" style="margin-top: 16px; overflow-x: auto;">
+<table><thead><tr><th scope="col">Pack</th><th scope="col">Price</th><th scope="col">Sold</th><th scope="col">Free From Checkout</th><th scope="col">Opened</th><th scope="col">Revenue</th><th scope="col">Est. Cost of Cards</th><th scope="col">Margin</th></tr></thead>
+<tbody><sc-for list="{{ perf }}" as="p" hint-placeholder-count="5"><tr><td><span style="display: flex; align-items: center; gap: 10px;"><span class="mini" style="background: {{ p.art }};"></span><b style="font-weight: 500;">{{ p.name }}</b></span></td><td class="mono">{{ p.price }}</td><td class="mono">{{ p.sold }}</td><td class="mono">{{ p.free }}</td><td class="mono">{{ p.opened }}</td><td class="mono">{{ p.rev }}</td><td class="mono">{{ p.cost }}</td><td class="mono" style="color: {{ p.mc }};">{{ p.margin }}</td></tr></sc-for></tbody></table>
+</div>
+</sc-if>
+
+<sc-if value="{{ vPacks }}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; margin-bottom: 20px;"><div style="flex: 1 1 300px;"><h1 style="margin: 0 0 4px; font-size: 24px; font-weight: 600; letter-spacing: -0.02em;">Packs</h1><p class="hint" style="margin: 0;">Price, odds and which cards each pack can hold. Odds are published to traders exactly as set here.</p></div><button type="button" class="pill pri" onClick="{{ newPack }}">New Pack</button></div>
+<div class="card" style="overflow-x: auto;">
+<table><thead><tr><th scope="col">Pack</th><th scope="col">Status</th><th scope="col">Price</th><th scope="col">Guarantee</th><th scope="col">Rare or Better</th><th scope="col">Mythic</th><th scope="col">Limit</th><th scope="col">Opened (30d)</th></tr></thead>
+<tbody><sc-for list="{{ packs }}" as="p" hint-placeholder-count="5"><tr class="lk" onClick="{{ p.edit }}"><td><span style="display: flex; align-items: center; gap: 10px;"><span class="mini" style="background: {{ p.art }};"></span><b style="font-weight: 500;">{{ p.name }}</b></span></td><td><span class="b" style="background: {{ p.sbg }}; color: {{ p.sfg }};">{{ p.status }}</span></td><td class="mono">{{ p.priceTxt }}</td><td>{{ p.g }}</td><td class="mono">{{ p.rare }}</td><td class="mono">{{ p.myth }}</td><td>{{ p.limit }}</td><td class="mono">{{ p.opened }}</td></tr></sc-for></tbody></table>
+</div>
+<p class="hint">Changing odds or price creates a new version on save. Packs already bought open with the odds they were sold with.</p>
+</sc-if>
+
+<sc-if value="{{ vCards }}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; margin-bottom: 16px;"><div style="flex: 1 1 300px;"><h1 style="margin: 0 0 4px; font-size: 24px; font-weight: 600; letter-spacing: -0.02em;">Cards</h1><p class="hint" style="margin: 0;">Every card does something the platform already does: a discount, a reset, a rule change or a new account. Pick the effect, the value and where it can be used.</p></div><button type="button" class="pill pri" onClick="{{ newCard }}">New Card</button></div>
+<div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px;"><sc-for list="{{ rfilt }}" as="f" hint-placeholder-count="7"><button type="button" class="pill sm" aria-pressed="{{ f.on }}" onClick="{{ f.go }}" style="{{ f.style }}">{{ f.label }}</button></sc-for></div>
+<div class="card" style="overflow-x: auto;">
+<table><thead><tr><th scope="col">Card</th><th scope="col">Rarity</th><th scope="col">Effect</th><th scope="col">Used On</th><th scope="col">Uses</th><th scope="col">Status</th><th scope="col">Drawn (30d)</th><th scope="col">Used</th><th scope="col">Est. Cost Each</th></tr></thead>
+<tbody><sc-for list="{{ cards }}" as="c" hint-placeholder-count="10"><tr class="lk" onClick="{{ c.edit }}"><td><b style="font-weight: 500;">{{ c.name }}</b><div class="hint">{{ c.desc }}</div></td><td><span style="display: inline-flex; align-items: center; gap: 6px; color: {{ c.color }}; font-weight: 600; font-size: 12.5px;"><i style="width: 8px; height: 8px; border-radius: 50%; background: {{ c.color }};"></i>{{ c.r }}</span></td><td>{{ c.effect }}</td><td>{{ c.kind }}</td><td>{{ c.uses }}</td><td><span class="b" style="background: {{ c.sbg }}; color: {{ c.sfg }};">{{ c.st }}</span></td><td class="mono">{{ c.drawn }}</td><td class="mono">{{ c.used }}</td><td class="mono">{{ c.cost }}</td></tr></sc-for></tbody></table>
+</div>
+</sc-if>
+
+<sc-if value="{{ vCredits }}">
+<h1 style="margin: 0 0 4px; font-size: 24px; font-weight: 600; letter-spacing: -0.02em;">Credits</h1><p class="hint" style="margin: 0 0 20px;">What traders pay for credits. Credits are stored value: they never expire. Refunding a credits order takes back the credits that are still unspent.</p>
+<div style="display: flex; flex-wrap: wrap; gap: 16px;">
+<div class="card" style="flex: 2 1 520px; min-width: 0; overflow-x: auto;">
+<div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 14px 0;"><b style="font-weight: 600;">Credit Bundles</b><button type="button" class="pill sm" onClick="{{ addBundle }}">Add Bundle</button></div>
+<table><thead><tr><th scope="col">Price ($)</th><th scope="col">Bonus (%)</th><th scope="col">Credits</th><th scope="col">Label</th><th scope="col">On Sale</th><th scope="col"></th></tr></thead>
+<tbody><sc-for list="{{ bundles }}" as="b"><tr><td style="width: 110px;"><input type="number" min="1" value="{{ b.usd }}" onChange="{{ b.setUsd }}" aria-label="Bundle price"></td><td style="width: 100px;"><input type="number" min="0" max="100" value="{{ b.bonus }}" onChange="{{ b.setBonus }}" aria-label="Bonus percent"></td><td class="mono">{{ b.cr }}</td><td style="min-width: 140px;"><input type="text" value="{{ b.badge }}" onChange="{{ b.setBadge }}" placeholder="None" aria-label="Label"></td><td><input type="checkbox" checked="{{ b.on }}" onChange="{{ b.toggle }}" aria-label="On sale"></td><td><button type="button" class="pill sm" onClick="{{ b.remove }}">Remove</button></td></tr></sc-for></tbody></table>
+</div>
+<div class="card" style="flex: 1 1 320px; min-width: 0; padding: 18px; display: flex; flex-direction: column; gap: 14px;">
+<b style="font-weight: 600;">Rules</b>
+<div class="fl"><label for="cpr">Credits per $1</label><input id="cpr" type="number" min="1" value="{{ rules.perDollar }}" onChange="{{ setPerDollar }}"><span class="hint">{{ perDollarHint }}</span></div>
+<div class="fl"><label for="cry">Extra Credits When Paying by Crypto (%)</label><input id="cry" type="number" min="0" value="{{ rules.cryptoBonus }}" onChange="{{ setCrypto }}"></div>
+<div class="fl"><label for="cap">Most Credits One Trader Can Buy per Day</label><input id="cap" type="number" min="0" value="{{ rules.dailyCap }}" onChange="{{ setCap }}"><span class="hint">0 means no limit.</span></div>
+<label class="tog"><input type="checkbox" checked="{{ rules.customOn }}" onChange="{{ toggleCustom }}">Let Traders Pick Any Amount</label>
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;"><div class="fl"><label for="cmin">Smallest ($)</label><input id="cmin" type="number" min="1" value="{{ rules.min }}" onChange="{{ setMin }}"></div><div class="fl"><label for="cmax">Largest ($)</label><input id="cmax" type="number" min="1" value="{{ rules.max }}" onChange="{{ setMax }}"></div></div>
+</div>
+</div>
+<div class="card" style="margin-top: 16px; padding: 18px; display: flex; flex-wrap: wrap; gap: 24px;">
+<sc-for list="{{ credStats }}" as="s"><div style="flex: 1 1 200px;"><div class="hint">{{ s.k }}</div><div class="mono" style="font-size: 24px;">{{ s.v }}</div><div class="hint">{{ s.d }}</div></div></sc-for>
+</div>
+</sc-if>
+<sc-if value="{{ vLadder }}">
+<div style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; margin-bottom: 20px;"><div style="flex: 1 1 300px;"><h1 style="margin: 0 0 4px; font-size: 24px; font-weight: 600; letter-spacing: -0.02em;">Checkout Rewards</h1><p class="hint" style="margin: 0;">Free packs (and credits) for orders with more accounts. They show under Bundles on step 1 of the checkout and arrive when the order is paid.</p></div>
+<label class="tog"><input type="checkbox" checked="{{ ladderOn }}" onChange="{{ toggleLadder }}">Show in Checkout</label></div>
+<div class="card" style="overflow-x: auto;">
+<table><thead><tr><th scope="col">Accounts in the Order</th><th scope="col">Free Packs</th><th scope="col">Free Credits</th><th scope="col">Worth</th><th scope="col">Orders (30d)</th><th scope="col"></th></tr></thead>
+<tbody><sc-for list="{{ ladder }}" as="t"><tr><td style="width: 130px;"><input type="number" min="1" value="{{ t.n }}" onChange="{{ t.setN }}" aria-label="Accounts"></td><td style="white-space: normal; min-width: 260px;"><span style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;"><sc-for list="{{ t.chips }}" as="c"><span class="chipx"><span class="mini" style="background: {{ c.art }}; width: 12px; height: 17px;"></span>{{ c.name }}<button type="button" onClick="{{ c.remove }}" aria-label="Remove {{ c.name }}">×</button></span></sc-for><select onChange="{{ t.add }}" aria-label="Add a pack" style="width: auto; height: 28px; font-size: 12px;"><option value="">+ Add Pack</option><sc-for list="{{ packOpts }}" as="o"><option value="{{ o.id }}">{{ o.name }}</option></sc-for></select></span></td><td style="width: 120px;"><input type="number" min="0" value="{{ t.credits }}" onChange="{{ t.setCr }}" aria-label="Free credits"></td><td class="mono">{{ t.worth }}</td><td class="mono">{{ t.orders }}</td><td><button type="button" class="pill sm" onClick="{{ t.remove }}">Remove</button></td></tr></sc-for></tbody></table>
+<div style="padding: 12px 14px;"><button type="button" class="pill sm" onClick="{{ addTier }}">Add a Step</button></div>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 16px; margin-top: 16px;">
+<div class="card" style="flex: 1 1 320px; padding: 18px; display: flex; flex-direction: column; gap: 12px;">
+<b style="font-weight: 600;">Which Plans Count</b>
+<sc-for list="{{ ladPlans }}" as="p"><label style="display: flex; gap: 10px; align-items: center;"><input type="checkbox" checked="{{ p.on }}" onChange="{{ p.toggle }}">{{ p.name }}</label></sc-for>
+<span class="hint">Accounts on these plans count toward the steps, mixed sizes included. Refunded orders: unopened free packs are removed, and unused cards from them are taken back.</span>
+</div>
+<div class="card" style="flex: 1 1 320px; padding: 18px;">
+<b style="font-weight: 600;">How It Shows in Checkout</b>
+<p class="hint" style="margin: 4px 0 12px;">Open the live checkout with three accounts in the cart to see the steps as traders do.</p>
+<a href="/checkout" class="pill" target="_blank" rel="noopener">Open the Checkout</a>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{ vTraders }}">
+<h1 style="margin: 0 0 4px; font-size: 24px; font-weight: 600; letter-spacing: -0.02em;">Traders</h1><p class="hint" style="margin: 0 0 16px;">Look up a trader's credits, packs and cards. Grants need a reason and are logged in Activity. Grants over 100,000 credits need an admin.</p>
+<form onSubmit="{{ search }}" style="display: flex; gap: 8px; max-width: 520px; margin-bottom: 14px;"><div class="fl" style="flex: 1;"><label for="tq">Find a Trader</label><input id="tq" type="search" value="{{ tq }}" onChange="{{ setTq }}" placeholder="Name, email or trader ID"></div><button type="submit" class="pill" style="align-self: flex-end; height: 36px;">Search</button></form>
+<sc-if value="{{ hasResults }}"><div class="card" style="margin-bottom: 16px; overflow-x: auto;"><table><tbody><sc-for list="{{ results }}" as="r"><tr class="lk" onClick="{{ r.pick }}"><td><b style="font-weight: 500;">{{ r.name }}</b> <span class="hint mono">{{ r.tid }}</span></td><td class="hint">{{ r.email }}</td><td class="mono">{{ r.bal }} credits</td></tr></sc-for></tbody></table></div></sc-if>
+<sc-if value="{{ noResults }}"><p class="hint">No trader matches that search.</p></sc-if>
+<sc-if value="{{ hasTrader }}">
+<div style="display: flex; flex-wrap: wrap; gap: 16px;">
+<div class="card" style="flex: 1 1 300px; padding: 18px; display: flex; flex-direction: column; gap: 10px; align-self: flex-start;">
+<b style="font-weight: 600; font-size: 16px;">{{ tr.name }} <span class="hint mono">{{ tr.tid }}</span></b>
+<sc-for list="{{ tr.rows }}" as="x"><div style="display: flex; justify-content: space-between;"><span class="hint">{{ x.k }}</span><b class="mono" style="font-weight: 500;">{{ x.v }}</b></div></sc-for>
+<div style="display: flex; flex-wrap: wrap; gap: 8px; padding-top: 6px;"><sc-for list="{{ grants }}" as="g"><button type="button" class="pill sm" onClick="{{ g.go }}" style="{{ g.style }}">{{ g.label }}</button></sc-for></div>
+<sc-if value="{{ granting }}">
+<div style="display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--ln); padding-top: 12px;">
+<sc-if value="{{ gCredits }}"><div class="fl"><label for="gc">Credits</label><input id="gc" type="number" value="{{ g.credits }}" onChange="{{ setGCredits }}"><span class="hint">{{ gCreditsHint }}</span></div></sc-if>
+<sc-if value="{{ gPack }}"><div style="display: grid; grid-template-columns: 1fr 90px; gap: 10px;"><div class="fl"><label for="gp">Pack</label><select id="gp" onChange="{{ setGPack }}"><sc-for list="{{ packOpts }}" as="o"><option value="{{ o.id }}" selected="{{ o.sel }}">{{ o.name }}</option></sc-for></select></div><div class="fl"><label for="gq">How Many</label><input id="gq" type="number" min="1" max="10" value="{{ g.qty }}" onChange="{{ setGQty }}"></div></div></sc-if>
+<sc-if value="{{ gCard }}"><div class="fl"><label for="gk">Card</label><select id="gk" onChange="{{ setGCard }}"><sc-for list="{{ cardOpts }}" as="o"><option value="{{ o.id }}" selected="{{ o.sel }}">{{ o.name }}</option></sc-for></select></div></sc-if>
+<div class="fl"><label for="gr">Reason</label><input id="gr" type="text" value="{{ g.reason }}" onChange="{{ setGReason }}" placeholder="Shown to the trader and logged"></div>
+<button type="button" class="pill pri" onClick="{{ doGrant }}" disabled="{{ busy }}">Grant</button>
+</div>
+</sc-if>
+<sc-if value="{{ trMsg }}"><p role="status" class="ok">{{ trMsg }}</p></sc-if>
+<sc-if value="{{ trErr }}"><p role="alert" class="err">{{ trErr }}</p></sc-if>
+</div>
+<div class="card" style="flex: 2 1 520px; min-width: 0; overflow-x: auto;">
+<table><thead><tr><th scope="col">Card</th><th scope="col">Rarity</th><th scope="col">Got It</th><th scope="col">Status</th><th scope="col"></th></tr></thead>
+<tbody><sc-for list="{{ trCards }}" as="c"><tr><td><b style="font-weight: 500;">{{ c.name }}</b></td><td style="color: {{ c.color }}; font-weight: 600; font-size: 12.5px;">{{ c.r }}</td><td class="hint">{{ c.at }}</td><td class="hint">{{ c.st }}</td><td><sc-if value="{{ c.can }}"><button type="button" class="pill sm" onClick="{{ c.revoke }}">Take Back</button></sc-if></td></tr></sc-for></tbody></table>
+<sc-if value="{{ noCards }}"><p class="hint" style="padding: 14px; margin: 0;">No cards yet.</p></sc-if>
+</div>
+</div>
+</sc-if>
+</sc-if>
+<sc-if value="{{ vAct }}">
+<div style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; margin-bottom: 16px;"><div style="flex: 1 1 300px;"><h1 style="margin: 0 0 4px; font-size: 24px; font-weight: 600; letter-spacing: -0.02em;">Activity</h1><p class="hint" style="margin: 0;">Every credit purchase, pack opening, card use, checkout reward, grant and refund. Newest first.</p></div><button type="button" class="pill sm" onClick="{{ reload }}">Refresh</button></div>
+<div class="card" style="overflow-x: auto;">
+<table><thead><tr><th scope="col">When</th><th scope="col">Trader</th><th scope="col">What</th><th scope="col">Details</th><th scope="col">Credits</th><th scope="col">By</th></tr></thead>
+<tbody><sc-for list="{{ act }}" as="a"><tr><td class="hint">{{ a.w }}</td><td>{{ a.t }} <span class="hint mono">{{ a.tid }}</span></td><td><b style="font-weight: 500;">{{ a.what }}</b></td><td style="color: var(--t2); white-space: normal; min-width: 240px;">{{ a.det }}</td><td class="mono" style="color: {{ a.c }};">{{ a.cr }}</td><td class="hint">{{ a.by }}</td></tr></sc-for></tbody></table>
+<sc-if value="{{ noAct }}"><p class="hint" style="padding: 14px; margin: 0;">Nothing yet.</p></sc-if>
+</div>
+</sc-if>
+<sc-if value="{{ dirty }}"><div class="sticky-save"><span class="hint">{{ dirtyTxt }}</span><sc-if value="{{ saveErr }}"><span class="err">{{ saveErr }}</span></sc-if><button type="button" class="pill" onClick="{{ discard }}">Discard</button><button type="button" class="pill pri" onClick="{{ saveCfg }}" disabled="{{ busy }}">Save Changes</button></div></sc-if>
+</main>
+</div>
+<sc-if value="{{ editing }}">
+<div role="dialog" aria-modal="true" aria-label="{{ ed.title }}" style="position: fixed; inset: 0; background: var(--ov); display: flex; justify-content: flex-end; z-index: 50;">
+<div style="width: 100%; max-width: 540px; height: 100%; overflow: auto; background: var(--p1); border-left: 1px solid var(--ln); display: flex; flex-direction: column;">
+<div style="display: flex; align-items: center; justify-content: space-between; padding: 18px 20px; border-bottom: 1px solid var(--ln);"><b style="font-size: 17px; font-weight: 600;">{{ ed.title }}</b><button type="button" class="pill sm" onClick="{{ closeEd }}" aria-label="Close">Close</button></div>
+<div style="padding: 20px; display: flex; flex-direction: column; gap: 16px; flex: 1;">
+<sc-if value="{{ edPack }}">
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px;">
+<div class="fl"><label for="pn">Name</label><input id="pn" type="text" value="{{ ep.name }}" onChange="{{ ep.setName }}"></div>
+<div class="fl"><label for="ps">Short Name</label><input id="ps" type="text" value="{{ ep.short }}" onChange="{{ ep.setShort }}"><span class="hint">On the cover and in checkout.</span></div>
+<div class="fl"><label for="pp">Price (Credits)</label><input id="pp" type="number" min="1" value="{{ ep.price }}" onChange="{{ ep.setPrice }}"><span class="hint">{{ ep.usd }}</span></div>
+<div class="fl"><label for="pl">Most per Trader per Day</label><input id="pl" type="number" min="0" value="{{ ep.limit }}" onChange="{{ ep.setLimit }}"><span class="hint">0 means no limit.</span></div>
+<div class="fl" style="grid-column: 1 / -1;"><label for="pg">Guarantee Shown to Traders</label><input id="pg" type="text" value="{{ ep.g }}" onChange="{{ ep.setG }}"></div>
+<div class="fl" style="grid-column: 1 / -1;"><label for="pt">What Traders Read</label><textarea id="pt" onChange="{{ ep.setTag }}">{{ ep.tag }}</textarea></div>
+<label class="tog" style="grid-column: 1 / -1;"><input type="checkbox" checked="{{ ep.on }}" onChange="{{ ep.toggle }}">On Sale</label>
+</div>
+<div>
+<b style="font-weight: 600;">Odds for Each Card</b>
+<p class="hint" style="margin: 2px 0 12px;">The chance of each rarity, per card. Must add up to 100%. Packs already bought open with the odds they were sold with.</p>
+<div style="display: flex; flex-direction: column; gap: 8px;">
+<sc-for list="{{ ep.odds }}" as="o"><div style="display: grid; grid-template-columns: 110px minmax(0, 1fr) 96px; gap: 12px; align-items: center;"><span style="display: flex; align-items: center; gap: 8px; font-size: 13.5px;"><i style="width: 8px; height: 8px; border-radius: 50%; background: {{ o.c }};"></i>{{ o.r }}</span><div class="bar"><div style="height: 100%; width: {{ o.w }}; background: {{ o.c }};"></div></div><input type="number" step="0.01" min="0" value="{{ o.v }}" onChange="{{ o.set }}" aria-label="{{ o.r }} odds"></div></sc-for>
+</div>
+<p style="margin: 10px 0 0; font-weight: 600; color: {{ sumColor }};">{{ sumTxt }}</p>
+</div>
+<div style="border: 1px solid var(--ln); border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; font-size: 13px;">
+<div style="display: flex; justify-content: space-between;"><span class="hint">Expected cost of three cards</span><b class="mono" style="font-weight: 500;">{{ ep.ev }}</b></div>
+<div style="display: flex; justify-content: space-between;"><span class="hint">Pack price</span><b class="mono" style="font-weight: 500;">{{ ep.usd }}</b></div>
+<div style="display: flex; justify-content: space-between;"><span class="hint">Expected margin</span><b class="mono" style="font-weight: 500; color: {{ ep.mc }};">{{ ep.margin }}</b></div>
+</div>
+</sc-if>
+<sc-if value="{{ edCard }}">
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px;">
+<div class="fl" style="grid-column: 1 / -1;"><label for="cn">Name</label><input id="cn" type="text" value="{{ ec.name }}" onChange="{{ ec.setName }}"></div>
+<div class="fl"><label for="cr">Rarity</label><select id="cr" onChange="{{ ec.setR }}"><sc-for list="{{ ec.rOpts }}" as="o"><option value="{{ o.v }}" selected="{{ o.sel }}">{{ o.v }}</option></sc-for></select></div>
+<div class="fl"><label for="ce">Effect</label><select id="ce" onChange="{{ ec.setFx }}"><sc-for list="{{ ec.fxOpts }}" as="o"><option value="{{ o.v }}" selected="{{ o.sel }}">{{ o.l }}</option></sc-for></select></div>
+<sc-if value="{{ ec.hasVal }}"><div class="fl"><label for="cv">{{ ec.valLabel }}</label><input id="cv" type="number" value="{{ ec.val }}" onChange="{{ ec.setVal }}"></div></sc-if>
+<sc-if value="{{ ec.isAcct }}"><div class="fl"><label for="cpl">Plan</label><select id="cpl" onChange="{{ ec.setPlan }}"><sc-for list="{{ ec.planOpts }}" as="o"><option value="{{ o.v }}" selected="{{ o.sel }}">{{ o.l }}</option></sc-for></select></div><div class="fl"><label for="csz">Size</label><select id="csz" onChange="{{ ec.setSize }}"><sc-for list="{{ ec.sizeOpts }}" as="o"><option value="{{ o.v }}" selected="{{ o.sel }}">{{ o.l }}</option></sc-for></select></div></sc-if>
+<div class="fl"><label for="cb">Big Text on the Card</label><input id="cb" type="text" value="{{ ec.big }}" onChange="{{ ec.setBig }}"></div>
+<div class="fl"><label for="cu">Uses</label><input id="cu" type="text" value="{{ ec.uses }}" onChange="{{ ec.setUses }}"></div>
+<div class="fl" style="grid-column: 1 / -1;"><label for="cd">What Traders Read</label><input id="cd" type="text" value="{{ ec.desc }}" onChange="{{ ec.setDesc }}"></div>
+<div class="fl"><label for="cc">Est. Cost to Us ($)</label><input id="cc" type="number" step="0.01" min="0" value="{{ ec.cost }}" onChange="{{ ec.setCost }}"><span class="hint">Used for pack margins.</span></div>
+<label class="tog" style="align-self: end; height: 36px;"><input type="checkbox" checked="{{ ec.active }}" onChange="{{ ec.toggle }}">Can Be Drawn</label>
+</div>
+<div class="note">{{ ec.engine }}</div>
+</sc-if>
+<sc-if value="{{ edErr }}"><p role="alert" class="err">{{ edErr }}</p></sc-if>
+</div>
+<div style="display: flex; gap: 10px; justify-content: flex-end; padding: 16px 20px; border-top: 1px solid var(--ln);"><button type="button" class="pill" onClick="{{ closeEd }}">Cancel</button><button type="button" class="pill pri" onClick="{{ saveEd }}" disabled="{{ cantSave }}">{{ saveTxt }}</button></div>
+</div>
+</div>
+</sc-if>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { area: 'ov', d: null, cfg: null, dirty: false, edit: null, draft: null, busy: false, msg: '', saveErr: '', edErr: '', rf: 'all', tq: '', results: null, tr: null, grant: null, g: { credits: 2500, pack: '', qty: 1, card: '', reason: '' }, trMsg: '', trErr: '' }; }
+  async componentDidMount() {
+    this._rs = () => { const m = window.innerWidth <= 860; if (m !== this._m) { this._m = m; this.forceUpdate(); } }; this._m = window.innerWidth <= 860; window.addEventListener('resize', this._rs);
+    const h = (location.hash || '').slice(1); if (['ov', 'packs', 'cards', 'credits', 'ladder', 'traders', 'act'].includes(h)) this.state.area = h;
+    await this.load();
+  }
+  async load() { try { const d = await DC.api('/api/admin/packs'); this.setState({ d, cfg: JSON.parse(JSON.stringify(d.cfg)), dirty: false, saveErr: '' }); } catch (e) { this.setState({ msg: '', saveErr: e.message, d: this.state.d || { cfg: null } }); } }
+  flash(msg) { this.setState({ msg }); clearTimeout(this._ft); this._ft = setTimeout(() => this.setState({ msg: '' }), 4000); }
+  change(fn) { const cfg = JSON.parse(JSON.stringify(this.state.cfg)); fn(cfg); this.setState({ cfg, dirty: true, saveErr: '' }); }
+  async saveCfg(next) {
+    if (this.state.busy) return; this.setState({ busy: true, saveErr: '' });
+    try { await DC.api('/api/admin/packs/config', next || this.state.cfg, 'PUT'); await this.load(); this.setState({ busy: false, edit: null, draft: null, edErr: '' }); this.flash('Saved. Traders see the change right away.'); return true; }
+    catch (e) { this.setState({ busy: false, saveErr: e.message, edErr: e.message }); return false; }
+  }
+  async toggleOn() {
+    const on = !this.state.d.on; if (!on && !confirm('Switch packs off? Traders stop seeing packs, credits and free packs at checkout until you switch them back on.')) return;
+    try { await DC.api('/api/admin/packs/enabled', { on }, 'PUT'); await this.load(); if (on) this.flash('Packs are on. Traders see the Packs page, their credits and free packs at checkout again.'); } catch (e) { this.setState({ saveErr: e.message }); }
+  }
+  async search(e) { if (e && e.preventDefault) e.preventDefault(); const q = (this.state.tq || '').trim(); if (!q) return; try { const r = await DC.api('/api/admin/packs/traders?q=' + encodeURIComponent(q)); this.setState({ results: r.list }); } catch (x) { this.setState({ trErr: x.message }); } }
+  async pickTrader(id) { try { const tr = await DC.api('/api/admin/packs/traders/' + id); this.setState({ tr, results: null, grant: null, trMsg: '', trErr: '' }); } catch (x) { this.setState({ trErr: x.message }); } }
+  async doGrant() {
+    const st = this.state; if (st.busy) return; const g = st.g; const cfg = st.cfg;
+    const body = { type: st.grant, reason: g.reason, credits: Number(g.credits), pack: g.pack || cfg.packs[0].id, qty: Number(g.qty) || 1, card: g.card || cfg.cards[0].id };
+    this.setState({ busy: true, trErr: '', trMsg: '' });
+    try { await DC.api('/api/admin/packs/traders/' + st.tr.u.id + '/grant', body); const what = st.grant === 'credits' ? `${Number(g.credits).toLocaleString('en-US')} credits` : st.grant === 'pack' ? `${body.qty} × ${(cfg.packs.find((p) => p.id === body.pack) || {}).name}` : (cfg.cards.find((c) => c.id === body.card) || {}).name;
+      await this.pickTrader(st.tr.u.id); this.setState({ busy: false, grant: null, trMsg: `${what} granted to ${st.tr.u.first}. Logged in Activity.`, g: Object.assign({}, g, { reason: '' }) }); this.load(); }
+    catch (x) { this.setState({ busy: false, trErr: x.message }); }
+  }
+  async revoke(cardId) { if (!confirm('Take this card back? The trader can no longer use it.')) return; try { await DC.api('/api/admin/packs/cards/' + cardId + '/revoke', { reason: 'Taken back by support' }); await this.pickTrader(this.state.tr.u.id); this.setState({ trMsg: 'Card taken back. Logged in Activity.' }); } catch (x) { this.setState({ trErr: x.message }); } }
+  renderVals() {
+    const st = this.state; const light = (() => { try { return (localStorage.getItem('fs_admin_theme') || 'dark') === 'light'; } catch (e) { return false; } })(); const mob = window.innerWidth <= 860;
+    const RN = ['Common', 'Uncommon', 'Rare', 'Epic', 'Legendary', 'Mythic']; const RC = { Common: 'var(--r1)', Uncommon: 'var(--r2)', Rare: 'var(--r3)', Epic: 'var(--r4)', Legendary: 'var(--r5)', Mythic: 'var(--r6)' };
+    const n = (x) => Math.round(Number(x) || 0).toLocaleString('en-US'); const usd = (x) => '$' + (Number(x) || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+    const kusd = (x) => (x >= 1e6 ? '$' + (x / 1e6).toFixed(2) + 'M' : x >= 1e4 ? '$' + (x / 1e3).toFixed(1) + 'K' : usd(Math.round(x)));
+    const ART = { takeoff: 'linear-gradient(160deg,#9BD3FF,#2B6CB0 48%,#0B2545)', climb: 'linear-gradient(160deg,#8FF0C8,#1D8F6A 50%,#06291F)', jet: 'linear-gradient(160deg,#C9B8FF,#5B3FC4 50%,#170C3A)', strato: 'linear-gradient(160deg,#FFE3A3,#C98A1B 50%,#3A2405)', orbit: 'linear-gradient(160deg,#F4F2F1,#9AA7B8 40%,#3B4452 75%,#14181F)' };
+    const set = (o) => () => this.setState(o);
+    const d = st.d; const cfg = st.cfg;
+    const base = { themeCls: light ? 'light' : '', desk: !mob, padX: mob ? '16px' : '28px', navMax: mob ? '100%' : '240px', navDir: mob ? 'row' : 'column', tileCols: mob ? 2 : 6, loading: !cfg, msg: st.msg, isOff: !!(d && d.cfg && !d.on) };
+    if (!cfg) return Object.assign(base, { topStats: [], areas: [], saleTxt: '…', saleBtn: '…', toggleSale: () => {}, saleBg: 'var(--p3)', saleFg: 'var(--mu)' });
+    const per = cfg.rules.perDollar;
+    const costOf = (r) => { const L = cfg.cards.filter((c) => c.active && c.r === r); return L.length ? L.reduce((s, c) => s + Number(c.cost || 0), 0) / L.length : 0; };
+    const evPack = (odds) => 3 * odds.reduce((s, o, i) => s + Number(o) / 100 * costOf(RN[i]), 0);
+    const S = d.stats; const used30 = Object.values(d.used).reduce((a, b) => a + b, 0);
+    const AREAS = [['ov', 'Overview', ''], ['packs', 'Packs', String(cfg.packs.length)], ['cards', 'Cards', String(cfg.cards.length)], ['credits', 'Credits', ''], ['ladder', 'Checkout Rewards', String(cfg.ladder.tiers.length)], ['traders', 'Traders', ''], ['act', 'Activity', '']];
+    // 30-day chart
+    const days = []; for (let i = 29; i >= 0; i--) { const t = new Date(Date.now() - i * 864e5); const key = t.toLocaleDateString('en-CA', { timeZone: 'America/New_York' }); const r = d.daily.find((x) => x.d === key) || { paid: 0, free: 0 }; days.push({ key, p: r.paid, f: r.free }); }
+    const mx = Math.max(1, ...days.map((x) => x.p + x.f));
+    const pp = d.perPack;
+    // pack editor
+    const ep0 = st.edit && st.edit.t === 'pack' ? st.draft : null; const ec0 = st.edit && st.edit.t === 'card' ? st.draft : null;
+    const upd = (fn) => { const dr = JSON.parse(JSON.stringify(st.draft)); fn(dr); this.setState({ draft: dr, edErr: '' }); };
+    const sum = ep0 ? Math.round(ep0.odds.reduce((s, x) => s + Number(x), 0) * 100) / 100 : 100;
+    const FX = [['coupon', 'Discount on next purchase (%)', 'checkout', 'Checkout', 'pct'], ['resetCoupon', 'Discount on next reset (%)', 'checkout', 'Checkout', 'pct'], ['minDays', 'Fewer minimum trading days', 'eval', 'Evaluation', 'n'], ['evalCons', 'Remove consistency (evaluation)', 'eval', 'Evaluation', ''], ['payCons', 'Skip consistency on next payout', 'funded', 'Funded', ''], ['reset', 'Free reset on a failed evaluation', 'failed', 'Evaluation', ''], ['splitAdd', 'Profit split boost (points)', 'funded', 'Funded', 'add'], ['splitTo', 'Profit split set to (%)', 'funded', 'Funded', 'to'], ['account', 'Free account (plan and size)', 'new', 'New Account', ''], ['balance', 'Balance credit ($)', 'funded', 'Funded', 'amt'], ['news', 'News pass (days)', 'funded', 'Funded', 'days'], ['idle', 'Inactivity shield (days)', 'any', 'Any Account', 'days']];
+    const fxKey = (fx) => (fx.t === 'split' ? (fx.to ? 'splitTo' : 'splitAdd') : fx.t);
+    const VALL = { pct: 'Percent Off', n: 'Days Removed', add: 'Points Added', to: 'Split (%)', amt: 'Dollars Added', days: 'Days' };
+    const PLANS = (d.plans || [{ id: 'essential', name: 'Essential', sizes: [25000, 50000, 100000, 150000] }, { id: 'prime', name: 'Prime', sizes: [25000, 50000, 100000, 150000] }]);
+    const ENGINE = { coupon: 'Saved as a discount code that comes off the trader\'s next checkout automatically.', resetCoupon: 'Saved as a discount that comes off the trader\'s next reset automatically.', minDays: 'Lowers the minimum trading days on the evaluation it is used on.', evalCons: 'Turns off the consistency rule on the evaluation it is used on.', payCons: 'Skips the consistency check on the next payout of the funded account, then turns itself off.', reset: 'Resets a failed evaluation to its starting balance, like a paid reset.', splitAdd: 'Raises the profit split on one funded account for good.', splitTo: 'Sets the profit split on one funded account for good.', account: 'Opens a new evaluation on the trader\'s dashboard right away.', balance: 'Adds money to a funded account balance. It counts as profit.', news: 'Lifts the news rule on one funded account for the days set.', idle: 'Adds days before an idle account closes.' };
+    const editPack = (p) => this.setState({ edit: { t: 'pack', id: p ? p.id : 'new' }, draft: p ? JSON.parse(JSON.stringify(p)) : { id: '', name: 'New Pack', short: 'New', price: 5000, tag: '', odds: [50, 30, 14, 4.5, 1.2, 0.3], g: 'Any rarity', on: false, limit: 0 }, edErr: '' });
+    const editCard = (c) => this.setState({ edit: { t: 'card', id: c ? c.id : 'new' }, draft: c ? JSON.parse(JSON.stringify(c)) : { id: '', r: 'Common', kind: 'Checkout', big: '5%', name: 'New Card', desc: '', uses: '1 use', on: 'checkout', fx: { t: 'coupon', pct: 5 }, active: false, cost: 0 }, edErr: '' });
+    const saveEd = async () => {
+      const dr = st.draft; const next = JSON.parse(JSON.stringify(cfg));
+      if (st.edit.t === 'pack') { if (!dr.id) dr.id = 'p' + Date.now().toString(36); const i = next.packs.findIndex((p) => p.id === dr.id); if (i >= 0) next.packs[i] = dr; else next.packs.push(dr); }
+      else { if (!dr.id) dr.id = 'c' + Date.now().toString(36); const i = next.cards.findIndex((c) => c.id === dr.id); if (i >= 0) next.cards[i] = dr; else next.cards.push(dr); }
+      await this.saveCfg(next);
+    };
+    let ec = {};
+    if (ec0) {
+      const k = fxKey(ec0.fx); const def = FX.find((x) => x[0] === k) || FX[0]; const vk = def[4];
+      const plan = PLANS.find((p) => p.id === ec0.fx.plan) || PLANS[0];
+      ec = Object.assign({}, ec0, {
+        setName: (e) => upd((x) => { x.name = e.target.value; }), setR: (e) => upd((x) => { x.r = e.target.value; }), setBig: (e) => upd((x) => { x.big = e.target.value; }), setUses: (e) => upd((x) => { x.uses = e.target.value; }), setDesc: (e) => upd((x) => { x.desc = e.target.value; }), setCost: (e) => upd((x) => { x.cost = Number(e.target.value) || 0; }), toggle: () => upd((x) => { x.active = !x.active; }),
+        rOpts: RN.map((v) => ({ v, sel: v === ec0.r })), fxOpts: FX.map((f) => ({ v: f[0], l: f[1], sel: f[0] === k })),
+        setFx: (e) => upd((x) => { const f = FX.find((y) => y[0] === e.target.value); const t = f[0]; x.on = f[2]; x.kind = f[3]; x.fx = t === 'splitAdd' ? { t: 'split', add: 5 } : t === 'splitTo' ? { t: 'split', to: 100 } : t === 'account' ? { t, plan: PLANS[0].id, size: PLANS[0].sizes[0] } : f[4] ? { t, [f[4]]: f[4] === 'pct' ? 5 : f[4] === 'amt' ? 500 : 1 } : { t }; }),
+        hasVal: !!vk, valLabel: VALL[vk] || '', val: vk ? ec0.fx[vk] : '', setVal: (e) => upd((x) => { x.fx[vk] = Number(e.target.value) || 0; }),
+        isAcct: k === 'account', planOpts: PLANS.map((p) => ({ v: p.id, l: p.name, sel: p.id === plan.id })), sizeOpts: plan.sizes.map((z) => ({ v: z, l: '$' + z / 1000 + 'K', sel: Number(ec0.fx.size) === z })),
+        setPlan: (e) => upd((x) => { const p = PLANS.find((y) => y.id === e.target.value); x.fx.plan = p.id; if (!p.sizes.includes(Number(x.fx.size))) x.fx.size = p.sizes[0]; }), setSize: (e) => upd((x) => { x.fx.size = Number(e.target.value); }),
+        engine: 'Engine check: supported. ' + (ENGINE[k] || '')
+      });
+    }
+    const odds = ep0 ? ep0.odds : [0, 0, 0, 0, 0, 0]; const evv = ep0 ? evPack(odds) : 0; const priceUsd = ep0 ? Number(ep0.price) / per : 0; const marg = priceUsd ? Math.round((1 - evv / priceUsd) * 100) : 0;
+    const ep = ep0 ? Object.assign({}, ep0, { usd: usd(priceUsd), ev: usd(evv.toFixed(2)), margin: marg + '%', mc: marg > 30 ? 'var(--ok)' : marg > 0 ? 'var(--wa)' : 'var(--no)',
+      setName: (e) => upd((x) => { x.name = e.target.value; }), setShort: (e) => upd((x) => { x.short = e.target.value; }), setPrice: (e) => upd((x) => { x.price = Number(e.target.value) || 0; }), setLimit: (e) => upd((x) => { x.limit = Number(e.target.value) || 0; }), setG: (e) => upd((x) => { x.g = e.target.value; }), setTag: (e) => upd((x) => { x.tag = e.target.value; }), toggle: () => upd((x) => { x.on = !x.on; }),
+      odds: RN.map((r, i) => ({ r, c: RC[r], v: odds[i], w: Math.min(100, Number(odds[i])) + '%', set: (e) => upd((x) => { x.odds[i] = Number(e.target.value) || 0; }) })).reverse() }) : { odds: [] };
+    // ladder
+    const L = cfg.ladder; const ordersBy = Object.fromEntries((d.ladderOrders || []).map((r) => [r.label, r.n]));
+    const pname = (k) => (cfg.packs.find((p) => p.id === k) || { short: k }).short;
+    const summarize = (list) => { const m = {}; list.forEach((k) => { m[k] = (m[k] || 0) + 1; }); return Object.entries(m).map(([k, c]) => (c > 1 ? c + ' ' : '') + pname(k) + (c > 1 ? ' Packs' : ' Pack')).join(' + '); };
+    const ladder = L.tiers.map((t, i) => ({ n: t.n, credits: t.credits, worth: usd(t.packs.reduce((s, k) => s + ((cfg.packs.find((p) => p.id === k) || {}).price || 0), 0) / per + t.credits / per), orders: n(ordersBy[summarize(t.packs)] || 0),
+      chips: t.packs.map((k, j) => ({ name: pname(k), art: ART[k] || ART.orbit, remove: () => this.change((c) => { c.ladder.tiers[i].packs.splice(j, 1); }) })),
+      add: (e) => { const v = e.target.value; if (v) this.change((c) => { c.ladder.tiers[i].packs.push(v); }); e.target.value = ''; },
+      setN: (e) => this.change((c) => { c.ladder.tiers[i].n = Number(e.target.value) || 1; }), setCr: (e) => this.change((c) => { c.ladder.tiers[i].credits = Number(e.target.value) || 0; }),
+      remove: () => this.change((c) => { c.ladder.tiers.splice(i, 1); }) }));
+    const planNames = Object.assign({ essential: 'Essential', prime: 'Prime', instant: 'Instant' }, Object.fromEntries(PLANS.map((p) => [p.id, p.name])));
+    const ladPlans = Object.keys(Object.assign({}, planNames, L.plans)).map((k) => ({ name: planNames[k] || k, on: L.plans[k] !== false, toggle: () => this.change((c) => { c.ladder.plans[k] = c.ladder.plans[k] === false; }) }));
+    // trader
+    const tr = st.tr; const fmtD = (x) => (x ? new Date(x).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '');
+    const ago = (t) => { const m = (Date.now() - new Date(t)) / 6e4; return m < 1 ? 'Just now' : m < 60 ? Math.round(m) + ' min ago' : m < 1440 ? Math.round(m / 60) + ' hr ago' : fmtD(t); };
+    const kindLbl = { bought: 'Bought credits', spent: 'Opened a pack', grant: 'Support grant', reward: 'Checkout reward', refund: 'Refund', card: 'Used a card' };
+    const deEmpty = (s) => s || '';
+    return Object.assign(base, {
+      topStats: [['Credits Sold (30d)', kusd(S.creditsSold30)], ['Packs Opened (30d)', n(S.opened30)], ['Cards Used (30d)', n(used30)], ['Credits Owed', kusd(S.outstanding / per)]].map(([k, v], i) => ({ k, v, bl: i ? '1px solid var(--ln)' : '0' })),
+      saleTxt: d.on ? 'Packs On' : 'Packs Off', saleBg: d.on ? 'var(--okt)' : 'var(--wat)', saleFg: d.on ? 'var(--ok)' : 'var(--wa)', saleBtn: d.on ? 'Switch Packs Off' : 'Switch Packs On', toggleSale: () => this.toggleOn(),
+      areas: AREAS.map(([k, l, c]) => ({ label: l, n: c, cur: st.area === k ? 'page' : 'false', style: st.area === k ? 'background: var(--p3); color: var(--tx);' : (mob ? 'width: auto;' : ''), go: () => { history.replaceState(null, '', '#' + k); this.setState({ area: k, edit: null }); } })),
+      vOv: st.area === 'ov', vPacks: st.area === 'packs', vCards: st.area === 'cards', vCredits: st.area === 'credits', vLadder: st.area === 'ladder', vTraders: st.area === 'traders', vAct: st.area === 'act',
+      tiles: [['Credits Sold (30d)', usd(S.creditsSold30), `${n(S.creditsOrders30)} orders`, 'var(--mu)'], ['Packs Opened (30d)', n(S.opened30), 'Paid and free', 'var(--mu)'], ['Cards Issued (30d)', n(S.drawn30), '3 per pack', 'var(--mu)'], ['Cards Used (30d)', n(used30), S.drawn30 ? Math.round(used30 / S.drawn30 * 100) + '% of issued' : '—', 'var(--mu)'], ['Credits Outstanding', n(S.outstanding), 'Unspent, all traders', 'var(--mu)'], ['Owed as Stored Value', usd(Math.round(S.outstanding / per)), 'At ' + n(per) + ' credits per $1', 'var(--wa)']].map(([k, v, dd, c]) => ({ k, v, d: dd, c })),
+      chartNote: 'Paid · Free (checkout and grants)', chart: days.map((x) => ({ p: (x.p / mx * 100) + '%', f: (x.f / mx * 100) + '%', t: `${x.key}: ${x.p} paid, ${x.f} free` })),
+      fairNote: S.drawn30 ? `Rarity actually drawn vs the published odds, last 30 days (${n(S.drawn30)} cards).` : 'Shows once packs are opened.',
+      fair: d.fair.slice().reverse().map((f) => ({ r: f.r, c: RC[f.r], got: f.got.toFixed(2) + '%', exp: f.want.toFixed(2) + '%', w: Math.min(100, f.got * 1.8) + '%' })),
+      perf: cfg.packs.map((p) => { const r = pp[p.id] || { sold: 0, free: 0, opened: 0, credits: 0 }; const rev = r.credits / per; const cost = r.opened * evPack(p.odds); const m = rev ? Math.round((1 - cost / rev) * 100) : 0; return { name: p.name, art: ART[p.id] || ART.orbit, price: n(p.price), sold: n(r.sold), free: n(r.free), opened: n(r.opened), rev: usd(Math.round(rev)), cost: usd(Math.round(cost)), margin: rev ? m + '%' : '—', mc: m > 30 ? 'var(--ok)' : m > 0 ? 'var(--wa)' : 'var(--no)' }; }),
+      packs: cfg.packs.map((p) => ({ name: p.name, art: ART[p.id] || ART.orbit, status: !d.on ? 'Off' : p.on ? 'On Sale' : 'Hidden', sbg: p.on && d.on ? 'var(--okt)' : 'var(--wat)', sfg: p.on && d.on ? 'var(--ok)' : 'var(--wa)', priceTxt: n(p.price) + ' · ' + usd(p.price / per), g: p.g, rare: (Math.round((p.odds[2] + p.odds[3] + p.odds[4] + p.odds[5]) * 100) / 100) + '%', myth: p.odds[5] + '%', limit: p.limit ? p.limit + ' per day' : 'No limit', opened: n((pp[p.id] || {}).opened || 0), edit: () => editPack(p) })),
+      newPack: () => editPack(null),
+      rfilt: [['all', 'All']].concat(RN.map((r) => [r, r])).map(([k, l]) => ({ label: l, on: st.rf === k, style: st.rf === k ? 'border-color: var(--sky);' : '', go: set({ rf: k }) })),
+      cards: cfg.cards.filter((c) => st.rf === 'all' || c.r === st.rf).map((c) => ({ name: c.name, desc: c.desc, r: c.r, color: RC[c.r], effect: (FX.find((x) => x[0] === fxKey(c.fx)) || [0, c.fx.t])[1], kind: c.kind, uses: c.uses, st: c.active ? 'On' : 'Off', sbg: c.active ? 'var(--okt)' : 'var(--p3)', sfg: c.active ? 'var(--ok)' : 'var(--mu)', drawn: n(d.drawn[c.id] || 0), used: n(d.used[c.id] || 0), cost: usd(c.cost), edit: () => editCard(c) })),
+      newCard: () => editCard(null),
+      bundles: cfg.bundles.map((b, i) => ({ usd: b.usd, bonus: b.bonus, badge: b.badge, on: b.on, cr: n(Math.round(b.usd * per * (1 + b.bonus / 100))),
+        setUsd: (e) => this.change((c) => { c.bundles[i].usd = Number(e.target.value) || 1; c.bundles[i].cr = Math.round(c.bundles[i].usd * per * (1 + c.bundles[i].bonus / 100)); }),
+        setBonus: (e) => this.change((c) => { c.bundles[i].bonus = Number(e.target.value) || 0; c.bundles[i].cr = Math.round(c.bundles[i].usd * per * (1 + c.bundles[i].bonus / 100)); }),
+        setBadge: (e) => this.change((c) => { c.bundles[i].badge = e.target.value; }), toggle: () => this.change((c) => { c.bundles[i].on = !c.bundles[i].on; }), remove: () => this.change((c) => { c.bundles.splice(i, 1); }) })),
+      addBundle: () => this.change((c) => { c.bundles.push({ usd: 500, cr: Math.round(500 * per * 1.2), bonus: 20, badge: '', on: false }); }),
+      rules: { perDollar: per, cryptoBonus: cfg.rules.cryptoBonus, dailyCap: cfg.rules.dailyCap, customOn: cfg.rules.custom.on, min: cfg.rules.custom.min, max: cfg.rules.custom.max },
+      perDollarHint: `1 credit is worth $${(1 / per).toFixed(per >= 100 ? 2 : 3)}. Changing this changes what packs cost in dollars.`,
+      setPerDollar: (e) => this.change((c) => { c.rules.perDollar = Number(e.target.value) || 100; c.bundles.forEach((b) => { b.cr = Math.round(b.usd * c.rules.perDollar * (1 + b.bonus / 100)); }); }), setCrypto: (e) => this.change((c) => { c.rules.cryptoBonus = Number(e.target.value) || 0; }), setCap: (e) => this.change((c) => { c.rules.dailyCap = Number(e.target.value) || 0; }),
+      toggleCustom: () => this.change((c) => { c.rules.custom.on = !c.rules.custom.on; }), setMin: (e) => this.change((c) => { c.rules.custom.min = Number(e.target.value) || 1; }), setMax: (e) => this.change((c) => { c.rules.custom.max = Number(e.target.value) || 1; }),
+      credStats: [['Credits Outstanding', n(S.outstanding), `${usd(Math.round(S.outstanding / per))} owed to traders as stored value`], ['Credits Sold (30d)', usd(S.creditsSold30), `${n(S.creditsOrders30)} orders`], ['Credits Spent on Packs (30d)', n(Object.values(pp).reduce((s, r) => s + r.credits, 0)), `${n(S.opened30)} packs opened`]].map(([k, v, dd]) => ({ k, v, d: dd })),
+      ladderOn: L.on, toggleLadder: () => this.change((c) => { c.ladder.on = !c.ladder.on; }), ladder, ladPlans,
+      addTier: () => this.change((c) => { const last = c.ladder.tiers[c.ladder.tiers.length - 1]; c.ladder.tiers.push({ n: last ? last.n + 1 : 2, packs: [c.packs[0].id], credits: 0 }); }),
+      packOpts: cfg.packs.map((p) => ({ id: p.id, name: p.name, sel: (st.g.pack || cfg.packs[0].id) === p.id })), cardOpts: cfg.cards.map((c) => ({ id: c.id, name: `${c.name} (${c.r})`, sel: (st.g.card || cfg.cards[0].id) === c.id })),
+      tq: st.tq, setTq: (e) => this.setState({ tq: e.target.value }), search: (e) => this.search(e),
+      results: (st.results || []).map((r) => ({ name: `${r.first} ${r.last}`, tid: r.tid, email: r.email, bal: n(r.points), pick: () => this.pickTrader(r.id) })), hasResults: !!(st.results && st.results.length), noResults: !!(st.results && !st.results.length),
+      hasTrader: !!tr, tr: tr ? { name: `${tr.u.first} ${tr.u.last}`, tid: tr.u.tid, rows: [['Credits', n(tr.u.points)], ['Unopened Packs', String(tr.packs.filter((p) => p.status === 'unopened').length)], ['Packs Opened', String(tr.packs.filter((p) => p.status === 'opened').length)], ['Cards Ready', String(tr.cards.filter((c) => c.status === 'ready').length)], ['Spent on Packs', n(tr.spent) + ' credits']].map(([k, v]) => ({ k, v })) } : { rows: [] },
+      grants: [['credits', 'Grant Credits'], ['pack', 'Grant a Pack'], ['card', 'Grant a Card']].map(([k, l]) => ({ label: l, style: st.grant === k ? 'border-color: var(--sky);' : '', go: () => this.setState({ grant: st.grant === k ? null : k, trMsg: '', trErr: '' }) })),
+      granting: !!st.grant, gCredits: st.grant === 'credits', gPack: st.grant === 'pack', gCard: st.grant === 'card', g: st.g, busy: st.busy,
+      gCreditsHint: `${usd(Number(st.g.credits || 0) / per)} of credits. Use a minus number to remove credits.`,
+      setGCredits: (e) => this.setState({ g: Object.assign({}, st.g, { credits: e.target.value }) }), setGPack: (e) => this.setState({ g: Object.assign({}, st.g, { pack: e.target.value }) }), setGQty: (e) => this.setState({ g: Object.assign({}, st.g, { qty: e.target.value }) }), setGCard: (e) => this.setState({ g: Object.assign({}, st.g, { card: e.target.value }) }), setGReason: (e) => this.setState({ g: Object.assign({}, st.g, { reason: e.target.value }) }),
+      doGrant: () => this.doGrant(), trMsg: st.trMsg, trErr: st.trErr,
+      trCards: tr ? tr.cards.map((c) => ({ name: c.name, r: c.r, color: RC[c.r], at: fmtD(c.at), st: c.status === 'ready' ? 'Ready' : c.status === 'used' ? 'Used on ' + deEmpty(c.usedOn) : deEmpty(c.usedOn) || 'Taken back', can: c.status === 'ready', revoke: () => this.revoke(c.id) })) : [], noCards: !!tr && !tr.cards.length,
+      act: d.act.map((a) => { const [what, ...rest] = a.what.split(': '); return { w: ago(a.at), t: a.who, tid: a.tid, what: rest.length ? what : (kindLbl[a.kind] || what), det: rest.length ? rest.join(': ') : a.what, cr: a.delta ? (a.delta > 0 ? '+' : '−') + n(Math.abs(a.delta)) : '—', c: a.delta > 0 ? 'var(--ok)' : a.delta < 0 ? 'var(--t2)' : 'var(--mu)', by: a.by || (a.kind === 'reward' || a.kind === 'refund' ? 'System' : 'Trader') }; }), noAct: !d.act.length, reload: () => this.load(),
+      dirty: st.dirty && !st.edit, dirtyTxt: 'You have unsaved changes.', saveErr: st.saveErr, saveCfg: () => this.saveCfg(), discard: () => this.setState({ cfg: JSON.parse(JSON.stringify(d.cfg)), dirty: false, saveErr: '' }),
+      editing: !!st.edit, edPack: !!ep0, edCard: !!ec0, ed: { title: ep0 ? (st.edit.id === 'new' ? 'New Pack' : 'Edit ' + ep0.name) : ec0 ? (st.edit.id === 'new' ? 'New Card' : 'Edit ' + ec0.name) : '' }, ep, ec,
+      sumTxt: sum === 100 ? 'Adds up to 100%. Ready to save.' : `Adds up to ${sum}%. Change the odds so they total 100%.`, sumColor: sum === 100 ? 'var(--ok)' : 'var(--no)',
+      cantSave: (!!ep0 && sum !== 100) || st.busy, saveTxt: st.busy ? 'Saving…' : 'Save', saveEd, edErr: st.edErr, closeEd: () => this.setState({ edit: null, draft: null, edErr: '' })
+    });
+  }
+}
+
+</script>
+</body>
+</html>

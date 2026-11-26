@@ -208,6 +208,15 @@ function router(h) {
   // ---- Store: board settings and lists kept for each board ----
   r.put('/store/:key', h(async (req) => { const k = clean(req.params.key, 60); if (!/^[a-z0-9_.-]+$/i.test(k)) bad('Bad key'); need(req.user, ...storeRoles(k)); if (k === 'team.security' && req.body.value && req.body.value.ipOnly) { const nets = ((await db.one("SELECT v FROM kv WHERE k='store.team.networks'")) || {}).v || []; if (!nets.length) bad('Add at least one network first'); if (!nets.some((x) => require('./auth').ipIn(req.ip, x))) bad('Your current network is not on the list. Add it first so you are not locked out.'); } const before = k === 'affiliate.payments' ? ((await db.one('SELECT v FROM kv WHERE k=$1', ['store.' + k])) || {}).v || [] : null; await putStore(k, req.body.value);
     if (before) { const seen = new Set(before.map((x) => JSON.stringify(x))); for (const x of (req.body.value || []).filter((y) => !seen.has(JSON.stringify(y)))) if (x && x.user && Number(x.amount) > 0) require('./mail').t('affpaid', +x.user, { amount: '$' + Number(x.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), method: x.method || 'Bank or wallet transfer', url: require('./auth').BASE() + '/app#affiliates' }); } await core.audit(req.user.id, 'store.' + k, k, {}); }));
+  // ---- Packs and credits ----
+  const PK = require('./packs');
+  r.get('/packs', h(async (req) => { need(req.user, 'support', 'finance', 'risk'); return PK.adminData(); }));
+  r.put('/packs/config', h(async (req) => { need(req.user); return { cfg: await PK.saveConfig(req.body || {}, req.user.id) }; }));
+  r.put('/packs/enabled', h(async (req) => { need(req.user); await PK.setEnabled(!!(req.body || {}).on, req.user.id); return { on: await PK.enabled() }; }));
+  r.get('/packs/traders', h(async (req) => { need(req.user, 'support', 'finance', 'risk'); return { list: await PK.findTrader(req.query.q) }; }));
+  r.get('/packs/traders/:id', h(async (req) => { need(req.user, 'support', 'finance', 'risk'); return PK.traderAdmin(req.params.id); }));
+  r.post('/packs/traders/:id/grant', h(async (req) => { need(req.user, 'support'); return PK.grant(req.user, req.params.id, req.body || {}); }));
+  r.post('/packs/cards/:id/revoke', h(async (req) => { need(req.user, 'support'); return PK.revokeCard(req.user, req.params.id, (req.body || {}).reason); }));
   // Integrations (admin only)
   r.get('/integrations', h(async (req) => { need(req.user); const hooks = await db.all('SELECT * FROM webhook_log ORDER BY id DESC LIMIT 100'); const alerts = await db.one("SELECT v FROM kv WHERE k='settings.alerts'"); return { list: await I.list(), hooks, alerts: alerts ? alerts.v : {}, base: require('./auth').BASE() }; }));
   r.put('/integrations/:id', h(async (req) => { need(req.user); await I.save(req.params.id, req.body, req.user.id); await require('./payments').refreshMode(); await core.audit(req.user.id, 'integration.update', req.params.id, { enabled: req.body.enabled }); return { list: await I.list() }; }));

@@ -33,7 +33,7 @@
     },
     fromOrder(o, cat) {
       return { cat, source: 'order', code: o.code, status: o.status, lines: o.lines.map(lineOut), total: o.total, kind: o.kind,
-        title: o.kind === 'activation' ? 'Activation Fee' : o.kind === 'reset' ? 'Account Reset' : 'Order ' + o.code, sub: o.kind === 'activation' ? 'For ' + (o.account || '') : o.lines.filter((l) => l.kind === 'plan').map((l) => l.label).join(', ') };
+        title: o.kind === 'activation' ? 'Activation Fee' : o.kind === 'reset' ? 'Account Reset' : o.kind === 'credits' ? ((o.lines[0] || {}).label || 'Credits').replace(/ \(.*\)$/, '') : 'Order ' + o.code, sub: o.kind === 'activation' ? 'For ' + (o.account || '') : o.lines.filter((l) => l.kind === 'plan').map((l) => l.label).join(', ') };
     },
     async pay(sum, st) {
       if (sum.source === 'cart') {

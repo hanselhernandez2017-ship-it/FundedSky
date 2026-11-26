@@ -49,7 +49,7 @@
         <div class="sum"><span>Today</span><b class="num ${today >= 0 ? 'pos' : 'neg'}">${signed(today)}</b><small>${act.filter((a) => a.today > 0).length} of ${act.length} accounts green</small></div>
         ${ready ? `<div class="sum hl"><span>Payout Ready</span><b class="num">${money(ready.avail)}</b><small>${ready.id}</small></div>` : ''}
         <div class="sum"><span>Paid to You</span><b class="num">${money(PAYOUTS.reduce((s, p) => s + p.amt, 0))}</b><small><a href="#payouts">${PAYOUTS.length} payouts</a></small></div>
-        <div class="sum"><span>Reward Points</span><b class="num">${S.pts.toLocaleString('en-US')}</b><small><a href="#rewards">${afford ? afford + (afford === 1 ? ' reward' : ' rewards') + ' ready' : 'Earn 1 point per $1'}</a></small></div>
+        <div class="sum"><span>Reward Credits</span><b class="num">${S.pts.toLocaleString('en-US')}</b><small><a href="#rewards">${afford ? afford + (afford === 1 ? ' reward' : ' rewards') + ' ready' : 'Earn 1 credit per $1'}</a></small></div>
         <div class="sum"><span>Accounts</span><b class="num">${act.length}</b><small>${ACC.filter((a) => a.kind === 'funded').length} funded · ${ACC.filter((a) => a.kind === 'evaluation').length} evaluating</small></div>
       </div></div>
       <div class="homeg"><div class="hmain">${sh('Your Accounts', '', `<div class="vzchips">${[['all', 'All', ACC.length], ['evaluation', 'Evaluations', cnt('evaluation')], ['funded', 'Funded', cnt('funded')], ['breached', 'Breached', cnt('breached')]].map(([k, l, n]) => `<button class="${f === k ? 'on' : ''}" data-act="af" data-k="${k}">${l} <em>${n}</em></button>`).join('')}</div>`)}

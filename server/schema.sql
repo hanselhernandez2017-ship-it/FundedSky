@@ -293,3 +293,39 @@ ALTER TABLE accounts ADD COLUMN IF NOT EXISTS scalp_profit NUMERIC(14,2) NOT NUL
 ALTER TABLE accounts ADD COLUMN IF NOT EXISTS cycle_scalp NUMERIC(14,2) NOT NULL DEFAULT 0;
 ALTER TABLE accounts ADD COLUMN IF NOT EXISTS last_trade_at TIMESTAMPTZ;
 ALTER TABLE accounts ADD COLUMN IF NOT EXISTS last_payout_at TIMESTAMPTZ;
+
+-- Packs and credits. Credits are the one currency (users.points holds the balance, points_log is the ledger).
+ALTER TABLE points_log ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT '';   -- earned | bought | spent | grant | refund | reward
+ALTER TABLE points_log ADD COLUMN IF NOT EXISTS ref TEXT NOT NULL DEFAULT '';
+ALTER TABLE points_log ADD COLUMN IF NOT EXISTS actor_id INTEGER;
+ALTER TABLE accounts ADD COLUMN IF NOT EXISTS perks JSONB NOT NULL DEFAULT '{}';
+ALTER TABLE coupons ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT '';
+ALTER TABLE coupons ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ;
+CREATE TABLE IF NOT EXISTS user_packs (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  pack TEXT NOT NULL,
+  name TEXT NOT NULL DEFAULT '',
+  odds JSONB NOT NULL DEFAULT '[]',                -- odds the pack was sold with
+  source TEXT NOT NULL DEFAULT 'bought',           -- bought | checkout | grant
+  order_id INTEGER REFERENCES orders(id),
+  price INTEGER NOT NULL DEFAULT 0,                -- credits paid
+  status TEXT NOT NULL DEFAULT 'unopened',         -- unopened | opened | revoked
+  note TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  opened_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS user_packs_user ON user_packs(user_id);
+CREATE TABLE IF NOT EXISTS user_cards (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  card TEXT NOT NULL,
+  rarity TEXT NOT NULL,
+  data JSONB NOT NULL DEFAULT '{}',                -- the card as it was drawn
+  pack_id INTEGER REFERENCES user_packs(id),
+  status TEXT NOT NULL DEFAULT 'ready',            -- ready | used | revoked
+  used_on TEXT,
+  used_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS user_cards_user ON user_cards(user_id);

@@ -49,7 +49,7 @@ app.get('/api/catalog', h(async () => { const c = await core.catalog(); const RR
   const rules = {}; c.plans.filter((p) => p.active).forEach((p) => { rules[p.id] = {}; p.sizes.forEach((z) => { const inst = p.id === 'instant' || p.kind === 'funded'; const ev = RR.rulesFor(c, { plan: p.id, size: z.size, kind: inst ? 'funded' : 'evaluation', payout_count: 0 }); const fu = inst ? ev : RR.rulesFor(c, { plan: p.id, size: z.size, kind: 'funded', payout_count: 0 }); const ov = ((c.planRules || {})[p.id] || {})[z.size] || {};
     rules[p.id][z.size] = { target: inst ? ev.goal : ev.target, dll: ev.dll, maxLoss: ev.maxLoss, contracts: ev.fullContracts || ev.contracts, minDays: ev.minDays || 0, consistency: ev.consistency, split: fu.split, splitText: inst && ov.split == null ? `${c.instantCommon.splitFirst}%, then ${c.instantCommon.splitLater}%` : fu.split + '%', payoutMin: fu.payoutMin }; }); });
   const pubPlans = c.plans.filter((p) => p.active).map((p) => Object.assign({}, p, { sizes: p.sizes.map((z) => ({ size: z.size, price: core.priceOf(z), activation: z.activation, compare: z.compare && z.compare > core.priceOf(z) ? z.compare : undefined })), bundleOff: undefined }));
-  return { rules, plans: pubPlans, evalRules: c.evalRules, evalCommon: c.evalCommon, fundedCommon: c.fundedCommon, fundedCaps: c.fundedCaps, instantRules: c.instantRules, instantCommon: c.instantCommon, instantCaps: c.instantCaps, addons: c.addons, resetPct: c.resetPct, bundles: c.bundles, promos: (c.promos || []).filter((p) => p.active && !(Number(p.total) === 1) && (!p.ends || p.ends >= new Date().toISOString().slice(0, 10))).map(({ code, name, pct, plans, starts, ends, desc }) => ({ code, name, pct, plans, starts, ends, desc })), payments: pay.mode() }; }));
+  return { rules, plans: pubPlans, evalRules: c.evalRules, evalCommon: c.evalCommon, fundedCommon: c.fundedCommon, fundedCaps: c.fundedCaps, instantRules: c.instantRules, instantCommon: c.instantCommon, instantCaps: c.instantCaps, addons: c.addons, resetPct: c.resetPct, bundles: c.bundles, promos: (c.promos || []).filter((p) => p.active && !(Number(p.total) === 1) && (!p.ends || p.ends >= new Date().toISOString().slice(0, 10))).map(({ code, name, pct, plans, starts, ends, desc }) => ({ code, name, pct, plans, starts, ends, desc })), payments: pay.mode(), packLadder: await require('./packs').publicLadder(), credits: await require('./packs').publicCredits() }; }));
 app.get('/api/public-config', h(async () => { const m = await pay.refreshMode(); const crisp = await I.cfg('crisp'); const ph = await I.cfg('posthog'); const ss = await I.cfg('sumsub');
   const kv2 = await db.all("SELECT k, v FROM kv WHERE k IN ('settings.flags','settings.maint')"); const g = (k) => (kv2.find((r) => r.k === k) || {}).v || {};
   const ann = await db.one("SELECT v FROM kv WHERE k='list.announcements'"); const now = new Date().toISOString().slice(0, 10);
@@ -78,7 +78,14 @@ const maintOn = async () => { const r = await db.one("SELECT v FROM kv WHERE k='
 const flagOn = async (k) => ((((await db.one("SELECT v FROM kv WHERE k='settings.flags'")) || {}).v || {})[k]) !== false;
 const needFlag = (k, msg) => async (req, res, next) => { try { if (await flagOn(k)) return next(); res.status(403).json({ error: msg }); } catch (e) { next(e); } };
 T.post('/agreements/accept', h(async (req) => require('./legal').accept(req.user, Array.isArray(req.body.keys) ? req.body.keys : null)));
-T.post(['/orders', '/orders/reset', '/orders/activation', '/payouts', '/accounts/:id/agreement'], (req, res, next) => require('./legal').guard(req, res, next));
+T.post(['/orders', '/orders/reset', '/orders/activation', '/orders/credits', '/payouts', '/accounts/:id/agreement'], (req, res, next) => require('./legal').guard(req, res, next));
+// Packs and credits (switched by settings.flags.packs)
+const PK = require('./packs');
+T.get('/packs', h(async (req) => { const d = await PK.traderData(req.user.id); if (!d) bad('Packs are switched off right now', 403); return d; }));
+T.post('/packs/buy', limit(30, 60000), h((req) => PK.buy(req.user, clean(req.body.pack, 30))));
+T.post('/packs/open', limit(30, 60000), h((req) => PK.openOwned(req.user, req.body.id)));
+T.post('/cards/:id/use', limit(20, 60000), h((req) => PK.useCard(req.user, req.params.id, req.body || {})));
+T.post('/orders/credits', h(async (req) => { const m = await maintOn(); if (m) bad(m, 503); if (await auth.blockedReq(req, req.user.email)) bad('This purchase could not be completed. Contact support.', 403); return PK.createCreditsOrder(req.user, req.body || {}); }));
 T.post('/orders', h(async (req) => { const m = await maintOn(); if (m) bad(m, 503); if (await auth.blockedReq(req, req.user.email)) bad('This purchase could not be completed. Contact support.', 403); { const sw = ((await db.one("SELECT v FROM kv WHERE k='store.risk.switches'")) || {}).v || {}; if (sw.sales) bad('New purchases are paused for a short time. Try again soon.', 503); } return pay.createOrder(req.user, req.body); }));
 T.post('/orders/reset', h((req) => pay.createResetOrder(req.user, req.body)));
 T.post('/orders/activation', h((req) => pay.createActivationOrder(req.user, req.body)));
@@ -155,7 +162,7 @@ T.post('/courses/:id/lesson', needFlag('education', 'Courses are switched off ri
 T.post('/rewards/:id/redeem', needFlag('rewards', 'Rewards are switched off right now'), h(async (req) => {
   const C = await content.all(); const r = C.rewards.find((x) => x.id === req.params.id); if (!r) bad('Reward not found', 404);
   return db.tx(async (c) => {
-    const u = await c.one('SELECT points FROM users WHERE id=$1 FOR UPDATE', [req.user.id]); if (u.points < r.pts) bad('You need more points for this reward');
+    const u = await c.one('SELECT points FROM users WHERE id=$1 FOR UPDATE', [req.user.id]); if (u.points < r.pts) bad('You need more credits for this reward');
     const map = { r1: ['discount', 10], r2: ['free_reset', 0], r3: ['discount', 25], r4: ['free_eval', 0], r5: ['split', 0], r6: ['merch', 0] };
     const [kind, pct] = map[r.id] || ['discount', 0];
     const code = 'FS-' + r.id.toUpperCase() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase();
@@ -177,7 +184,7 @@ async function findCert(id) {
   }
   return null;
 }
-// Sharing a certificate earns 50 points, at most once a week
+// Sharing a certificate earns 50 credits, at most once a week
 T.post('/certs/:id/share', h(async (req) => {
   const c = await findCert(req.params.id); if (!c || c.user !== req.user.id) bad('Certificate not found', 404);
   const rev = ((await db.one("SELECT v FROM kv WHERE k='store.rewards.revoked'")) || {}).v || []; if (rev.includes(c.id)) bad('This certificate is no longer valid');
@@ -247,6 +254,7 @@ const themed = (f) => (req, res) => { const lt = /(?:^|;\s*)fs_theme=light/.test
 app.get('/checkout', themed('checkout.html'));
 app.get('/checkout/payment', themed((req) => (req.user ? 'payment-member.html' : 'payment.html')));
 app.get('/checkout/confirmed', themed('confirmed.html'));
+app.get('/checkout/credits', needPage(false), async (req, res, next) => { if (!(await require('./packs').enabled())) return res.redirect('/app'); themed('credits.html')(req, res, next); });
 app.get('/login', (req, res, next) => (req.user && !req.query.next ? res.redirect(auth.STAFF.includes(req.user.role) && req.query.admin ? '/admin' : '/app') : next()), themed('login.html'));
 app.get('/signup', (req, res) => themed('signup.html')(req, res));
 const editable = (slug, f) => async (req, res) => {
@@ -302,6 +310,7 @@ app.get('/forgot-password', (req, res) => themed('forgot.html')(req, res));
 app.get('/reset-password', (req, res) => themed('reset-password.html')(req, res));
 app.get('/verify-email', (req, res) => themed('verify.html')(req, res));
 app.get('/reset', needPage(false), (req, res, next) => themed('reset.html')(req, res, next));
+app.get('/app/packs', async (req, res, next) => { if (!(await require('./packs').enabled())) return res.redirect('/app'); next(); });
 app.get(['/app', '/app/*'], needPage(false), page('app.html'));
 app.get(['/admin', '/admin/*'], needPage(true), (req, res) => { const b = ((req.params[0] || 'home').split('/')[0] || 'home').replace(/[^a-z]/g, ''); const f = path.join(DIST, 'admin', b + '.html'); if (fs.existsSync(f)) return res.sendFile(f); res.redirect('/admin/home'); });
 app.use((req, res) => res.status(404).sendFile(path.join(DIST, '404.html'), (e) => e && res.status(404).send('Not found')));

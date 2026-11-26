@@ -17,7 +17,21 @@ function catFor(cat, a) {
     instantCaps: Object.assign({}, cat.instantCaps, { [z]: pick(s.icap, (cat.instantCaps || {})[z]) })
   });
 }
-function rulesFor(cat0, a) {
+// Card perks on an account (accounts.perks, from Packs): fewer days, rule removals, split boosts
+function perked(R, a) {
+  const P = a && a.perks; if (!P || typeof P !== 'object') return R;
+  R = Object.assign({}, R);
+  if (R.kind === 'evaluation') { if (P.minDaysOff && R.minDays != null) R.minDays = Math.max(0, R.minDays - P.minDaysOff); if (P.evalCons) { R.consOff = true; R.consistency = 100; } }
+  if (R.kind === 'funded') {
+    if (P.payCons) { R.consOff = true; R.consistency = 100; }
+    if (P.splitTo) R.split = Math.max(R.split || 0, P.splitTo); else if (P.splitAdd) R.split = Math.min(100, (R.split || 0) + P.splitAdd);
+  }
+  if (P.newsUntil && Date.parse(P.newsUntil) > Date.now()) R.news = null;
+  if (P.idleDays && R.inactivity) R.inactivity += P.idleDays;
+  R.perks = P; return R;
+}
+function rulesFor(cat0, a) { return perked(rulesFor0(cat0, a), a); }
+function rulesFor0(cat0, a) {
   const cat = catFor(cat0, a);
   const R0 = rulesBase(cat, a); const o = (((cat.planRules || {})[a.plan]) || {})[a.size];
   if (!o) return phaseRules(R0, null, a);

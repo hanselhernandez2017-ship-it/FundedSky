@@ -76,11 +76,7 @@ async function run() {
       }
     }
   }
-  // points expire after 12 months without a purchase, payout or other activity
-  const stale = await db.all(`SELECT u.id, u.points FROM users u WHERE u.points > 0 AND u.created_at < now() - interval '12 months'
-    AND NOT EXISTS (SELECT 1 FROM points_log l WHERE l.user_id=u.id AND l.created_at > now() - interval '12 months' AND l.delta > 0)
-    AND NOT EXISTS (SELECT 1 FROM orders o WHERE o.user_id=u.id AND o.status='paid' AND o.paid_at > now() - interval '12 months')`);
-  for (const u of stale) { await core.points(null, u.id, -u.points, 'Points expired after 12 months without activity'); await core.notify(null, u.id, 'Your points expired', `${u.points.toLocaleString('en-US')} points expired after 12 months without activity.`, 'rewards'); hit('pointsExpired'); }
+  // Credits never expire: bought credits are stored value, and earned credits share the same balance.
   return out;
 }
 function start() { setTimeout(() => run().catch((e) => console.error('automations', e.message)), 20000); setInterval(() => run().catch((e) => console.error('automations', e.message)), 15 * 60 * 1000).unref(); }

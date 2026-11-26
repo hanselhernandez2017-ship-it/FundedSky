@@ -121,8 +121,8 @@ function startBoard(root) {
   const OUT = F.st('webhooks.out', []);
   const EVTS = ['order.paid', 'payout.updated', 'account.passed', 'account.breached', 'dispute.opened', 'kyc.updated', 'payment.declined', 'user.created'];
   const outLog = (BO.hooks || []).filter((h) => String(h.provider).startsWith('out:'));
-  const FLAGS = [['competitions', 'Competitions', 'Trading contests in the dashboard'], ['rewards', 'Rewards Points', 'Points and the rewards catalog'], ['affiliates', 'Affiliates', 'Refer-a-friend page in the dashboard'], ['education', 'Education', 'Courses in the dashboard'], ['cryptoPayouts', 'Crypto Payouts', 'USDC payouts']];
-  const FL = Object.assign({ competitions: true, rewards: true, affiliates: true, education: true, cryptoPayouts: true }, SET.flags || {});
+  const FLAGS = [['packs', 'Packs and Credits', 'Packs page, credits balance, credits checkout and free packs at checkout'], ['competitions', 'Competitions', 'Trading contests in the dashboard'], ['rewards', 'Rewards', 'Credits rewards catalog'], ['affiliates', 'Affiliates', 'Refer-a-friend page in the dashboard'], ['education', 'Education', 'Courses in the dashboard'], ['cryptoPayouts', 'Crypto Payouts', 'USDC payouts']];
+  const FL = Object.assign({ packs: true, competitions: true, rewards: true, affiliates: true, education: true, cryptoPayouts: true }, SET.flags || {});
   const MT = Object.assign({ on: false, msg: 'Funded Sky is getting an upgrade. Trading accounts are not affected. Back in about 30 minutes.' }, SET.maint || {});
   Object.assign(S.set, { maint: !!MT.on, maintMsg: MT.msg, statusPub: true, nfSlack: true, nfEmail: true, nfSms: false, bRisk: true, bPay: true, bDisp: true, bId: true, bSup: true, bSys: true, tz: 'Eastern Time', cur: 'USD', eod: '5:00 PM ET' }, F.st('settings.prefs', {}), { maint: !!MT.on });
   F.watch(() => { const o = Object.assign({}, S.set); delete o.maint; delete o.maintMsg; return o; }, 'settings.prefs');

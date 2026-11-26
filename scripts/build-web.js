@@ -15,12 +15,12 @@ const out = (f, s) => { fs.writeFileSync(path.join(DIST, f), s); console.log('bu
 
 // ---------- trader app (one page, routes by path) ----------
 {
-  const css = ['tr.css', 'viz.css', 'tr_panel.css', 'tr_shell.css', 'tr_fix.css', 'tr_light.css'].map(rd).join('\n') + (fs.existsSync(path.join(SRC, 'tr_live.css')) ? rd('tr_live.css') : '');
-  const js = ['viz.js', 'tr_data.js', 'tr_app.js', 'tr_viz.js', 'tr_pages1.js', 'tr_pages2.js', 'tr_pages4.js', 'tr_pages5.js', 'tr_pages3.js'].map(rd).join('\n');
+  const css = ['tr.css', 'viz.css', 'tr_panel.css', 'tr_shell.css', 'tr_fix.css', 'tr_light.css', 'tr_packs.css'].map(rd).join('\n') + (fs.existsSync(path.join(SRC, 'tr_live.css')) ? rd('tr_live.css') : '');
+  const js = ['viz.js', 'tr_data.js', 'tr_app.js', 'tr_viz.js', 'tr_pages1.js', 'tr_pages2.js', 'tr_pages4.js', 'tr_pages5.js', 'tr_pages6.js', 'tr_pages3.js'].map(rd).join('\n');
   const html = `${HEAD('Funded Sky', `<style>html,body{margin:0;background:#08080A}html[data-theme=light],html[data-theme=light] body{background:#F6F5F3}${css}
 .fsload{position:fixed;inset:0;display:grid;place-items:center;font:500 14px 'Mona Sans',system-ui;color:#9C9693}</style>`)}
 <body><div class="fsbo" id="fsbo"></div><div class="fsload" id="fsload">Loading your dashboard…</div>
-<script src="/static/pay.js"></script>
+<script src="/static/pay.js"></script><script src="/static/morphdom.js"></script><script src="/static/packart.js"></script>
 <script>
 (function () {
   var t = 'dark'; try { t = localStorage.getItem('fs_theme') || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'); } catch (e) {}
@@ -83,9 +83,9 @@ ${js}
 }
 
 // ---------- design-template pages (checkout and sign-in) ----------
-const DCP = { 'Main.dc.html': 'checkout.html', 'Payment.dc.html': 'payment.html', 'PaymentLoggedIn.dc.html': 'payment-member.html', 'Confirmed.dc.html': 'confirmed.html', 'Login.dc.html': 'login.html', 'SignUp.dc.html': 'signup.html', 'ForgotPassword.dc.html': 'forgot.html', 'ResetPassword.dc.html': 'reset-password.html', 'VerifyEmail.dc.html': 'verify.html' };
+const DCP = { 'Main.dc.html': 'checkout.html', 'Payment.dc.html': 'payment.html', 'PaymentLoggedIn.dc.html': 'payment-member.html', 'Confirmed.dc.html': 'confirmed.html', 'Credits.dc.html': 'credits.html', 'AdminPacks.dc.html': 'admin/packs.html', 'Login.dc.html': 'login.html', 'SignUp.dc.html': 'signup.html', 'ForgotPassword.dc.html': 'forgot.html', 'ResetPassword.dc.html': 'reset-password.html', 'VerifyEmail.dc.html': 'verify.html' };
 // Checkout pages also get a light version that matches the trader's dashboard theme (chosen by the fs_theme cookie on the server).
-const LIGHTP = { 'Main.dc.html': 1, 'Payment.dc.html': 1, 'PaymentLoggedIn.dc.html': 1, 'Confirmed.dc.html': 1, 'Login.dc.html': 1, 'SignUp.dc.html': 1, 'ForgotPassword.dc.html': 1, 'ResetPassword.dc.html': 1, 'VerifyEmail.dc.html': 1 };
+const LIGHTP = { 'Credits.dc.html': 1, 'Main.dc.html': 1, 'Payment.dc.html': 1, 'PaymentLoggedIn.dc.html': 1, 'Confirmed.dc.html': 1, 'Login.dc.html': 1, 'SignUp.dc.html': 1, 'ForgotPassword.dc.html': 1, 'ResetPassword.dc.html': 1, 'VerifyEmail.dc.html': 1 };
 for (const [src0, dst0] of Object.entries(DCP).concat(Object.keys(LIGHTP).map((k) => [k + ':light', DCP[k].replace('.html', '-light.html')]))) {
   const lightV = src0.endsWith(':light'); const src = src0.replace(':light', ''); const dst = dst0;
   const s0 = fs.readFileSync(path.join(PAGES, src), 'utf8'); const s = lightV ? lighten(s0) : s0;
@@ -95,8 +95,8 @@ for (const [src0, dst0] of Object.entries(DCP).concat(Object.keys(LIGHTP).map((k
   const tpl = body.replace(/<helmet>[\s\S]*?<\/helmet>/, '');
   const jsStart = s.indexOf('class Component'); const js = s.slice(jsStart, s.indexOf('</script>', jsStart));
   const helmNoFont = helm.replace(/<link[^>]+fonts\.googleapis[^>]+>/g, '');
-  out(dst, `${HEAD(title.replace(/^Funded Sky( mobile)?( checkout)?:\s*/i, 'Funded Sky: '), (LIGHTP[src] ? THEME_JS(lightV ? 'light' : 'dark') : '') + helmNoFont + `<style>${SELECT_CSS(lightV ? '5E636C' : '9C9693')}</style>`)}<body><div id="dc-root"></div><template id="dc-tpl">${tpl}</template>
-<script src="/static/morphdom.js"></script><script src="/static/dc.js"></script><script src="/static/site.js"></script><script src="/static/pay.js"></script>
+  out(dst, `${HEAD(title.replace(/^Funded Sky( mobile)?( checkout)?:\s*/i, 'Funded Sky: '), (LIGHTP[src] ? THEME_JS(lightV ? 'light' : 'dark') : '') + helmNoFont + `<style>${SELECT_CSS(lightV ? '5E636C' : '9C9693')}</style>`)}<body><div id="dc-root"></div>${src.startsWith('Admin') ? `<script type="text/x-dc-tpl" id="dc-tpl">${tpl}</script>` : `<template id="dc-tpl">${tpl}</template>`}
+<script src="/static/morphdom.js"></script><script src="/static/dc.js"></script>${src.startsWith('Admin') ? '' : '<script src="/static/site.js"></script><script src="/static/pay.js"></script>'}${/dc-import/.test(tpl) ? '<script src="/static/packart.js"></script>' : ''}
 <script>
 ${js}
 DC.mount(Component, { mobileLinks: false });

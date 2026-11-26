@@ -2,7 +2,7 @@
    Templates come from <template id="dc-tpl">; the page script defines `class Component extends DCLogic`. */
 (function () {
   const BOOL = new Set(['checked', 'disabled', 'selected', 'readonly', 'required', 'hidden', 'open', 'multiple', 'autofocus']);
-  const EVT = { onclick: 'click', onchange: 'change', oninput: 'input', onsubmit: 'submit', onkeydown: 'keydown', onblur: 'focusout', onfocus: 'focusin' };
+  const EVT = { onclick: 'click', onchange: 'change', oninput: 'input', onsubmit: 'submit', onkeydown: 'keydown', onblur: 'focusout', onfocus: 'focusin', onscroll: 'scroll' };
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   function get(path, ctx) {
     path = path.trim();
@@ -24,9 +24,11 @@
     });
   }
   function interp(text, ctx) {
+    // design components (<dc-import name="PackCover" ...>) come from packart.js when the page loads it
+    if (window.DCR) text = text.replace(/<dc-import\b([^>]*)><\/dc-import>/g, (m, a) => { const pr = {}; a.replace(/([\w-]+)="([^"]*)"/g, (x, k, v) => { const e = /^\{\{(.*)\}\}$/.exec(v.trim()); pr[k] = e ? get(e[1], ctx) : v; }); const c = window.DCR.COMP[pr.name]; return c ? '\u0001' + encodeURIComponent(c(pr)) + '\u0002' : ''; });
     // attributes inside tags first, then text
     text = text.replace(/<([a-zA-Z][a-zA-Z0-9-]*)((?:\s+[^\s>=]+(?:="[^"]*")?)*)\s*(\/?)>/g, (m, tag, rest, sl) => `<${tag}${attrs(rest, ctx)}${sl ? ' /' : ''}>`);
-    return text.replace(/\{\{([^}]*)\}\}/g, (m, e) => { const v = get(e, ctx); return typeof v === 'function' ? '' : esc(v); });
+    return text.replace(/\{\{([^}]*)\}\}/g, (m, e) => { const v = get(e, ctx); return typeof v === 'function' ? '' : esc(v); }).replace(/\u0001([^\u0002]*)\u0002/g, (m, x) => decodeURIComponent(x));
   }
   const OPEN = /<(sc-for|sc-if)\b([^>]*)>/g;
   function render(t, ctx) {
@@ -74,6 +76,7 @@
     const t = document.getElementById('dc-tpl'); tpl = t.innerHTML;
     root = document.getElementById('dc-root');
     comp = new Component(props || {}); comp.state = comp.state || {};
+    root.addEventListener('scroll', (ev) => fire('scroll', ev), true);
     ['click', 'input', 'change', 'submit', 'keydown', 'focusout', 'focusin'].forEach((type) => root.addEventListener(type, (ev) => {
       if (type === 'input') { fire('input', ev); const tg = ev.target; if (tg.type !== 'checkbox' && tg.type !== 'radio' && tg.tagName !== 'SELECT') fire('change', ev); return; }
       if (type === 'change') { const tg = ev.target; if (tg.type === 'checkbox' || tg.type === 'radio' || tg.tagName === 'SELECT') fire('change', ev); return; }

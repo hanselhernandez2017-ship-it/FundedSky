@@ -25,11 +25,31 @@ a{color:#7CC4FF}a:hover{color:#A9D8FF}
 .fs-qbtn{width:36px;height:36px;border:1px solid #26262A;border-radius:4px;background:#111113;color:#F4F2F1;font:inherit;font-size:18px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:border-color .15s}
 .fs-qbtn:hover{border-color:#7CC4FF}
 .fs-qbtn:disabled{color:#3A3A40;cursor:default;border-color:#26262A}
-.fs-bar{display:none}
+.fs-bar{display:none;z-index:30}
+.fs-mini{width:18px;height:25px;border-radius:3px;flex:none;position:relative;overflow:hidden;display:block}
+.fs-mini:after{content:'';position:absolute;inset:0;background:linear-gradient(115deg,transparent 35%,rgba(255,255,255,.3) 50%,transparent 65%)}
+.fs-dots{display:none}
+.fs-gc{display:grid!important;grid-template-columns:auto minmax(0,1fr) auto;align-items:center!important}
+.fs-gval{align-self:center}
+.fs-g4p{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
 .fs-mprog{display:none}
 button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4FF;outline-offset:2px}
 @media (max-width: 760px){
 .fs-steps,.fs-secure{display:none!important}
+.fs-g4p{display:flex!important;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;gap:10px!important;margin:0 -20px;padding:0 20px 2px;scroll-padding:0 20px}
+.fs-g4p::-webkit-scrollbar{display:none}
+.fs-dots{display:flex;justify-content:center;gap:6px;margin-top:-2px}.fs-dots i{display:block;height:6px;border-radius:3px;transition:width .2s,background .2s}
+.fs-lt{flex:0 0 152px;scroll-snap-align:start;min-height:0!important;padding:12px!important}
+.fs-fph{flex-direction:column;align-items:flex-start!important}
+.fs-gc{display:grid!important;grid-template-columns:minmax(0,1fr);gap:12px 14px!important;padding:16px!important;align-items:start!important}
+.fs-gcv{grid-column:1 / -1;margin:0 auto}
+.fs-gtx{grid-column:1 / -1}
+.fs-gtx{gap:4px!important}
+.fs-gtx p:nth-child(2){font-size:17px!important;line-height:22px!important}
+.fs-gtx p:nth-child(3){font-size:12px!important;line-height:16px!important}
+.fs-gval{grid-column:1 / -1;flex-direction:row!important;align-items:center!important;justify-content:space-between;gap:12px!important;border-top:1px solid #26262A;padding-top:12px;text-align:left!important}
+.fs-gval>p{display:none}
+.fs-gval>span{font-size:20px!important;line-height:24px!important}
 .fs-hdr{padding:0 20px!important;height:64px;box-sizing:border-box}
 .fs-mprog{display:flex!important}
 .fs-main{padding:24px 20px 32px!important;gap:28px!important}
@@ -133,6 +153,42 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 </button>
 </sc-for>
 </div>
+<sc-if value="{{ hasLadder }}">
+<div style="display: flex; flex-direction: column; gap: 12px; margin-top: 12px;">
+<div class="fs-fph" style="display: flex; align-items: baseline; justify-content: space-between; gap: 4px 12px;"><h3 style="margin: 0; font-size: 15px; line-height: 20px; font-weight: 600;">Free Packs With Your Order</h3><span style="font-size: 13px; color: #9C9693;">{{ packNudge }}</span></div>
+<div class="fs-g4p" onScroll="{{ ladScroll }}">
+<sc-for list="{{ ladder }}" as="t" hint-placeholder-count="4">
+<div class="fs-lt" style="min-height: 132px; box-sizing: border-box; background: {{ t.bg }}; border: 1px solid {{ t.bd }}; border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px;">
+<span style="display: flex; align-items: center; justify-content: space-between; gap: 8px;"><span style="font-size: 13px; line-height: 18px; font-weight: 600; color: {{ t.fg }}; white-space: nowrap;">{{ t.when }}</span><span style="font-size: 10px; line-height: 1; font-weight: 600; font-stretch: 112%; padding: 4px 7px 5px; border-radius: 4px; background: {{ t.stBg }}; color: {{ t.stFg }}; white-space: nowrap;">{{ t.st }}</span></span>
+<span class="fs-chips" style="display: flex; flex-direction: column; justify-content: center; gap: 6px; height: 72px; width: 100%; filter: {{ t.fx }};"><sc-for list="{{ t.chips }}" as="c" hint-placeholder-count="2"><span style="position: relative; display: flex; align-items: center; gap: 7px; height: 30px; padding: 0 8px 0 9px; border-radius: 6px; background: {{ c.bg }}; box-shadow: inset 0 0 0 1px rgba(255,255,255,.16), 0 4px 12px {{ c.glow }}; overflow: hidden;"><span style="position: absolute; inset: 0; background: linear-gradient(115deg, transparent 40%, rgba(255,255,255,.18) 52%, transparent 64%);"></span><svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true" style="flex: none;"><path d="M4 2h8l3 4-7 8-7-8z" fill="{{ c.glyph }}"></path><path d="M1 6h14M5.5 2L8 6l2.5-4M5.5 6L8 14l2.5-8" fill="none" stroke="rgba(0,0,0,.28)" stroke-width=".8" stroke-linejoin="round"></path></svg><span style="position: relative; flex: 1; min-width: 0; font-size: 11px; line-height: 1; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #FFFFFF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ c.name }}</span><sc-if value="{{ c.hasQty }}" hint-placeholder-val="{{ false }}"><span style="position: relative; flex: none; font-size: 10.5px; line-height: 1; font-weight: 700; color: #FFFFFF; background: rgba(0,0,0,.28); border-radius: 4px; padding: 3px 5px;">{{ c.qty }}</span></sc-if></span></sc-for></span>
+<span style="margin-top: auto; font-size: 12.5px; line-height: 17px; color: {{ t.sub }};">{{ t.what }}</span>
+</div>
+</sc-for>
+</div>
+<div class="fs-dots" role="tablist" aria-label="Free pack steps"><sc-for list="{{ ladDots }}" as="d" hint-placeholder-count="4"><i style="width: {{ d.w }}; background: {{ d.c }};"></i></sc-for></div>
+<div class="fs-gc" style="display: flex; flex-wrap: wrap; align-items: center; gap: 18px 28px; padding: 20px 22px; border: 1px dashed {{ goal.line }}; border-radius: 8px; background: {{ goal.bg }};">
+<div class="fs-gcv" aria-hidden="true" style="position: relative; width: 276px; height: 76px; flex: none;">
+<sc-for list="{{ goal.stack }}" as="c" hint-placeholder-count="5"><span style="position: absolute; top: 2px; left: {{ c.x }}; width: 52px; z-index: {{ c.z }}; filter: {{ goal.fx }};"><dc-import name="PackCover" pack="{{ c.id }}" size="xs" hint-size="52px,73px"></dc-import></span></sc-for>
+<sc-if value="{{ goal.locked }}" hint-placeholder-val="{{ true }}"><span style="position: absolute; right: -8px; top: -8px; z-index: 9; width: 28px; height: 28px; border-radius: 14px; box-shadow: 0 4px 10px rgba(0,0,0,.35); background: #08080A; border: 1px solid #3A3A40; color: #F4F2F1; display: flex; align-items: center; justify-content: center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg></span></sc-if>
+<sc-if value="{{ goal.open }}" hint-placeholder-val="{{ false }}"><span style="position: absolute; right: -8px; top: -8px; z-index: 9; width: 28px; height: 28px; border-radius: 14px; box-shadow: 0 4px 10px rgba(0,0,0,.35); background: #7CC4FF; color: #08080A; display: flex; align-items: center; justify-content: center;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"></path></svg></span></sc-if>
+</div>
+<div class="fs-gtx" style="flex: 1 1 240px; min-width: 0; display: flex; flex-direction: column; gap: 6px;">
+<p style="margin: 0; font-stretch: 125%; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: #9C9693; font-weight: 500; color: #7CC4FF;">{{ goal.eyebrow }}</p>
+<p style="margin: 0; font-size: 20px; line-height: 26px; font-weight: 600; letter-spacing: -0.01em;">{{ goal.title }}</p>
+<p style="margin: 0; font-size: 13px; line-height: 18px; color: #9C9693;">{{ goal.sub }}</p>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-top: 8px;">
+<div role="progressbar" aria-label="Accounts toward {{ goal.title }}" aria-valuemin="0" aria-valuemax="{{ goal.need }}" aria-valuenow="{{ goal.have }}" style="flex: 1 1 160px; max-width: 260px; height: 6px; border-radius: 3px; background: #26262A; overflow: hidden;"><i style="display: block; height: 100%; width: {{ goal.pct }}; background: #7CC4FF; border-radius: 3px;"></i></div>
+<span style="font-size: 13.5px; color: #D4CFCD;">{{ goal.msgA }}<b style="color: #F4F2F1; font-weight: 600;">{{ goal.msgB }}</b>{{ goal.msgC }}</span>
+</div>
+</div>
+<div class="fs-gval" style="flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; text-align: right;">
+<p style="margin: 0; font-stretch: 125%; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: #9C9693; font-weight: 500;">Pack Value</p>
+<span style="font-family: 'Geist Mono', monospace; font-size: 26px; line-height: 28px; font-weight: 500; color: #9C9693; text-decoration: line-through;">{{ goal.worth }}</span>
+<button type="button" onClick="{{ goal.act }}" style="border: 0; font: inherit; font-size: 10px; line-height: 1; font-weight: 600; font-stretch: 112%; letter-spacing: 0.08em; text-transform: uppercase; padding: 7px 11px 8px; border-radius: 999px; background: {{ goal.pillBg }}; color: {{ goal.pillFg }}; cursor: {{ goal.cursor }};">{{ goal.pill }}</button>
+</div>
+</div>
+</div>
+</sc-if>
 </div>
 
 <div style="display: flex; flex-direction: column; gap: 12px;">
@@ -261,10 +317,41 @@ class Component extends DCLogic {
     const r = ((cat.rules || {})[pc.id] || {})[cur.size] || (isI ? Object.assign({ target: cat.instantRules[cur.size].goal }, cat.instantRules[cur.size]) : cat.evalRules[cur.size]);
     const rules = { targetLabel: isI ? 'Profit Goal Before First Payout' : 'Profit Target', target: M(r.target), maxLossLabel: 'Max Loss (Trailing, End of Day)', maxLoss: M(r.maxLoss), dllLabel: 'Daily Loss Limit', dll: M(r.dll), contracts: r.contracts,
       split: r.splitText || (isI ? cat.instantCommon.splitFirst + '%, then ' + cat.instantCommon.splitLater + '%' : cat.fundedCommon.split + '%') };
+    // Free packs with the order (Back Office › Packs › Checkout Rewards). Hidden when packs are switched off.
+    const LD = cat.packLadder; const hasLadder = !!(LD && LD.tiers && LD.tiers.length);
+    const CHIP = { takeoff: ['linear-gradient(120deg,#3D8BDB,#123B6E)', 'rgba(76,155,232,.3)', '#BFE3FF'], climb: ['linear-gradient(120deg,#1E9A6E,#0A3D2B)', 'rgba(21,128,92,.3)', '#B8F5DA'], jet: ['linear-gradient(120deg,#7454E0,#2A1670)', 'rgba(142,108,240,.32)', '#DCD0FF'], strato: ['linear-gradient(120deg,#D9A030,#6B4508)', 'rgba(245,192,78,.32)', '#FFF1C4'], orbit: ['linear-gradient(120deg,#8E97A8,#2A303B)', 'rgba(126,135,152,.3)', '#FFFFFF'] };
+    let ladder = [], goal = {}, packNudge = '', ladDots = [];
+    if (hasLadder) {
+      const LAD = LD.tiers; const PKD = (k) => LD.packs.find((x) => x.id === k) || { id: k, short: k, usd: 0 };
+      const nAcc = st.cart.filter((c) => LD.plans[c.plan] !== false).reduce((n, c) => n + c.qty, 0);
+      const tier = LAD.filter((t) => nAcc >= t.n).pop(); const nextT = LAD.find((t) => nAcc < t.n);
+      const cnt = (t) => t.packs.reduce((m, k) => { m[k] = (m[k] || 0) + 1; return m; }, {});
+      const allKinds = (t) => t.packs.length >= 3 && new Set(t.packs).size === t.packs.length;
+      const pname = (t) => { if (allKinds(t)) return 'One of every pack'; const parts = Object.entries(cnt(t)).map(([k, n]) => (n > 1 ? n + ' ' : '') + PKD(k).short + (n > 1 ? ' Packs' : ' Pack')); if (t.credits) parts.push(t.credits.toLocaleString('en-US') + ' Credits'); return parts.join(' + '); };
+      const title = (t) => (allKinds(t) ? 'The Full Pack Stack' : pname(t));
+      ladder = LAD.map((t, i) => { const got = nAcc >= t.n; const here = tier === t; const isNext = !!nextT && nextT.n === t.n; const last = i === LAD.length - 1;
+        const chips = allKinds(t) ? [{ name: `All ${t.packs.length} Packs`, bg: 'linear-gradient(90deg,#1C5FA8,#15805C 30%,#4E2DB8 55%,#C98A1B 78%,#7E8798)', glow: 'rgba(142,108,240,.25)', glyph: '#FFFFFF', hasQty: false, qty: '' }]
+          : Object.entries(cnt(t)).map(([k, n]) => { const ch = CHIP[k] || CHIP.orbit; return { name: PKD(k).short, bg: ch[0], glow: ch[1], glyph: ch[2], hasQty: n > 1, qty: '×' + n }; });
+        return { when: last ? `${t.n}+ Accounts` : `${t.n} Accounts`, what: title(t), chips, fx: got || isNext ? 'none' : 'saturate(.35) brightness(.7)',
+          bg: here ? '#13202E' : '#111113', bd: here ? '#7CC4FF' : '#26262A', fg: got || isNext ? '#F4F2F1' : '#9C9693', sub: got || isNext ? '#D4CFCD' : '#9C9693',
+          st: here ? 'In Your Order' : got ? 'Unlocked' : `+${t.n - nAcc} More`, stBg: here ? '#7CC4FF' : '#26262A', stFg: here ? '#08080A' : isNext ? '#7CC4FF' : '#D4CFCD' }; });
+      const top = LAD[LAD.length - 1]; const gotTop = nAcc >= top.n; const leftN = top.n - nAcc; const worth = top.packs.reduce((a, k) => a + PKD(k).usd, 0) + (top.credits || 0) / 100;
+      goal = { show: true, locked: !gotTop, open: gotTop, have: Math.min(nAcc, top.n), need: top.n, pct: Math.min(100, nAcc / top.n * 100).toFixed(1) + '%', worth: '$' + Math.round(worth).toLocaleString('en-US'),
+        eyebrow: 'Top Reward', title: title(top), sub: allKinds(top) ? 'One of every pack: ' + top.packs.map((k) => PKD(k).short).join(' · ') : 'With ' + top.n + ' or more accounts in one order',
+        stack: top.packs.slice(0, 5).map((id, i) => ({ id, x: (i * 56) + 'px', z: i + 1 })),
+        msgA: gotTop ? 'Unlocked. ' : 'Add ', msgB: gotTop ? (allKinds(top) ? `All ${top.packs.length} packs` : title(top)) : `${leftN} more ${leftN === 1 ? 'account' : 'accounts'}`, msgC: gotTop ? (allKinds(top) || top.packs.length > 1 ? ' are free with this order.' : ' is free with this order.') : ' to unlock',
+        pill: gotTop ? 'Free With This Order' : `Add ${leftN} to Unlock`, pillBg: gotTop ? '#7CC4FF' : '#26262A', pillFg: gotTop ? '#08080A' : '#D4CFCD', cursor: gotTop ? 'default' : 'pointer',
+        act: () => { if (!gotTop) this.updActive((c) => ({ qty: Math.min(5, c.qty + leftN) })); },
+        line: gotTop ? '#7CC4FF' : '#3A3A40', bg: gotTop ? '#13202E' : '#111113', fx: gotTop ? 'none' : 'saturate(.35) brightness(.7)' };
+      packNudge = nextT ? `Add ${nextT.n - nAcc} more for ${title(nextT)}` : 'Top reward unlocked';
+      const li = st.ladIdx || 0; ladDots = LAD.map((t, i) => ({ w: i === li ? '18px' : '6px', c: i === li ? '#7CC4FF' : '#3A3A40' }));
+      if (tier) lines.push({ label: 'Free Packs: ' + title(tier), amount: 'Free', color: '#7CC4FF' });
+    }
+    const ladScroll = (e) => { const el = e.target; const max = el.scrollWidth - el.clientWidth; const i = max <= 0 ? 0 : Math.round(el.scrollLeft / max * (ladder.length - 1)); if (i !== (st.ladIdx || 0)) this.setState({ ladIdx: i }); };
     const act = st.cart.some((c) => (P(c.plan).sizes.find((z) => z.size === c.size) || {}).activation);
     const next = st.me ? '/checkout/payment' : '/checkout/payment';
     return {
-      plans, sizes, platforms, addons, bundles, cart, lines, rules,
+      plans, sizes, platforms, addons, bundles, cart, lines, rules, hasLadder, ladder, goal, packNudge, ladDots, ladScroll,
       multi: many, lineCount: st.cart.length, activeIndex: st.cart.findIndex((c) => c.id === cur.id) + 1,
       activeLabel: pc.short + ' · ' + K(cur.size), activeQty: cur.qty, atMin: cur.qty <= 1,
       inc: () => this.updActive((c) => ({ qty: Math.min(5, c.qty + 1) })), dec: () => this.updActive((c) => ({ qty: Math.max(1, c.qty - 1) })),

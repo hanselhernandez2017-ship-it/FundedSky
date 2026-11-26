@@ -79,11 +79,13 @@ async function createResetOrder(user, body) {
   lines.push({ label: `Reset · ${core.kLabel(a.size)} ${core.planDef(cat, a.plan).short}`, amount: base, kind: 'plan' }); subtotal += base;
   if (a.free_resets > 0) { lines.push({ label: 'Free Reset (your add-on)', amount: -base, kind: 'discount' }); discount += base; }
   for (const ad of addons) { const def = cat.addons[ad]; if ((a.addons || []).includes(ad) && ad === 'daily') continue; const amt = def.flat != null && Number(def.flat) > 0 ? Number(def.flat) : Math.round(core.priceOf(s) * def.pct / 100); lines.push({ label: def.name, amount: amt, kind: 'addon' }); subtotal += amt; }
+  // a "% off a reset" card saved by the trader comes off automatically
+  if (!body.coupon && (await require('./packs').enabled())) { const cc = await db.one("SELECT code FROM coupons WHERE user_id=$1 AND used=false AND source='card' AND kind IN ('reset_discount','discount') AND (expires_at IS NULL OR expires_at > now()) ORDER BY (kind='reset_discount') DESC, pct DESC LIMIT 1", [user.id]); if (cc && subtotal - discount > 0) body = Object.assign({}, body, { coupon: cc.code }); }
   if (body.coupon) {
     const c = await db.one('SELECT * FROM coupons WHERE code=$1 AND user_id=$2 AND used=false', [clean(body.coupon, 40), user.id]);
     if (!c) bad('That reward code is not valid');
     if (c.expires_at ? new Date(c.expires_at) < new Date() : new Date(c.created_at) < new Date(Date.now() - 90 * 86400000)) bad('That code has expired');
-    const d = c.kind === 'free_reset' ? Math.max(0, base - (a.free_resets > 0 ? base : 0)) : c.kind === 'discount' ? round2((subtotal - discount) * Number(c.pct) / 100) : 0;
+    const d = c.kind === 'free_reset' ? Math.max(0, base - (a.free_resets > 0 ? base : 0)) : c.kind === 'discount' || c.kind === 'reset_discount' ? round2((subtotal - discount) * Number(c.pct) / 100) : 0;
     if (!d) bad('That code does not apply to resets');
     lines.push({ label: c.label, amount: -d, kind: 'coupon' }); discount += d;
   }
@@ -120,7 +122,7 @@ async function markPaid(o, provider, ref, method) {
   I.alert('order', `:moneybag: New order ${o.code}: $${Number(o.total).toFixed(2)} (${o.lines.filter((l) => l.kind === 'plan').map((l) => l.label).join(', ')}) via ${provider}`);
   if (o.kind === 'reset' && o.meta.useFree) await db.q('UPDATE accounts SET free_resets=GREATEST(0,free_resets-1) WHERE id=$1', [o.meta.account]);
   const u = await db.one('SELECT email, first FROM users WHERE id=$1', [o.user_id]);
-  { const cat = await core.catalog(); const it = (o.items || [])[0] || {}; const pl = it.plan ? ((core.planDef(cat, it.plan) || {}).name || it.plan) : (o.kind === 'reset' ? 'Reset' : o.kind); const adds = o.lines.filter((l) => l.kind === 'addon').map((l) => l.label);
+  { const cat = await core.catalog(); const it = (o.items || [])[0] || {}; const pl = it.plan ? ((core.planDef(cat, it.plan) || {}).name || it.plan) : (o.kind === 'reset' ? 'Reset' : o.kind === 'credits' ? (o.lines[0] || {}).label || 'Credits' : o.kind); const adds = o.lines.filter((l) => l.kind === 'addon').map((l) => l.label);
     await require('./mail').sendT('order', u.email, { first_name: u.first, order: o.code, plan: pl, size: it.size ? core.kLabel(it.size) : '', platform: it.platform || '', addons: adds.join(', '), discount: Number(o.discount) > 0 ? `${o.promo ? o.promo + ' · ' : ''}−${money2(o.discount)}` : '', total: money2(o.total), paid_with: method || provider, url: `${BASE()}/app#billing` }, { uid: o.user_id }); }
 }
 
@@ -217,7 +219,7 @@ async function getOrder(user, code, sessionId) {
     else { const s = await stripe.checkout.sessions.retrieve(ref).catch(() => null);
       if (s && s.payment_status === 'paid' && s.metadata && s.metadata.order === o.code) { await markPaid(o, 'stripe', s.payment_intent || s.id, 'Card via Stripe'); o = await db.one('SELECT * FROM orders WHERE id=$1', [o.id]); } }
   }
-  return { code: o.code, kind: o.kind, status: o.status, provider: o.provider, lines: o.lines, items: o.items, subtotal: Number(o.subtotal), discount: Number(o.discount), total: Number(o.total), accounts: (o.meta && o.meta.accounts) || [], account: o.meta && o.meta.account, mode: mode(), email: user.email };
+  return { code: o.code, kind: o.kind, status: o.status, provider: o.provider, lines: o.lines, items: o.items, subtotal: Number(o.subtotal), discount: Number(o.discount), total: Number(o.total), accounts: (o.meta && o.meta.accounts) || [], account: o.meta && o.meta.account, credits: (o.meta && (o.meta.creditsAdded || o.meta.credits)) || 0, packs: (o.meta && o.meta.packsGranted && o.meta.packsGranted.label) || '', balance: (await db.one('SELECT points FROM users WHERE id=$1', [user.id])).points, mode: mode(), email: user.email };
 }
 
 async function hookLog(provider, event, ok, detail) { await db.q('INSERT INTO webhook_log(provider,event,ok,detail) VALUES($1,$2,$3,$4)', [provider, event || '', ok, String(detail || '').slice(0, 500)]).catch(() => {}); }
@@ -281,12 +283,16 @@ async function refund(actorId, code, note, opt = {}) {
     note = (note ? note + ' · ' : '') + 'Crypto refund: send it manually from Confirmo';
   }
   await db.q("UPDATE orders SET status='refunded', refunded_at=now(), meta = meta || $2 WHERE id=$1", [o.id, JSON.stringify({ refundNote: note || '' })]);
-  // Take back the points this order earned, and the referrer's bonus if this was a referred trader's first purchase
-  const earned = Math.floor(Number(o.total)); if (earned > 0) await core.points(null, o.user_id, -earned, 'Refund ' + o.code);
+  // Take back the credits this order earned, and the referrer's bonus if this was a referred trader's first purchase
+  const earned = o.kind === 'credits' ? 0 : Math.floor(Number(o.total)); if (earned > 0) { const u0 = await db.one('SELECT points FROM users WHERE id=$1', [o.user_id]); const take = Math.min(earned, Math.max(0, u0 ? u0.points : 0)); if (take > 0) await core.points(null, o.user_id, -take, 'Refund ' + o.code, 'refund'); }
+  // Packs: bought credits come back out, free packs from this order that are still unopened are removed with unused cards from them
+  const pk = await require('./packs').onRefund(o).catch((e) => { console.error('packs refund', e); return {}; });
+  if (pk && (pk.packs || pk.cards || pk.credits)) note = (note ? note + ' · ' : '') + [pk.credits ? `${pk.credits} credits taken back` : '', pk.packs ? `${pk.packs} unopened packs removed` : '', pk.cards ? `${pk.cards} unused cards removed` : ''].filter(Boolean).join(', ');
+  if (pk && (pk.packs || pk.cards || pk.credits)) await db.q("UPDATE orders SET meta = meta || $2 WHERE id=$1", [o.id, JSON.stringify({ refundNote: note || '' })]);
   { const u = await db.one('SELECT referred_by FROM users WHERE id=$1', [o.user_id]);
-    if (u && u.referred_by && o.kind !== 'reset') { const first = await db.one("SELECT id FROM orders WHERE user_id=$1 AND (status='paid' OR id=$2) AND kind<>'reset' ORDER BY paid_at NULLS LAST, id LIMIT 1", [o.user_id, o.id]);
+    if (u && u.referred_by && o.kind !== 'reset' && o.kind !== 'credits') { const first = await db.one("SELECT id FROM orders WHERE user_id=$1 AND (status='paid' OR id=$2) AND kind<>'reset' ORDER BY paid_at NULLS LAST, id LIMIT 1", [o.user_id, o.id]);
       const gave = await db.one("SELECT 1 FROM points_log WHERE user_id=$1 AND label='Friend bought an account' LIMIT 1", [u.referred_by]);
-      if (first && first.id === o.id && gave) { await core.points(null, u.referred_by, -1000, 'Friend\'s order refunded'); await core.notify(null, u.referred_by, 'A referred order was refunded', 'The 1,000 points for that referral were taken back.', 'affiliates'); } } }
+      if (first && first.id === o.id && gave) { await core.points(null, u.referred_by, -1000, 'Friend\'s order refunded'); await core.notify(null, u.referred_by, 'A referred order was refunded', 'The 1,000 credits for that referral were taken back.', 'affiliates'); } } }
   // close accounts created by this order that have not traded
   for (const id of (o.meta && o.meta.accounts) || []) await db.q("UPDATE accounts SET phase='closed', closed_at=now(), breach_reason='Order refunded' WHERE id=$1 AND phase IN ('active','passed')", [id]);
   require('./mail').t('refund', o.user_id, { amount: money2(o.total), order: o.code, paid_with: o.pay_method || o.provider || 'Original payment method', url: `${BASE()}/app#billing` });
