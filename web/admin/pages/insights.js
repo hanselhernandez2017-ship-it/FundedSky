@@ -11,8 +11,10 @@ function startInsights(root) {
   const K = (n) => '$' + n / 1000 + 'K';
 
   const F = window.FSG; const BO = F.BO;
-  const PLANS = (() => { const W = 90; const inW = (d) => F.within(d, W); const all = BO.orders.filter((o) => (o.status === 'paid' || o.status === 'refunded') && ['evaluation', 'instant', 'mixed'].includes(o.kind) && inW(o.paid || o.created));
-    return BO.catalog.plans.map((p) => ({ id: p.id, name: p.short, billing: p.billing === 'monthly' ? 'Monthly' : 'One-Time', badge: p.badge || '', sizes: p.sizes.map((z) => {
+  // Every number is worked out from the orders, accounts and payouts inside the chosen range (30 days, 90 days or 12 months)
+  const ACC = {}; BO.accounts.forEach((a) => { ACC[a.id] = a; });
+  const buildPlans = (W) => { const inW = (d) => F.within(d, W); const paidPo = BO.payouts.filter((x) => x.status === 'paid' && inW(x.paid)); const all = BO.orders.filter((o) => (o.status === 'paid' || o.status === 'refunded') && ['evaluation', 'instant', 'mixed'].includes(o.kind) && inW(o.paid || o.created));
+    return BO.catalog.plans.map((p) => ({ id: p.id, kind: p.kind, name: p.short, billing: p.billing === 'monthly' ? 'Monthly' : 'One-Time', badge: p.badge || '', sizes: p.sizes.map((z) => {
       const os = all.filter((o) => (o.items || []).some((it) => it.plan === p.id && +it.size === z.size)); const sold = F.sum(os.map((o) => F.sum((o.items || []).filter((it) => it.plan === p.id && +it.size === z.size).map((it) => it.qty || 1))));
       const list = sold * z.price;
       // Each order's total is shared out by item value, so a cart with several sizes is not counted twice, and add-ons are kept apart
@@ -24,9 +26,11 @@ function startInsights(root) {
       const passed = acc.filter((a) => a.passed || a.phase === 'passed'); const fundedA = BO.accounts.filter((a) => a.kind === 'funded' && a.size === z.size && passed.some((x) => x.id === a.parent || x.user === a.user)); const funded = p.kind === 'funded' ? acc : fundedA; const paidF = funded.filter((a) => a.payouts > 0);
       const resets = BO.orders.filter((o) => o.kind === 'reset' && o.status === 'paid' && acc.some((a) => a.id === o.account || (o.accounts || []).includes(a.id)));
       const addonRev = F.sum(os.map((o) => addV(o) * scale(o) * mine(o) / planV(o)));
-      return { size: z.size, sold, price: z.price, disc: list ? Math.max(0, 1 - net / list) : 0, refund: os.length ? os.filter((o) => o.status === 'refunded').length / os.length : 0, cb: os.length ? (BO.disputes || []).filter((d) => os.some((o) => o.code === d.order)).length / os.length : 0,
+      const payReal = F.sum(paidPo.filter((x) => { const a = ACC[x.account]; return a && a.plan === p.id && a.size === z.size; }).map((x) => x.amount));
+      return { size: z.size, sold, payReal, price: z.price, disc: list ? Math.max(0, 1 - net / list) : 0, refund: os.length ? os.filter((o) => o.status === 'refunded').length / os.length : 0, cb: os.length ? (BO.disputes || []).filter((d) => os.some((o) => o.code === d.order)).length / os.length : 0,
         pass: p.kind === 'funded' ? 1 : acc.length ? passed.length / acc.length : 0, funded: p.kind === 'funded' ? 1 : passed.length ? Math.min(1, fundedA.length / passed.length) : 0, paid: funded.length ? paidF.length / funded.length : 0, avgPay: paidF.length ? F.sum(paidF.map((a) => a.paid)) / paidF.length : 0,
-        resets: sold ? resets.length / sold : 0, resetP: resets.length ? F.sum(resets.map((o) => o.total)) / resets.length : Math.round(z.price * (BO.catalog.resetPct || 50) / 100), addon: sold ? addonRev / sold : 0, act: z.activation || 0 }; }) })); })();
+        resets: sold ? resets.length / sold : 0, resetP: resets.length ? F.sum(resets.map((o) => o.total)) / resets.length : Math.round(z.price * (BO.catalog.resetPct || 50) / 100), addon: sold ? addonRev / sold : 0, act: z.activation || 0 }; }) })); };
+  let PLANS = buildPlans(90);
   const COST = Object.assign({ proc: 4.2, procFix: 0.3, platEval: 0, platFunded: 0, data: 0, kyc: 1.9, affShare: 0, affRate: 10, cbFee: 15 }, F.st('risk.costs', {}));
   setInterval(() => { const cur = JSON.stringify(COST); if (cur !== COST._last) { if (COST._last) F.put('risk.costs', JSON.parse(cur)).catch(() => {}); Object.defineProperty(COST, '_last', { value: cur, writable: true, enumerable: false }); } }, 1000);
   const COST_LABELS = { proc: ['Card Processing (%)', 'Of every payment'], procFix: ['Card Processing per Payment ($)', 'Fixed part of each charge'], platEval: ['Platform Fee per Evaluation ($)', 'Simulator seat for the evaluation'], platFunded: ['Platform Fee per Funded Account ($)', 'Per funded account, for its lifetime'], data: ['Market Data per Account ($)', 'Exchange data passed through'], kyc: ['Identity Check per Trader ($)', 'Charged per check'], affShare: ['Sales Through Affiliates (%)', 'Share of evaluation revenue'], affRate: ['Affiliate Commission (%)', 'Paid on the amount after discounts'], cbFee: ['Chargeback Fee ($)', 'Charged by the processor per dispute'] };
@@ -37,8 +41,8 @@ function startInsights(root) {
     else F.put('catalog.labPrice', { plan: p.id, size: z.size, price, by: ME, at: new Date().toISOString() }).then(() => toast(`Saved $${price} for ${p.name} ${K(z.size)}. Open the Checkout Catalog to add it to the draft.`)).catch((x) => toast(x.message)); }
   // ---------- economics ----------
   function econ(p, z, over) {
-    const c = Object.assign({}, z, over || {}); const k = S.range / 90;
-    const sold = c.sold * k; const net = c.price * (1 - c.disc); const months = c.months || 1;
+    const c = Object.assign({}, z, over || {});
+    const sold = c.sold; const net = c.price * (1 - c.disc); const months = c.months || 1;
     const evalRev = sold * net * months; const resetRev = sold * c.resets * c.resetP; const addonRev = sold * c.addon;
     const passed = sold * c.pass; const funded = passed * c.funded; const paidN = funded * c.paid; const actRev = funded * (c.act || 0);
     const gross = evalRev + resetRev + addonRev + actRev;
@@ -47,7 +51,9 @@ function startInsights(root) {
     const proc = gross * COST.proc / 100 + payments * COST.procFix;
     const platform = sold * (1 + c.resets) * COST.platEval + funded * COST.platFunded; const data = sold * COST.data; const kyc = passed * COST.kyc;
     const aff = evalRev * COST.affShare / 100 * COST.affRate / 100;
-    const payouts = paidN * c.avgPay * (over && over.split ? over.split / 90 : 1);
+    // Payouts are what was really paid in the range on this plan and size; the Price Lab scales them by its changes
+    const paidN0 = z.sold * z.pass * z.funded * z.paid; const ratio = !over ? 1 : paidN0 > 0 ? paidN / paidN0 : (z.sold ? sold / z.sold : 1);
+    const payouts = (z.payReal || 0) * ratio * (over && over.split ? over.split / 90 : 1);
     const revenue = gross - refunds - cbs;
     const costs = cbFees + proc + platform + data + kyc + aff;
     const profit = revenue - costs - payouts;
@@ -68,6 +74,7 @@ function startInsights(root) {
   const NAV = [['h', 'Insights'], ['overview', 'Overview'], ['matrix', 'Plans and Sizes'], ['detail', 'Plan Detail'], ['cohorts', 'Cohorts'], ['addons', 'Add-Ons and Resets'], ['promos', 'Discounts and Affiliates'], ['h', 'Model'], ['costs', 'Cost Assumptions'], ['lab', 'Price Lab']];
   const navHtml = () => NAV.map((n) => n[0] === 'h' ? `<h6>${n[1]}</h6>` : `<button class="ni ${S.view === n[0] ? 'on' : ''}" data-act="go" data-v="${n[0]}">${n[1]}${n[0] === 'matrix' ? `<i class="${cells().some((c) => c.e.margin < 0) ? 'bad' : ''}">${cells().filter((c) => c.e.margin < 0.1).length || ''}</i>` : ''}</button>`).join('');
   const mnavHtml = () => { let o = '', open = false; NAV.forEach((n) => { if (n[0] === 'h') { if (open) o += '</optgroup>'; o += `<optgroup label="${n[1]}">`; open = true; } else o += `<option value="${n[0]}" ${S.view === n[0] ? 'selected' : ''}>${n[1]}</option>`; }); return o + '</optgroup>'; };
+  const rangeName = () => (S.range === 365 ? 'last 12 months' : 'last ' + S.range + ' days');
   const rangeSeg = () => `<div class="seg">${[[30, '30 Days'], [90, '90 Days'], [365, '12 Months']].map(([d, l]) => `<button class="${S.range === d ? 'on' : ''}" data-act="range" data-k="${d}">${l}</button>`).join('')}</div>`;
 
   // ---------- overview ----------
@@ -80,8 +87,8 @@ function startInsights(root) {
   }
   function vOverview() {
     const T = allTotal(); const ps = PLANS.map((p) => ({ p, t: planTotal(p) })); const mx = Math.max(...ps.map((x) => x.t.revenue));
-    return `<div class="ph"><div><h1>Plan Profitability</h1><p>Which plans and sizes make money once payouts, fees, refunds, chargebacks and discounts are counted. Worked out from the last 90 days of orders, accounts and payouts.</p></div><div class="act">${rangeSeg()}</div></div>
-      <div class="tiles t6"><div class="tile"><span>Revenue</span><b>${kmoney(T.revenue)}</b><small>After refunds and chargebacks</small></div><div class="tile"><span>Payouts to Traders</span><b>${kmoney(T.payouts)}</b><small>${pct(T.payRatio)} of revenue</small></div><div class="tile"><span>Costs</span><b>${kmoney(T.costs)}</b><small>Fees, platforms, data, checks</small></div><div class="tile"><span>Profit</span><b class="${T.profit < 0 ? 'dn' : 'up'}">${kmoney(T.profit)}</b><small>${pct(T.margin)} margin</small></div><div class="tile"><span>Evaluations Sold</span><b>${Math.round(T.sold).toLocaleString('en-US')}</b><small>${money(T.profit / T.sold)} profit each</small></div><div class="tile"><span>Reached a Payout</span><b>${pct(T.paidN / T.sold, 1)}</b><small>Of evaluations sold</small></div></div>
+    return `<div class="ph"><div><h1>Plan Profitability</h1><p>Which plans and sizes make money once payouts, fees, refunds, chargebacks and discounts are counted. Worked out from the orders, accounts and payouts of the ${rangeName()}. Payouts are what was really paid to traders in that time.</p></div><div class="act">${rangeSeg()}</div></div>
+      <div class="tiles t6"><div class="tile"><span>Revenue</span><b>${kmoney(T.revenue)}</b><small>After refunds and chargebacks</small></div><div class="tile"><span>Payouts to Traders</span><b>${kmoney(T.payouts)}</b><small>Paid in this period · ${pct(T.payRatio)} of revenue</small></div><div class="tile"><span>Costs</span><b>${kmoney(T.costs)}</b><small>Fees, platforms, data, checks</small></div><div class="tile"><span>Profit</span><b class="${T.profit < 0 ? 'dn' : 'up'}">${kmoney(T.profit)}</b><small>${pct(T.margin)} margin</small></div><div class="tile"><span>Evaluations Sold</span><b>${Math.round(T.sold).toLocaleString('en-US')}</b><small>${money(T.profit / T.sold)} profit each</small></div><div class="tile"><span>Reached a Payout</span><b>${pct(T.paidN / T.sold, 1)}</b><small>Of evaluations sold</small></div></div>
       <div class="two wl"><div class="card m0"><div class="ch"><h3>By Plan</h3><span class="lab"><i class="lgd lr"></i>Revenue <i class="lgd lp"></i>Payouts <i class="lgd lc"></i>Costs</span></div><div class="cb fg">${ps.map(({ p, t }) => `<button class="pbar" data-act="piOpenPlan" data-id="${p.id}"><div class="pbh"><b>${esc(p.name)}</b><span class="hint">${p.billing}</span><span class="b ${health(t.margin)[1]}">${health(t.margin)[0]}</span><b class="${t.profit < 0 ? 'dn' : 'up'}">${kmoney(t.profit)}</b></div><div class="stk" title="Revenue ${kmoney(t.revenue)}"><i class="r" style="width:${t.revenue / mx * 100}%"></i></div><div class="stk"><i class="p" style="width:${t.payouts / mx * 100}%"></i><i class="c" style="width:${t.costs / mx * 100}%"></i></div><div class="pbf"><span>Revenue ${kmoney(t.revenue)}</span><span>Payouts ${kmoney(t.payouts)} · Costs ${kmoney(t.costs)}</span><span>${pct(t.margin)} margin</span></div></button>`).join('')}</div></div>
       <div class="card m0"><div class="ch"><h3>What Stands Out</h3></div><div class="cb fd">${findings().map(([k, h, d, c]) => `<div class="fnd ${k}"><i></i><div><b>${esc(h)}</b><p>${esc(d)}</p>${c ? `<div class="edact"><button class="lnk" data-act="piOpenCell" data-id="${c.p.id}" data-k="${c.z.size}">See the Numbers</button>${c.e.margin < 0.1 ? `<button class="lnk" data-act="piToLab" data-id="${c.p.id}" data-k="${c.z.size}">Try a Fix in the Price Lab</button>` : ''}</div>` : ''}</div></div>`).join('')}</div></div></div>
       <div class="card" style="margin-top:14px"><div class="ch"><h3>Every Plan and Size</h3><span class="lab">Sorted by profit per evaluation sold</span></div><div class="tsc">${cellTable(cells().sort((a, b) => b.e.perSold - a.e.perSold))}</div></div>`;
@@ -126,17 +133,17 @@ function startInsights(root) {
   }
   // ---------- add-ons ----------
   function vAddons() {
-    const evO = BO.orders.filter((o) => o.status === 'paid' && F.within(o.paid, 90) && (o.items || []).length && o.kind !== 'reset' && o.kind !== 'activation');
+    const evO = BO.orders.filter((o) => o.status === 'paid' && F.within(o.paid, S.range) && (o.items || []).length && o.kind !== 'reset' && o.kind !== 'activation');
     const accOf = (o) => BO.accounts.filter((a) => (o.accounts || []).includes(a.id)); const paidPer = (os) => { const ac = [].concat(...os.map(accOf)); return ac.length ? F.sum(ac.map((a) => a.paid)) / ac.length : 0; };
     const A = Object.entries(BO.catalog.addons || {}).map(([key, ad]) => { const w = evO.filter((o) => (o.items || []).some((it) => (it.addons || []).includes(key))); const wo = evO.filter((o) => !w.includes(o)); const lines = [].concat(...w.map((o) => (o.lines || []).filter((l) => l.kind === 'addon' && (l.label || '').toLowerCase().includes((ad.name || '').toLowerCase().split(' ')[0])))); const rev = F.sum(lines.map((l) => l.amount)); const avg = lines.length ? rev / lines.length : 0; const extra = Math.max(0, paidPer(w) - paidPer(wo));
       return [ad.name, evO.length ? w.length / evO.length : 0, avg, rev, w.length ? avg - extra - avg * COST.proc / 100 : 0, ad.desc || ''] });
     const addonRev = F.sum(A.map((a) => a[3])); const attach = evO.length ? evO.filter((o) => (o.items || []).some((it) => (it.addons || []).length)).length / evO.length : 0; const resetsPer = (() => { const sold = F.sum(cells().map((c) => c.z.sold)); return sold ? F.sum(cells().map((c) => c.z.resets * c.z.sold)) / sold : 0; })();
-    const k = S.range / 90; const resetRev = cells().reduce((s, c) => s + c.e.resetRev, 0);
+    const resetRev = cells().reduce((s, c) => s + c.e.resetRev, 0);
     return `<div class="ph"><div><h1>Add-Ons and Resets</h1><p>What each extra brings in, and what it costs later in payouts. An add-on that sells well can still lose money.</p></div><div class="act">${rangeSeg()}</div></div>
-      <div class="tiles"><div class="tile"><span>Reset Revenue</span><b>${kmoney(resetRev)}</b><small>${allTotal().revenue ? pct(resetRev / allTotal().revenue) : '0%'} of all revenue</small></div><div class="tile"><span>Resets per Evaluation</span><b>${resetsPer.toFixed(2)}</b><small>Average across plans</small></div><div class="tile"><span>Add-On Revenue</span><b>${kmoney(addonRev)}</b><small>All add-ons, 90 days</small></div><div class="tile"><span>Add-On Attach Rate</span><b>${pct(attach)}</b><small>Orders with at least one</small></div></div>
+      <div class="tiles"><div class="tile"><span>Reset Revenue</span><b>${kmoney(resetRev)}</b><small>${allTotal().revenue ? pct(resetRev / allTotal().revenue) : '0%'} of all revenue</small></div><div class="tile"><span>Resets per Evaluation</span><b>${resetsPer.toFixed(2)}</b><small>Average across plans</small></div><div class="tile"><span>Add-On Revenue</span><b>${kmoney(addonRev)}</b><small>All add-ons, ${rangeName()}</small></div><div class="tile"><span>Add-On Attach Rate</span><b>${pct(attach)}</b><small>Orders with at least one</small></div></div>
       <div class="card"><div class="ch"><h3>Add-Ons</h3><span class="lab">Revenue minus the extra payouts and fees they cause</span></div><div class="tsc"><table class="t"><thead><tr><th>Add-On</th><th class="num">Bought With</th><th class="num">Average Price</th><th class="num">Revenue</th><th class="num">Extra Payouts per Sale</th><th class="num">Net per Sale</th><th>Verdict</th><th>Why</th></tr></thead><tbody>${A.map(([n, att, avg, rev, netPer, why]) => { const extra = avg - netPer - avg * 0.06; return `<tr><td class="nw"><b>${n}</b></td><td class="num">${pct(att)}</td><td class="num">${money(avg)}</td><td class="num">${kmoney(rev)}</td><td class="num">${money(extra)}</td><td class="num nw ${netPer < 0 ? 'dn' : 'up'}"><b>${money(netPer, 1)}</b></td><td><span class="b ${netPer < 0 ? 'err' : 'live'}">${netPer < 0 ? 'Costs Money' : 'Pays Off'}</span></td><td class="hint why">${why}</td></tr>`; }).join('')}</tbody></table></div></div>
       <div class="card"><div class="ch"><h3>Resets by Plan and Size</h3></div><div class="tsc"><table class="t"><thead><tr><th>Plan</th><th>Size</th><th class="num">Reset Price</th><th class="num">Resets per Evaluation</th><th class="num">Reset Revenue</th><th class="num">Share of Size Revenue</th></tr></thead><tbody>${cells().map(({ p, z, e }) => `<tr><td class="nw"><b>${esc(p.name)}</b></td><td>${K(z.size)}</td><td class="num">${money(z.resetP)}</td><td class="num">${z.resets.toFixed(2)}</td><td class="num">${kmoney(e.resetRev)}</td><td class="num">${pct(e.resetRev / e.revenue)}</td></tr>`).join('')}</tbody></table></div></div>
-      <p class="hint">Add-on effects compare what traders who bought each add-on were paid with what everyone else was paid, last 90 days.</p>`;
+      <p class="hint">Add-on effects compare what traders who bought each add-on were paid with what everyone else was paid, ${rangeName()}.</p>`;
   }
   // ---------- promotions ----------
   function vPromos() {
@@ -183,7 +190,7 @@ function startInsights(root) {
     const a = el.dataset.act, k = el.dataset.k, id = el.dataset.id;
     switch (a) {
       case 'go': S.view = el.dataset.v; break;
-      case 'range': S.range = +k; break;
+      case 'range': S.range = +k; PLANS = buildPlans(S.range); break;
       case 'metric': S.metric = k; break;
       case 'openPlan': S.plan = id; S.size = PLANS.find((p) => p.id === id).sizes[0].size; S.view = 'detail'; break;
       case 'openCell': S.plan = id; S.size = +k; S.view = 'detail'; { const m = root.querySelector('.main'); if (m) m.scrollTop = 0; } break;
@@ -192,7 +199,7 @@ function startInsights(root) {
       case 'labReset': S.lab = null; break;
       case 'labSend': { const p = curPlan(), z = curSize(); labToCatalog(p, z, S.lab || {}); return; }
       case 'costReset': Object.assign(COST, { proc: 4.2, procFix: 0.3, platEval: 0, platFunded: 0, data: 0, kyc: 1.9, affShare: 0, affRate: 10, cbFee: 15 }); toast('Costs reset'); return;
-      case 'export': { const rows = [['Plan', 'Size', 'Sold', 'Revenue', 'Payouts', 'Costs', 'Profit', 'Margin %', 'Profit per Sale']].concat(cells().map((c) => [c.p.name, c.z.size, c.z.sold, Math.round(c.e.revenue), Math.round(c.e.payouts), Math.round(c.e.costs != null ? c.e.costs : c.e.revenue - c.e.payouts - c.e.profit), Math.round(c.e.profit), Math.round(c.e.margin * 1000) / 10, Math.round(c.e.perSold)])); const q = (v) => (/[",\n]/.test(String(v)) ? '"' + String(v).replace(/"/g, '""') + '"' : String(v)); const a2 = document.createElement('a'); a2.href = URL.createObjectURL(new Blob([rows.map((r2) => r2.map(q).join(',')).join('\n')], { type: 'text/csv' })); a2.download = 'plan-insights.csv'; document.body.appendChild(a2); a2.click(); setTimeout(() => a2.remove(), 500); toast('Downloaded as CSV'); return; }
+      case 'export': { const rows = [['Plan', 'Size', 'Sold', 'Revenue', 'Payouts', 'Costs', 'Profit', 'Margin %', 'Profit per Sale']].concat(cells().map((c) => [c.p.name, c.z.size, c.z.sold, Math.round(c.e.revenue), Math.round(c.e.payouts), Math.round(c.e.costs != null ? c.e.costs : c.e.revenue - c.e.payouts - c.e.profit), Math.round(c.e.profit), Math.round(c.e.margin * 1000) / 10, Math.round(c.e.perSold)])); window.FSG.csvDl('plan-insights-' + (S.range === 365 ? '12-months' : S.range + '-days') + '.csv', rows); toast('Downloaded as CSV'); return; }
       default: return;
     }
     render();

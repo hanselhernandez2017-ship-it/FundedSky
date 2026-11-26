@@ -101,6 +101,7 @@ body{margin:0;background:#08080A}
 .fsbo .pop .ph{display:flex;align-items:center;padding:16px 20px 12px;gap:10px}.fsbo .pop .ph b{font-size:15px;font-weight:600}.fsbo .pop .ph .lk{margin-left:auto;font-size:12.5px}
 .fsbo .pop .pl{max-height:520px;overflow:auto}.fsbo .pop .pl>a,.fsbo .pop .pl>div{display:grid;grid-template-columns:8px minmax(0,1fr);gap:12px;padding:13px 20px;border-top:1px solid var(--ln2);color:var(--tx)}
 .fsbo .pop .pl>a:hover{background:var(--p3);color:var(--tx)}.fsbo .pop .pl i{width:8px;height:8px;border-radius:50%;margin-top:6px;background:transparent}.fsbo .pop .pl .nw i{background:var(--sky)}
+.fsbo .pop .pl .wnh{margin:0;padding:14px 20px 8px;border-top:1px solid var(--ln);font-size:11.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--fa)}.fsbo .pop .pl>.wnh+.wn{border-top:0}.fsbo .pop .pl .pe{margin:0;padding:14px 20px;border-top:1px solid var(--ln2);font-size:13px;color:var(--mu)}
 .fsbo .pop .pl b{display:block;font-weight:500;font-size:13.5px}.fsbo .pop .pl span{display:block;font-size:12.5px;color:var(--mu);margin-top:2px}.fsbo .pop .pl em{display:block;font-style:normal;font-size:11.5px;color:var(--fa);margin-top:4px}
 /* empty and notes */
 .fsbo .note{display:flex;gap:12px;align-items:flex-start;padding:14px 16px;border-radius:8px;background:var(--skyt);color:var(--t2);font-size:13.5px}.fsbo .note.wa{background:var(--wat)}.fsbo .note.no{background:var(--not)}.fsbo .note.ok{background:var(--okt)}

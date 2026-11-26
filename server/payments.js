@@ -48,10 +48,13 @@ async function checkLimits(user, items) {
     const l = (L.plans || {})[pid]; if (!l) continue; const qty = items.filter((i) => i.plan === pid).reduce((n, i) => n + i.qty, 0); const pn = (core.planDef(cat, pid) || {}).short || pid;
     if (ctry && list(l.countries).includes(ctry)) bad(`The ${pn} plan is not available in ${user.country}.`, 403);
     if (+l.perTrader && mine.filter((a) => a.plan === pid).length + qty > +l.perTrader) bad(`You can have up to ${l.perTrader} active ${pn} account${+l.perTrader === 1 ? '' : 's'}.`);
-    if (+l.cap) { const sold = (await db.one("SELECT COALESCE(sum((it->>'qty')::int),0)::int n FROM orders o, jsonb_array_elements(o.items) it WHERE o.status='paid' AND it->>'plan'=$1 AND o.paid_at >= date_trunc('month', now())", [pid])).n; if (sold + qty > +l.cap) bad(`The ${pn} plan is sold out for this month.`); }
+    if (+l.cap) { const sold = (await db.one("SELECT COALESCE(sum((it->>'qty')::int),0)::int n FROM orders o, jsonb_array_elements(o.items) it WHERE o.status='paid' AND o.kind IN ('evaluation','instant','mixed') AND it->>'plan'=$1 AND o.paid_at >= date_trunc('month', now())", [pid])).n; if (sold + qty > +l.cap) bad(`The ${pn} plan is sold out for this month.`); }
   }
 }
+// Maintenance mode (Settings): every purchase and payment is refused with the maintenance message
+async function maintGuard() { const r = await db.one("SELECT v FROM kv WHERE k='settings.maint'"); if (r && r.v && r.v.on) bad(String(r.v.msg || '').trim() || 'Purchases are paused for maintenance. Try again soon.', 503); }
 async function createOrder(user, body) {
+  await maintGuard();
   const priced = await core.priceCart(body.items, { promo: body.promo, coupon: body.coupon, userId: user.id });
   // one use per trader for promo codes marked "once"
   if (priced.promo) {
@@ -68,18 +71,25 @@ async function createOrder(user, body) {
 }
 
 async function createResetOrder(user, body) {
+  await maintGuard();
   const id = clean(body.account, 40);
   const a = await db.one('SELECT * FROM accounts WHERE id=$1 AND user_id=$2', [id, user.id]);
   if (!a) bad('Account not found', 404);
   if (a.kind !== 'evaluation' || !['active', 'breached'].includes(a.phase)) bad('This account cannot be reset');
   if (a.comp) bad('Competition accounts cannot be reset');
-  const cat = await core.catalog(); const s = core.sizeDef(cat, a.plan, a.size);
-  const addons = (body.addons || []).filter((x) => ['reset', 'daily'].includes(x));
+  const cat = await core.catalog(); const ord = a.order_id ? await db.one('SELECT items FROM orders WHERE id=$1', [a.order_id]) : null; const fz = core.feesOf(cat, a, ord);
+  const addons = (body.addons || []).filter((x) => ['reset', 'daily'].includes(x) && cat.addons && cat.addons[x]);
   const lines = []; let subtotal = 0; let discount = 0;
-  const base = s.reset ? Number(s.reset) : Math.round(core.priceOf(s) * cat.resetPct / 100);
-  lines.push({ label: `Reset · ${core.kLabel(a.size)} ${core.planDef(cat, a.plan).short}`, amount: base, kind: 'plan' }); subtotal += base;
+  // Reset price: the one the account was sold with (Back Office › Resets and Fees at the time of sale)
+  const base = fz.reset; const pn = (core.planDef(cat, a.plan) || {}).short || a.plan;
+  lines.push({ label: `Reset · ${core.kLabel(a.size)} ${pn}`, amount: base, kind: 'plan' }); subtotal += base;
   if (a.free_resets > 0) { lines.push({ label: 'Free Reset (your add-on)', amount: -base, kind: 'discount' }); discount += base; }
-  for (const ad of addons) { const def = cat.addons[ad]; if ((a.addons || []).includes(ad) && ad === 'daily') continue; const amt = def.flat != null && Number(def.flat) > 0 ? Number(def.flat) : Math.round(core.priceOf(s) * def.pct / 100); lines.push({ label: def.name, amount: amt, kind: 'addon' }); subtotal += amt; }
+  // automatic promotions set to apply to resets (Back Office › Promotions › Applies To: Resets), unless resets of this size can't be discounted
+  else if ((((((cat.x || {}).fees || {})[a.plan] || {})[a.size] || {}).resetDiscountable) !== false) { const today = new Date().toISOString().slice(0, 10); const cap = Number(cat.maxPromoPct || 30);
+    const best = (cat.autos || []).map(core.normPromo).filter((p) => p.lines.reset && p.active && !(p.starts && today < p.starts) && !(p.ends && today > p.ends) && (!p.plans.length || p.plans.includes(a.plan)) && (!p.sizes.length || p.sizes.includes(Number(a.size))) && ['percent', 'fixed'].includes(p.vtype))
+      .map((p) => ({ p, off: round2(Math.min(base, p.vtype === 'percent' ? base * Math.min(p.value, cap) / 100 : p.value, p.maxOff || Infinity)) })).sort((x, y) => y.off - x.off)[0];
+    if (best && best.off > 0) { lines.push({ label: best.p.name, amount: -best.off, kind: 'discount' }); discount += best.off; } }
+  for (const ad of addons) { const def = cat.addons[ad]; if ((a.addons || []).includes(ad) && ad === 'daily') continue; const amt = def.flat != null && Number(def.flat) > 0 ? Number(def.flat) : Math.round(fz.price * def.pct / 100); lines.push({ label: def.name, amount: amt, kind: 'addon' }); subtotal += amt; }
   // a "% off a reset" card saved by the trader comes off automatically
   if (!body.coupon && (await require('./packs').enabled())) { const cc = await db.one("SELECT code FROM coupons WHERE user_id=$1 AND used=false AND source='card' AND kind IN ('reset_discount','discount') AND (expires_at IS NULL OR expires_at > now()) ORDER BY (kind='reset_discount') DESC, pct DESC LIMIT 1", [user.id]); if (cc && subtotal - discount > 0) body = Object.assign({}, body, { coupon: cc.code }); }
   if (body.coupon) {
@@ -97,14 +107,18 @@ async function createResetOrder(user, body) {
 }
 
 async function createActivationOrder(user, body) {
+  await maintGuard();
   const id = clean(body.account, 40);
   const a = await db.one('SELECT * FROM accounts WHERE id=$1 AND user_id=$2', [id, user.id]);
   if (!a || a.phase !== 'passed') bad('This account is not waiting for activation');
   if (!(a.steps || {}).agreement) bad('Sign the funded agreement first');
-  const existing = await db.one("SELECT * FROM orders WHERE user_id=$1 AND kind='activation' AND status='pending' AND meta->>'account'=$2", [user.id, a.id]);
-  if (existing) return { code: existing.code, total: Number(existing.total), mode: mode() };
-  const cat = await core.catalog(); const s = core.sizeDef(cat, a.plan, a.size);
-  const priced = { lines: [{ label: `Activation fee · ${core.kLabel(a.size)} ${core.planDef(cat, a.plan).short}`, amount: s.activation, kind: 'plan' }], subtotal: s.activation, discount: 0, total: s.activation, items: [] };
+  const cat = await core.catalog(); const ord = a.order_id ? await db.one('SELECT items FROM orders WHERE id=$1', [a.order_id]) : null; const fee = core.feesOf(cat, a, ord).activation;
+  if (!fee) bad('This account has no activation fee. Sign the agreement to get your funded account.');
+  // reuse a pending activation order only while it still charges the account's fee
+  const existing = await db.one("SELECT * FROM orders WHERE user_id=$1 AND kind='activation' AND status='pending' AND meta->>'account'=$2 ORDER BY id DESC LIMIT 1", [user.id, a.id]);
+  if (existing && Number(existing.total) === fee) return { code: existing.code, total: Number(existing.total), mode: mode() };
+  if (existing) await db.q("UPDATE orders SET status='canceled' WHERE user_id=$1 AND kind='activation' AND status='pending' AND meta->>'account'=$2", [user.id, a.id]);
+  const priced = { lines: [{ label: `Activation fee · ${core.kLabel(a.size)} ${(core.planDef(cat, a.plan) || {}).short || a.plan}`, amount: fee, kind: 'plan' }], subtotal: fee, discount: 0, total: fee, items: [] };
   const o = await insertOrder(user, 'activation', priced, { account: a.id });
   return { code: o.code, total: Number(o.total), mode: mode() };
 }
@@ -120,7 +134,8 @@ async function markPaid(o, provider, ref, method) {
   const r = await db.one("UPDATE orders SET status='paid', paid_at=now(), provider=$2, provider_ref=$3, pay_method=$4 WHERE id=$1 AND status='pending' RETURNING *", [o.id, provider, ref || null, method || '']);
   if (!r) return; // already paid
   await core.fulfilOrder(o.id);
-  I.alert('order', `:moneybag: New order ${o.code}: $${Number(o.total).toFixed(2)} (${o.lines.filter((l) => l.kind === 'plan').map((l) => l.label).join(', ')}) via ${provider}`);
+  { const wu = await db.one('SELECT tid, email FROM users WHERE id=$1', [o.user_id]); const fo = await db.one('SELECT meta FROM orders WHERE id=$1', [o.id]);
+    I.alert('order', `:moneybag: New order ${o.code}: $${Number(o.total).toFixed(2)} (${o.lines.filter((l) => l.kind === 'plan').map((l) => l.label).join(', ')}) via ${provider}`, { order: o.code, kind: o.kind, status: 'paid', currency: 'USD', subtotal: Number(o.subtotal), discount: Number(o.discount), total: Number(o.total), promo: o.promo || null, provider, method: method || null, lines: (o.lines || []).map((l) => ({ label: l.label, kind: l.kind || 'plan', amount: Number(l.amount) })), accounts: ((fo && fo.meta && fo.meta.accounts) || (o.meta && o.meta.account ? [o.meta.account] : [])), user: wu ? { id: wu.tid, email: wu.email } : null, paidAt: r.paid_at }); }
   if (o.kind === 'reset' && o.meta.useFree) await db.q('UPDATE accounts SET free_resets=GREATEST(0,free_resets-1) WHERE id=$1', [o.meta.account]);
   const u = await db.one('SELECT email, first FROM users WHERE id=$1', [o.user_id]);
   { const cat = await core.catalog(); const it = (o.items || [])[0] || {}; const pl = it.plan ? ((core.planDef(cat, it.plan) || {}).name || it.plan) : (o.kind === 'reset' ? 'Reset' : o.kind === 'credits' ? (o.lines[0] || {}).label || 'Credits' : o.kind); const adds = o.lines.filter((l) => l.kind === 'addon').map((l) => l.label);
@@ -136,12 +151,13 @@ function stripeMethod(pi) {
 // A card was declined: remember why, tell staff, and email the trader once per order
 async function declined(o, reason) {
   await db.q("UPDATE orders SET meta = meta || $2 WHERE id=$1", [o.id, JSON.stringify({ lastDecline: reason || 'Declined', declinedAt: new Date().toISOString() })]);
-  const u = await db.one('SELECT email FROM users WHERE id=$1', [o.user_id]); I.alert('decline', `:warning: Card declined on ${o.code} (${u ? u.email : ''}): ${reason || 'declined'}`);
+  const u = await db.one('SELECT email, tid FROM users WHERE id=$1', [o.user_id]); I.alert('decline', `:warning: Card declined on ${o.code} (${u ? u.email : ''}): ${reason || 'declined'}`, { order: o.code, kind: o.kind, total: Number(o.total), currency: 'USD', reason: reason || 'Declined', provider: o.provider || null, user: u ? { id: u.tid, email: u.email } : null });
   if (!(o.meta && o.meta.payfailSent)) { await db.q("UPDATE orders SET meta = meta || '{\"payfailSent\":true}'::jsonb WHERE id=$1", [o.id]); const it = (o.items || [])[0] || {}; const cat = await core.catalog();
     require('./mail').t('payfail', o.user_id, { reason: reason || 'Declined by the bank', plan: ((core.planDef(cat, it.plan) || {}).short) || (o.lines && o.lines[0] && o.lines[0].label) || 'Your', size: it.size ? core.kLabel(it.size) : '', amount: '$' + Number(o.total).toFixed(2), url: require('./auth').BASE() + '/checkout/payment?order=' + o.code }); }
 }
 
 async function payOrder(user, code, body) {
+  await maintGuard();
   await refreshMode();
   const o = await db.one('SELECT * FROM orders WHERE code=$1 AND user_id=$2', [clean(code, 30), user.id]);
   if (!o) bad('Order not found', 404);
@@ -265,7 +281,8 @@ async function confirmoHook(req, res) {
 async function recordDispute(provider, ref, amount, reason, id) {
   const o = await db.one('SELECT * FROM orders WHERE provider_ref=$1 OR provider_ref LIKE $2', [ref, '%' + ref]);
   await db.q("INSERT INTO kv(k,v) VALUES($1,$2) ON CONFLICT (k) DO UPDATE SET v=$2", ['dispute.' + id, JSON.stringify({ id, provider, order: o ? o.code : null, user: o ? o.user_id : null, amount, reason, status: 'open', opened: new Date().toISOString() })]);
-  I.alert('dispute', `:rotating_light: Chargeback opened: ${o ? o.code : ref} for $${amount} (${reason})`);
+  const du = o ? await db.one('SELECT tid, email FROM users WHERE id=$1', [o.user_id]) : null;
+  I.alert('dispute', `:rotating_light: Chargeback opened: ${o ? o.code : ref} for $${amount} (${reason})`, { dispute: id, provider, providerRef: ref, order: o ? o.code : null, amount: Number(amount), currency: 'USD', reason: reason || null, status: 'open', user: du ? { id: du.tid, email: du.email } : null });
 }
 
 async function refund(actorId, code, note, opt = {}) {
@@ -303,14 +320,17 @@ async function refund(actorId, code, note, opt = {}) {
 }
 
 async function receipt(user, code) {
-  const o = await db.one('SELECT * FROM orders WHERE code=$1 AND (user_id=$2 OR $3)', [clean(code, 30), user.id, ['admin', 'finance', 'support'].includes(user.role)]);
+  // Staff can open any receipt only from a finished back-office sign-in (two-step login, allowed network, not suspended)
+  const staff = ['admin', 'finance', 'support'].includes(user.role) && require('./auth').staffOk(user);
+  const o = await db.one('SELECT * FROM orders WHERE code=$1 AND (user_id=$2 OR $3)', [clean(code, 30), user.id, staff]);
   if (!o) throw new Error('nf');
   const u = await db.one('SELECT * FROM users WHERE id=$1', [o.user_id]);
-  const e = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
-  return `<!doctype html><meta charset="utf-8"><title>Receipt ${e(o.code)}</title><style>body{font:15px/1.5 system-ui;max-width:560px;margin:48px auto;color:#111;padding:0 20px}h1{font-size:22px}table{width:100%;border-collapse:collapse;margin:20px 0}td{padding:8px 0;border-bottom:1px solid #eee}td:last-child{text-align:right}.t td{font-weight:700;border:0}</style>
-  <h1>Funded Sky receipt</h1><p>${e(o.code)} · ${longDate(o.paid_at || o.created_at)}<br>${e(u.first)} ${e(u.last)} · ${e(u.email)}</p>
+  const e = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const co = await require('./mail').company();
+  return `<!doctype html><meta charset="utf-8"><title>Receipt ${e(o.code)}</title><style>body{font:15px/1.5 system-ui;max-width:560px;margin:48px auto;color:#111;padding:0 20px}h1{font-size:22px}table{width:100%;border-collapse:collapse;margin:20px 0}td{padding:8px 0;border-bottom:1px solid #eee}td:last-child{text-align:right}.t td{font-weight:700;border:0}.co{color:#555;font-size:13px;margin:0 0 18px}</style>
+  <h1>${e(co.brand)} Receipt</h1><p class="co">${[co.legal, co.address, co.taxId ? 'Tax number ' + co.taxId : '', co.support].filter(Boolean).map(e).join('<br>')}</p><p>${e(o.code)} · ${longDate(o.paid_at || o.created_at)}<br>${e(u.first)} ${e(u.last)} · ${e(u.email)}</p>
   <table>${o.lines.map((l) => `<tr><td>${e(l.label)}</td><td>${money2(l.amount)}</td></tr>`).join('')}<tr class="t"><td>Total</td><td>${money2(o.total)}</td></tr></table>
   <p>Status: ${e(o.status)}${o.pay_method ? ' · ' + e(o.pay_method) : ''}</p><p style="color:#666;font-size:13px">Evaluations and funded accounts are simulated trading accounts. Fees are not deposits and are not traded.</p><script>window.print&&setTimeout(()=>window.print(),300)</script>`;
 }
 
-module.exports = { enabled, mode, methods, refreshMode, confirmoHook, hookLog, recordDispute, createOrder, createResetOrder, createActivationOrder, payOrder, getOrder, webhook, refund, receipt, markPaid };
+module.exports = { checkLimits, maintGuard, enabled, mode, methods, refreshMode, confirmoHook, hookLog, recordDispute, createOrder, createResetOrder, createActivationOrder, payOrder, getOrder, webhook, refund, receipt, markPaid };

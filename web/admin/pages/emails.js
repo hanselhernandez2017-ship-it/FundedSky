@@ -67,7 +67,9 @@ function startEmails(root) {
   })();
   // ---------- live data: designs from the server, edits and switches from the store ----------
   const F = window.FSG; const BO = F.BO; const EMD = window.__EM || { defs: { SENDERS: {}, SAMPLE: {}, E: {}, FLOWS: [], GROUP_LABEL: {} }, byDay: [], logs: [] };
-  const SENDERS = EMD.defs.SENDERS; const SAMPLE = EMD.defs.SAMPLE;
+  const SENDERS = EMD.defs.SENDERS; const SAMPLE0 = EMD.sample || EMD.defs.SAMPLE; let CUR = null;
+  // Sample values for the email being shown: the shared sample plus that email's own overrides
+  const SAMPLE = new Proxy({}, { get: (t, k) => { const o = ((EMD.defs.SAMPLE_FOR || {})[CUR] || {}); return k in o ? o[k] : SAMPLE0[k]; } });
   const MERGE = [['{first_name}', 'First name'], ['{account}', 'Account number'], ['{plan}', 'Plan name'], ['{size}', 'Account size'], ['{platform}', 'Platform'], ['{code}', 'One-time code'], ['{amount}', 'Amount'], ['{order}', 'Order number'], ['{ticket}', 'Ticket number']];
   const ST = Object.assign({ on: {}, paused: {}, custom: {}, customFlow: {}, hist: {} }, F.st('emails.state', {}));
   const TPL = F.st('emails.tpl', {});
@@ -84,7 +86,7 @@ function startEmails(root) {
   const LOGS = EMD.logs.map((o) => { const st = STMAP[o.status] || 'Sent'; const ev = o.events || []; const bo = ev.find((x) => x.k === 'bounced'); return { id: o.ext_id || 'out_' + o.id, oid: o.id, e: (({ reset: 'pwreset', verify: 'confirm', receipt: 'order', ticket: 'reply' })[o.template]) || (o.template || '').replace(/^test:/, ''), raw: o.template, subj: o.subject, to: mask(o.to_email), full: o.to_email, t: o.tid ? `${o.first} ${(o.last || '').slice(0, 1)}. · ${o.tid}` : 'Not a trader', uid: o.user_id, at: o.created_at, when: F.when ? F.when(o.created_at) : F.ago(o.created_at), st, why: (bo && bo.why) || WHY[st] || '', ev }; });
   const TRACK = LOGS.some((l) => l.ev.length);
   const EO = (x) => E[x.e] || { id: x.e, n: x.raw === 'notify' ? 'Message from Staff' : x.raw ? x.raw : 'Message from Staff', s: x.subj, p: '', fr: 'support', h: x.subj, a: '', b: [], other: true };
-  const ME = '[Your Name]';
+  const ME = (F.me && F.me()) || 'You';
   const XL = (board, hash, label, cls) => `<a class="${cls || 'lnk'}" href="Admin${board}.dc.html${hash ? '#' + hash : ''}">${label}</a>`;
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const fill = (t) => String(t == null ? '' : t).replace(/\{(\w+)\}/g, (m, k) => SAMPLE[k] != null ? SAMPLE[k] : m);
@@ -116,7 +118,7 @@ function startEmails(root) {
     edit: null, who: { q: '', f: 'all', row: -1 }, range: 30, toast: '',
     logs: { status: 'all', q: '', em: 'all', row: null },
     rules: Object.assign({ quiet: true, qFrom: '21:00', qTo: '08:00', capDay: '1', capWeek: '3', pauseMk: false, noMkAfterBreach: true, test: false, testTo: (BO.me || {}).email || '', failover: true }, F.st('emails.rules', {})),
-    brand: Object.assign({ address: (((BO.settings || {}).company || {}).address) || '', support: 'support@fundedsky.com', legal: 'All Funded Sky accounts trade in a simulated environment. Nothing in this email is investment advice.', x: 'x.com/fundedsky', ig: '', discord: 'discord.gg/[invite]' }, F.st('emails.brand', {})),
+    brand: Object.assign({ address: (((BO.settings || {}).company || {}).address) || '', support: (((BO.settings || {}).company || {}).support) || 'support@fundedsky.com', legal: 'All Funded Sky accounts trade in a simulated environment. Nothing in this email is investment advice.', x: 'x.com/fundedsky', ig: '', discord: '' }, F.st('emails.brand', {})),
     supp: F.st('emails.supp', []).map((x) => ({ a: x.a, k: x.k, why: x.why, d: x.at ? F.md(x.at) : x.d || '' })),
     focus: null, dom: null
   };
@@ -128,10 +130,11 @@ function startEmails(root) {
 
   // ---------- email preview ----------
   const GROUP_LABEL = { signup: 'Welcome', orders: 'Orders', abandon: 'Checkout', progress: 'Evaluation', breach: 'Evaluation', funded: 'Funded', payouts: 'Payouts', billing: 'Billing', security: 'Security', rules: 'Rules', platforms: 'Platforms', affiliates: 'Affiliates', support: 'Support', marketing: 'News' };
-  function emailHtml(e, dev) {
+  function emailHtml(e, dev) { CUR = e.id;
     const f = flowOf(e.id) || {}; const paras = [].concat(e.b || []).filter(Boolean);
     const money = (v) => '$' + Number(v).toLocaleString('en-US');
-    const pg = e.pg ? `<div class="em-pg"><div class="em-pgh"><span>${esc(e.pg[0])}</span><b>${e.pg[2] === 100 ? e.pg[1] + '%' : e.pg[2] > 100 ? money(e.pg[1]) + ' of ' + money(e.pg[2]) : e.pg[1] + ' of ' + e.pg[2]}</b></div><div class="em-bar"><i style="width:${Math.min(100, e.pg[1] / e.pg[2] * 100)}%"></i></div><div class="em-pgs">${esc(e.pg[3])}</div></div>` : '';
+    const pv = +fill(e.pg && e.pg[1]) || 0, pm = +fill(e.pg && e.pg[2]) || 1;
+    const pg = e.pg ? `<div class="em-pg"><div class="em-pgh"><span>${fe(e.pg[0])}</span><b>${pm === 100 ? pv + '%' : pm > 100 ? money(pv) + ' of ' + money(pm) : pv + ' of ' + pm}</b></div><div class="em-bar"><i style="width:${Math.min(100, pv / pm * 100)}%"></i></div><div class="em-pgs">${fe(e.pg[3])}</div></div>` : '';
     return `<div class="em ${dev === 'phone' ? 'ph' : ''}">
       <div class="em-top"><span class="em-logo">fundedsky<i>futures</i></span><span class="em-lab">${esc(GROUP_LABEL[f.id] || 'Funded Sky')}</span></div>
       <div class="em-b">
@@ -148,7 +151,7 @@ function startEmails(root) {
       </div>
       <div class="em-foot">
         <div>${e.mk ? '<u>Unsubscribe</u> · <u>Email Preferences</u>' : "You're getting this because you have a Funded Sky account. It's about your account, so it can't be turned off."}</div>
-        <div>${['Funded Sky', S.brand.address, S.brand.support].filter((x) => x && !/^\[/.test(x)).map(esc).join(' · ')}</div>
+        <div>${[(((BO.settings || {}).company || {}).legal) || 'Funded Sky', S.brand.address, S.brand.support].filter((x) => x && !/^\[/.test(x)).map(esc).join(' · ')}</div>
         <div>${esc(S.brand.legal)}</div>
       </div></div>`;
   }
@@ -202,7 +205,7 @@ function startEmails(root) {
       <div class="ep-b">${body}</div>`;
   }
   const sender = (e) => SENDERS[e.fr] || SENDERS.hello;
-  function inbox(d) { const s = sender(d); return `<div class="inbox"><div><span>From</span><b>${esc(s[0])} <em>&lt;${esc(s[1])}&gt;</em></b></div><div><span>Subject</span><b>${fe(d.s)}</b></div><div><span>Preview Text</span><b class="mu">${fe(d.p)}</b></div></div>`; }
+  function inbox(d) { CUR = d.id; const s = sender(d); return `<div class="inbox"><div><span>From</span><b>${esc(s[0])} <em>&lt;${esc(s[1])}&gt;</em></b></div><div><span>Subject</span><b>${fe(d.s)}</b></div><div><span>Preview Text</span><b class="mu">${fe(d.p)}</b></div></div>`; }
   function tPreview(e) {
     const d = draftOf(e);
     return `<div class="pvact"><button class="pill" data-act="test">Send Me a Test</button><button class="pill" data-act="full">Open Full Size</button><div class="seg" role="group" aria-label="Preview size"><button class="${S.dev === 'desktop' ? 'on' : ''}" data-act="dev" data-k="desktop">Desktop</button><button class="${S.dev === 'phone' ? 'on' : ''}" data-act="dev" data-k="phone">Phone</button></div></div>
@@ -370,7 +373,7 @@ function startEmails(root) {
         F.put('emails.tpl', T2).then(() => saveState()).then(() => toast(`Saved. Version ${e.v} sends from now on.`)).catch((x) => toast(x.message)); render(); return; }
       case 'discardEdit': S.edit = null; break;
       case 'delEmail': { const f = flowOf(e.id); f.lanes.forEach((l) => { const j = l.indexOf('E:' + e.id); if (j >= 0) l.splice(j, 1); }); delete E[e.id]; S.sel = (emailsIn(f)[0] || {}).id; S.edit = null; S.tab = 'preview'; saveState(); toast('Email deleted'); return; }
-      case 'addEmail': { const f = FLOWS.find((x) => x.id === id); const nid = uid('custom'); E[nid] = { id: nid, n: '[New Email]', w: 'Set when this sends', fr: 'hello', s: '[Subject]', p: '[Preview text]', e: '[Small Heading]', h: '[Headline]', a: '', b: ['[Body]'], cta: '', sent: 0, open: 0, click: 0, bounce: 0, unsub: 0, on: false, draft: true, custom: true, v: 1, hist: [], by: ME, at: new Date().toISOString() }; f.lanes[i].push('E:' + nid); saveState(); S.sel = nid; S.tab = 'edit'; S.panel = true; startEdit(E[nid]); toast('New email added as a draft. It stays off until you turn it on.'); return; }
+      case 'addEmail': { const f = FLOWS.find((x) => x.id === id); const nid = uid('custom'); E[nid] = { id: nid, n: 'New Email', w: 'Set when this sends', fr: 'hello', s: 'A note from Funded Sky', p: 'Write a short preview line.', e: 'Funded Sky', h: 'Write your headline,', a: '{first_name}.', b: ['Write the message here.'], cta: '', sent: 0, open: 0, click: 0, bounce: 0, unsub: 0, on: false, draft: true, custom: true, v: 1, hist: [], by: ME, at: new Date().toISOString() }; f.lanes[i].push('E:' + nid); saveState(); S.sel = nid; S.tab = 'edit'; S.panel = true; startEdit(E[nid]); toast('New email added as a draft. It stays off until you turn it on.'); return; }
       case 'logF': S.logs.status = S.logs.status === k ? 'all' : k; break;
       case 'logRow': S.logs.row = id; break;
       case 'closeLog': S.logs.row = null; break;

@@ -288,6 +288,7 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_secret TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_on BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_backup JSONB;
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS mfa BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_step BIGINT NOT NULL DEFAULT 0;
 -- Full rule set support: scalping profit tracking and last trade time (inactivity)
 ALTER TABLE accounts ADD COLUMN IF NOT EXISTS scalp_profit NUMERIC(14,2) NOT NULL DEFAULT 0;
 ALTER TABLE accounts ADD COLUMN IF NOT EXISTS cycle_scalp NUMERIC(14,2) NOT NULL DEFAULT 0;
@@ -332,4 +333,14 @@ CREATE INDEX IF NOT EXISTS user_cards_user ON user_cards(user_id);
 
 -- Competitions: each registered trader gets a practice account for a live competition
 ALTER TABLE accounts ADD COLUMN IF NOT EXISTS comp TEXT;
+-- Fees the account was sold with: { price, activation, reset } (NULL for accounts sold before this was kept)
+ALTER TABLE accounts ADD COLUMN IF NOT EXISTS fees JSONB;
 CREATE INDEX IF NOT EXISTS accounts_comp ON accounts(comp) WHERE comp IS NOT NULL;
+-- Payout destinations: the full wallet address is kept encrypted (Finance sends wallet payouts by hand); dest_hash matches the same
+-- destination across traders without decrypting. Payouts copy the destination they were requested to.
+ALTER TABLE payout_methods ADD COLUMN IF NOT EXISTS dest TEXT;
+ALTER TABLE payout_methods ADD COLUMN IF NOT EXISTS dest_hash TEXT;
+ALTER TABLE payouts ADD COLUMN IF NOT EXISTS dest TEXT;
+ALTER TABLE payouts ADD COLUMN IF NOT EXISTS tries INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE payouts ADD COLUMN IF NOT EXISTS failed_at TIMESTAMPTZ;
+ALTER TABLE payouts ADD COLUMN IF NOT EXISTS approvers JSONB NOT NULL DEFAULT '[]';

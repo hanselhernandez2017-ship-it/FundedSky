@@ -25,7 +25,7 @@ async function scan() {
     db.all('SELECT id, user_id, plan, size, kind, phase, start_bal::float start_bal, balance::float balance, funded_at, created_at, payout_count, rs FROM accounts'),
     db.all("SELECT id, first, last, email, country, kyc, role FROM users WHERE role='trader'"),
     db.all("SELECT s.user_id, s.ip, s.ua, s.created_at FROM sessions s JOIN users u ON u.id=s.user_id WHERE u.role='trader'"),
-    db.all('SELECT user_id, label FROM payout_methods'),
+    db.all('SELECT user_id, label, dest_hash FROM payout_methods'),
     db.all("SELECT p.code, p.user_id, p.account_id, p.amount::float amount, p.requested_at, p.status FROM payouts p WHERE p.status IN ('requested','approved')"),
     db.all("SELECT user_id, status, created_at FROM orders WHERE created_at > now() - interval '30 days'"),
     db.all("SELECT k, v FROM kv WHERE k IN ('content.news')")
@@ -48,8 +48,9 @@ async function scan() {
   { const by = {}; sess.forEach((s) => { if (!s.ip || /^(127\.|::1|::ffff:127)/.test(s.ip)) return; (by[s.ip] = by[s.ip] || new Set()).add(s.user_id); });
     Object.entries(by).filter(([, v]) => v.size >= cfg.share.th[0]).forEach(([ip, v]) => { const ids = [...v]; add('share:' + ip, 'share', accts.filter((a) => v.has(a.user_id) && ['active', 'passed', 'review'].includes(a.phase)).map((a) => a.id), ids, `${ids.length} traders signed in from the same IP address.`, { h: ['Trader', 'IP', 'Device'], rows: sess.filter((s) => s.ip === ip).slice(0, 10).map((s) => [U[s.user_id] ? short(U[s.user_id]) : '?', ip.replace(/\.\d+\.\d+$/, '.x.x'), (s.ua || '').slice(0, 40)]) }, 'Could be a household or an office. Check identities and trades before acting.'); }); }
   // shared payout method
-  { const by = {}; methods.forEach((m) => { (by[m.label] = by[m.label] || new Set()).add(m.user_id); });
-    Object.entries(by).filter(([, v]) => v.size >= cfg.payment.th[0]).forEach(([lab, v]) => add('payment:' + lab, 'payment', accts.filter((a) => v.has(a.user_id) && a.kind === 'funded').map((a) => a.id), [...v], `The same payout method is saved by ${v.size} different traders.`, { h: ['Signal', ...[...v].map((i) => (U[i] ? short(U[i]) : '?'))], rows: [['Payout method', ...[...v].map(() => lab)]] }, 'Two traders paid to one wallet or account is a strong sign of one person. Hold payouts.')); }
+  // matched on the full destination (keyed hash); methods saved before full addresses were kept fall back to the label
+  { const by = {}; const labOf = {}; methods.forEach((m) => { const k = m.dest_hash || 'label:' + m.label; labOf[k] = m.label; (by[k] = by[k] || new Set()).add(m.user_id); });
+    Object.entries(by).filter(([, v]) => v.size >= cfg.payment.th[0]).forEach(([key, v]) => { const lab = labOf[key]; add('payment:' + (key.startsWith('label:') ? lab : key.slice(0, 16)), 'payment', accts.filter((a) => v.has(a.user_id) && a.kind === 'funded').map((a) => a.id), [...v], `The same payout method is saved by ${v.size} different traders.`, { h: ['Signal', ...[...v].map((i) => (U[i] ? short(U[i]) : '?'))], rows: [['Payout method', ...[...v].map(() => lab)]] }, 'Two traders paid to one wallet or account is a strong sign of one person. Hold payouts.'); }); }
   // very short holds
   { const by = {}; trades.forEach((t) => { (by[t.account_id] = by[t.account_id] || []).push(t); });
     Object.entries(by).forEach(([id, ts]) => { if (ts.length < 20) return; const sh = ts.filter((t) => (t.hold_min || 0) < cfg.hft.th[0]).length / ts.length * 100; if (sh >= cfg.hft.th[1]) add('hft:' + id, 'hft', [id], [ts[0].user_id], `${Math.round(sh)}% of ${ts.length} trades held under ${cfg.hft.th[0]} minute.`, { h: ['Hold Time', 'Trades', 'Share', 'P&L'], rows: [['Under ' + cfg.hft.th[0] + ' min', String(ts.filter((t) => (t.hold_min || 0) < cfg.hft.th[0]).length), Math.round(sh) + '%', money(ts.filter((t) => (t.hold_min || 0) < cfg.hft.th[0]).reduce((s, t) => s + t.pnl, 0))]] }, 'Check whether the profit comes from price delays on the simulator.'); });

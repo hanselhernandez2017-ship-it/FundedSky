@@ -11,8 +11,15 @@ const RULES0 = { quiet: true, qFrom: '21:00', qTo: '08:00', capDay: '1', capWeek
 
 async function cfg() {
   const [tpl, state, rules, brand, supp] = await Promise.all(['tpl', 'state', 'rules', 'brand', 'supp'].map((k) => kv('store.emails.' + k)));
-  const co = (await kv('settings.company')) || {}; const b0 = Object.assign({}, BRAND0, co.address ? { address: co.address } : {}, co.supportEmail ? { support: co.supportEmail } : {});
-  return { tpl: tpl || {}, state: state || {}, rules: Object.assign({}, RULES0, rules || {}), brand: Object.assign(b0, brand || {}), supp: supp || [] };
+  const co = await company();
+  // Company Details fill the footer; a value typed in the Emails board's Brand and Footer wins when it differs from the default
+  const b1 = Object.assign({}, brand || {}); ['address', 'support', 'legal'].forEach((k) => { if (!b1[k] || !String(b1[k]).trim() || b1[k] === BRAND0[k]) delete b1[k]; });
+  return { tpl: tpl || {}, state: state || {}, rules: Object.assign({}, RULES0, rules || {}), brand: Object.assign({}, BRAND0, { name: co.legal || co.brand, address: co.address, support: co.support }, b1), supp: supp || [] };
+}
+// Settings > Company Details (older saves used supportEmail / legalName)
+async function company() {
+  const co = (await kv('settings.company')) || {}; const t = (x) => String(x || '').trim();
+  return { legal: t(co.legal || co.legalName), brand: t(co.brand) || 'Funded Sky', address: t(co.address), taxId: t(co.taxId), support: t(co.support || co.supportEmail) || BRAND0.support };
 }
 function tplOf(C, key) {
   const st = C.state || {}; const base = DEFS.E[key] || (st.custom || {})[key]; if (!base) return null;
@@ -49,13 +56,21 @@ ${e.n2 ? `<div style="font-size:12.5px;color:${C.fa};line-height:1.5;margin-top:
 </div>
 <div style="border-top:1px solid ${C.ln2};padding:18px 26px 22px;font-size:11.5px;color:${C.fa};line-height:1.6">
 <div style="margin-bottom:6px">${e.mk ? `<a href="${esc(vars.unsub || '')}" style="color:${C.fa}">Unsubscribe</a> · <a href="${esc(vars.prefs || '')}" style="color:${C.fa}">Email Preferences</a>` : "You're getting this because you have a Funded Sky account. It's about your account, so it can't be turned off."}</div>
-<div style="margin-bottom:6px">${['Funded Sky', brand.address, brand.support].filter((x) => x && !/^\[/.test(x)).map(esc).join(' · ')}</div><div>${esc(brand.legal)}</div></div>
+<div style="margin-bottom:6px">${[brand.name || 'Funded Sky', brand.address, brand.support].filter((x) => x && !/^\[/.test(x)).map(esc).join(' · ')}</div><div>${esc(brand.legal)}</div></div>
 </div></div></body></html>`;
 }
 function text(e, vars) {
   const f = (t) => String(t == null ? '' : t).replace(/\{(\w+)\}/g, (m, k) => (vars[k] != null ? vars[k] : ''));
   const rows = (e.r || []).map(([k, v]) => [f(k), f(v)]).filter(([, v]) => v.trim());
   return [f(e.h) + (e.a ? ' ' + f(e.a) : ''), e.p ? f(e.p) : '', e.pg ? `${f(e.pg[0])}: ${f(e.pg[3])}` : '', e.al ? f(e.al[1]) : '', ...[].concat(e.b || []).map(f), e.c ? f(e.c) : '', rows.map(([k, v]) => `${k}: ${v}`).join('\n'), (e.st || []).map(([t, d], i) => `${i + 1}. ${f(t)}: ${f(d)}`).join('\n'), e.cta && vars.url ? `${f(e.cta)}: ${vars.url}` : '', e.n2 ? f(e.n2) : ''].filter(Boolean).join('\n\n');
+}
+// Realistic sample values for previews and test sends: the shared sample, the template's own overrides, and live plan rules where a template lists them
+async function sample(key, user) {
+  const v = Object.assign({}, DEFS.SAMPLE, (DEFS.SAMPLE_FOR || {})[key] || {});
+  if (user && user.first) { v.first_name = user.first; v.snippet = String(v.snippet).replace(/^Hi \w+/, 'Hi ' + user.first); v.message = String(v.message).replace(/Hi \w+/, 'Hi ' + user.first); }
+  try { const core = require('./core'); const R = require('./rules'); const cat = await core.catalog(); const p0 = (cat.plans || []).find((p) => p.active !== false && p.kind === 'evaluation');
+    if (p0) { v.plan = p0.name || v.plan; (p0.sizes || []).filter((z) => z.active !== false).slice(0, 3).forEach((z, i) => { const r = R.rulesFor(cat, { plan: p0.id, size: z.size, kind: 'evaluation', addons: [] }); v['s' + (i + 1)] = '$' + z.size / 1000 + 'K'; v['r' + (i + 1)] = `Target $${Math.round(r.target).toLocaleString('en-US')} · Max loss $${Math.round(r.maxLoss).toLocaleString('en-US')}`; }); } } catch (e) { /* keep the static sample */ }
+  return v;
 }
 async function deliver({ to, subject, body, html, template, from, status, uid, unsub }) {
   const c = await I.cfg('resend').catch(() => null);
@@ -156,4 +171,4 @@ async function hook(req, res) {
   }
   res.json({ ok: true });
 }
-module.exports = { deliverRaw: deliver, hook,  send, sendT, t, render, cfg, tplOf, DEFS, unsubLink, unsubCheck, releaseHeld, quietNow };
+module.exports = { deliverRaw: deliver, hook,  send, sendT, t, render, cfg, company, text, sample, tplOf, DEFS, unsubLink, unsubCheck, releaseHeld, quietNow };

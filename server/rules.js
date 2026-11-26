@@ -208,12 +208,14 @@ function payoutQuote(cat, a, opts = {}) {
   if (r.kind !== 'funded') return { ok: false, reasons: ['Only funded accounts can request payouts'], checks, max: 0 };
   const daily = (a.addons || []).includes('daily');
   const bal = Number(a.balance), start = Number(a.start_bal);
-  const cycleProfit = round2(bal - Number(a.cycle_profit_start || start));
+  // Money held by a payout that is still open (in review, ready to send, or sent back) is still this cycle's profit
+  const cycleProfit = round2(bal + Number(opts.held || 0) - Number(a.cycle_profit_start || start));
   const needDays = daily ? 1 : r.winDays;
   const winOk = (a.cycle_win_days || 0) >= needDays;
   checks.push({ k: 'win', label: `${needDays} winning day${needDays > 1 ? 's' : ''} of $${r.winDayMin}+ this cycle`, ok: winOk, have: a.cycle_win_days || 0, need: needDays });
   const consPct = cycleProfit > 0 ? Math.round((Number(a.cycle_best) / cycleProfit) * 100) : 0;
-  if (!r.consOff) { const consOk = cycleProfit > 0 && consPct <= r.consistency; checks.push({ k: 'cons', label: `Best day at or under ${r.consistency}% of cycle profit`, ok: consOk, have: consPct, need: r.consistency }); }
+  // Daily Payouts: each cycle is one winning day, so the best day is always the whole cycle. The consistency rule does not apply.
+  if (!r.consOff && !daily) { const consOk = cycleProfit > 0 && consPct <= r.consistency; checks.push({ k: 'cons', label: `Best day at or under ${r.consistency}% of cycle profit`, ok: consOk, have: consPct, need: r.consistency }); }
   if (r.buffer > 0) checks.push({ k: 'buffer', label: `Profit above the $${r.buffer.toLocaleString('en-US')} buffer`, ok: bal - start > r.buffer, have: round2(bal - start), need: r.buffer });
   const lastPay = opts.lastPayoutAt || a.last_payout_at; if (r.daysBetween > 0 && lastPay) { const d = (Date.now() - new Date(lastPay)) / 864e5; checks.push({ k: 'gap', label: `${r.daysBetween} day${r.daysBetween > 1 ? 's' : ''} since the last payout`, ok: d >= r.daysBetween, have: Math.floor(d), need: r.daysBetween }); }
   if (r.scalp && cycleProfit > 0) { const sp = Math.round(Number(a.cycle_scalp || 0) / cycleProfit * 100); checks.push({ k: 'scalp', label: `Profit from trades held under ${r.scalp.hold} seconds at or under ${r.scalp.pct}%`, ok: sp <= r.scalp.pct, have: sp, need: r.scalp.pct }); }
@@ -227,7 +229,9 @@ function payoutQuote(cat, a, opts = {}) {
   const minOk = maxNet >= r.payoutMin;
   checks.push({ k: 'min', label: `At least $${r.payoutMin} available`, ok: minOk, have: maxNet, need: r.payoutMin });
   if (a.phase !== 'active') reasons.push(a.phase === 'review' ? `This account is under review after ${r.reviewAfter || 6} payouts` : 'Account is not active');
+  if (opts.stop) reasons.unshift(opts.stop);
   if (opts.pending) reasons.push('A payout request is already in review');
+  if (opts.failed) reasons.push('Your last payout could not be sent. Support will send it again or return it to your balance first');
   checks.filter((c) => !c.ok).forEach((c) => reasons.push(c.label));
   return {
     ok: reasons.length === 0, reasons, checks, max: maxNet, split: r.split, cap: r.cap, lifetime: r.lifetime, lifetimeLeft,
@@ -235,4 +239,16 @@ function payoutQuote(cat, a, opts = {}) {
   };
 }
 
-module.exports = { snapshot, catFor, rulesFor, phaseRules, allowedContracts, initialState, trailFloor, applyTrade, closeDay, evalChecks, payoutQuote };
+// The chargeback state of the orders that bought this account or the evaluation it came from: '', 'open' or 'lost'
+function cbFor(a, orders) { const ids = [a.id, a.parent_id].filter(Boolean); let st = '';
+  (orders || []).forEach((o) => { const m = o.meta || {}; if (!m.chargeback) return; if (!(ids.includes(m.account) || (m.accounts || []).some((x) => ids.includes(x)) || (a.order_id && o.id === a.order_id))) return;
+    if (['lost', 'accepted'].includes(m.chargeback)) st = 'lost'; else if (m.chargeback === 'open' && st !== 'lost') st = 'open'; });
+  return st; }
+// Why payouts on this account are stopped right now, or '' (a payment dispute, a lost chargeback, or a paused account)
+function payoutStop(a, cb) {
+  if (cb === 'lost') return 'This account was closed after a chargeback on its order';
+  if (cb === 'open' || (a.sim && a.sim.pausedFor)) return 'Payouts are paused while a payment dispute on your order is reviewed';
+  if (a.sim && a.sim.paused) return 'Payouts on this account are paused. Contact support';
+  return ''; }
+
+module.exports = { cbFor, payoutStop, snapshot, catFor, rulesFor, phaseRules, allowedContracts, initialState, trailFloor, applyTrade, closeDay, evalChecks, payoutQuote };

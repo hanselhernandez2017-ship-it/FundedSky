@@ -5,6 +5,7 @@ const db = require('./db');
 
 const KEY = crypto.createHash('sha256').update(process.env.SECRETS_KEY || process.env.DATABASE_URL || 'fundedsky-dev').digest();
 const enc = (s) => { const iv = crypto.randomBytes(12); const c = crypto.createCipheriv('aes-256-gcm', KEY, iv); const e = Buffer.concat([c.update(String(s), 'utf8'), c.final()]); return 'enc:' + Buffer.concat([iv, c.getAuthTag(), e]).toString('base64'); };
+const mac = (s) => crypto.createHmac('sha256', KEY).update(String(s)).digest('hex');
 const dec = (s) => { if (!s || !String(s).startsWith('enc:')) return s; try { const b = Buffer.from(s.slice(4), 'base64'); const d = crypto.createDecipheriv('aes-256-gcm', KEY, b.subarray(0, 12)); d.setAuthTag(b.subarray(12, 28)); return Buffer.concat([d.update(b.subarray(28)), d.final()]).toString('utf8'); } catch (e) { return ''; } };
 
 // Field types: text (shown), secret (write-only, masked), select
@@ -125,21 +126,38 @@ async function test(id) {
 // ---------- alerts ----------
 // Outgoing webhooks set up in Settings: every alert kind is also an event (order.paid, payout.requested ...)
 const EVN = { order: 'order.paid', payout: 'payout.updated', pass: 'account.passed', breach: 'account.breached', dispute: 'dispute.opened', kyc: 'kyc.updated', decline: 'payment.declined', user: 'user.created' };
-async function outHooks(kind, text, data) {
-  try { const hs = ((await db.one("SELECT v FROM kv WHERE k='store.webhooks.out'")) || {}).v || []; const ev = EVN[kind] || kind;
-    for (const h of hs.filter((x) => x.on !== false && (x.events || []).includes(ev))) {
-      const t0 = Date.now(); let code = 0; try { const r = await fetch(h.url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'User-Agent': 'FundedSky-Webhooks/1' }, body: JSON.stringify({ event: ev, text: String(text || '').replace(/:[a-z_]+:\s*/g, ''), data: data || {}, at: new Date().toISOString() }), signal: T(10000) }); code = r.status; } catch (e) { code = 0; }
-      await db.q('INSERT INTO webhook_log(provider,event,ok,detail) VALUES($1,$2,$3,$4)', ['out:' + h.url.replace(/^https?:\/\//, '').split('/')[0], ev, code >= 200 && code < 300, JSON.stringify({ code, ms: Date.now() - t0, url: h.url })]);
-    } } catch (e) { /* never break the caller */ }
+// Outgoing webhooks (Settings > Webhooks). Each endpoint has its own signing secret, kept apart from the endpoint list:
+// X-FundedSky-Signature: t=<unix seconds>,v1=<hex HMAC-SHA256 of "<t>.<raw body>" with the endpoint secret>
+const hookId = (h) => h.id || 'wh_' + crypto.createHash('sha256').update(String(h.url) + '|' + String(h.at || '')).digest('hex').slice(0, 12);
+const hookSecrets = async () => ((await db.one("SELECT v FROM kv WHERE k='secret.webhooks'")) || {}).v || {};
+const hookHost = (u) => String(u).replace(/^https?:\/\//, '').split('/')[0];
+async function sendHook(h, ev, payload, secrets) {
+  const id = hookId(h); const body = JSON.stringify(payload); const t = Math.floor(Date.now() / 1000); const sec = dec((secrets || {})[id] || '');
+  const headers = { 'Content-Type': 'application/json', 'User-Agent': 'FundedSky-Webhooks/1', 'X-FundedSky-Event': ev, 'X-FundedSky-Delivery': payload.id };
+  if (sec) headers['X-FundedSky-Signature'] = `t=${t},v1=${crypto.createHmac('sha256', sec).update(t + '.' + body).digest('hex')}`;
+  const t0 = Date.now(); let code = 0, err = '';
+  try { const r = await fetch(h.url, { method: 'POST', headers, body, redirect: 'manual', signal: T(10000) }); code = r.status; } catch (e) { err = e.name === 'TimeoutError' ? 'Timed out after 10 s' : 'Could not connect'; }
+  const ok = code >= 200 && code < 300;
+  await db.q('INSERT INTO webhook_log(provider,event,ok,detail) VALUES($1,$2,$3,$4)', ['out:' + hookHost(h.url), ev, ok, JSON.stringify({ code, ms: Date.now() - t0, url: h.url, hook: id, delivery: payload.id, err: err || undefined, signed: !!sec })]).catch(() => {});
+  return { ok, code, ms: Date.now() - t0, err };
 }
-async function alert(kind, text) {
+// data: the event's fields (order code, amounts, user and so on). Events without data are not sent.
+async function outHooks(kind, text, data, only) {
+  try { if (!data) return []; const hs = ((await db.one("SELECT v FROM kv WHERE k='store.webhooks.out'")) || {}).v || []; const ev = EVN[kind] || kind; const secrets = await hookSecrets(); const out = [];
+    for (const h of hs.filter((x) => (only ? hookId(x) === only : x.on !== false) && (x.events || []).includes(ev))) {
+      out.push(await sendHook(h, ev, { id: 'evt_' + crypto.randomBytes(9).toString('hex'), event: ev, at: new Date().toISOString(), data, text: String(text || '').replace(/:[a-z_]+:\s*/g, '') }, secrets));
+    }
+    return out; } catch (e) { return []; /* never break the caller */ }
+}
+async function alert(kind, text, data) {
+  // Webhook endpoints have their own event choice, so they do not follow the alert switches
+  if (data) outHooks(kind, text, data);
   try {
     const set = (await db.one("SELECT v FROM kv WHERE k='settings.alerts'")) || { v: {} };
     if (set.v[kind] === false) return;
     const s = await cfg('slack'); if (s && s.webhookUrl && set.v['slack_' + kind] !== false) fetch(s.webhookUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }), signal: T(8000) }).catch(() => {});
-    outHooks(kind, text);
   } catch (e) { /* alerts never break the caller */ }
 }
 async function announce(text) { try { const d = await cfg('discord'); if (d && d.webhookUrl) fetch(d.webhookUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: text }), signal: T(8000) }).catch(() => {}); } catch (e) { /* ignore */ } }
 
-module.exports = { outHooks, EVN, PROVIDERS, cfg, on, list, save, test, alert, announce, nmi, sumsub, sumsubSign, rise, t1099, enc, dec, WEBHOOKS, bust };
+module.exports = { outHooks, hookId, hookSecrets, EVN, PROVIDERS, cfg, on, list, save, test, alert, announce, nmi, sumsub, sumsubSign, rise, t1099, enc, dec, mac, WEBHOOKS, bust };

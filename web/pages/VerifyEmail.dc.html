@@ -61,8 +61,16 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 14px; color: #9C9693;">
 <sc-if value="{{ notResent }}" hint-placeholder-val="{{ true }}"><span>Didn't get it? <button type="button" onClick="{{ resend }}" style="background: transparent; border: 0; padding: 0; color: #7CC4FF; font: inherit; font-size: 14px; font-weight: 500; cursor: pointer;">Resend Code</button></span></sc-if>
 <sc-if value="{{ resent }}" hint-placeholder-val="{{ false }}"><span role="status" style="color: #5FD39B;">New code sent. Check spam too.</span></sc-if>
-<a href="{{ signupHref }}">Change Email</a>
+<button type="button" onClick="{{ openEdit }}" style="background: transparent; border: 0; padding: 0; color: #7CC4FF; font: inherit; font-size: 14px; font-weight: 500; cursor: pointer;">Change Email</button>
 </div>
+<sc-if value="{{ editing }}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-direction: column; gap: 10px; border-top: 1px solid #26262A; padding-top: 20px;">
+<label for="newEmail" style="font-size: 13px; color: #9C9693;">Correct Email</label>
+<input id="newEmail" class="fs-in" type="email" autocomplete="email" placeholder="you@example.com" value="{{ newEmail }}" onChange="{{ setNewEmail }}" aria-invalid="{{ emailBad }}" style="height: 48px; box-sizing: border-box; background: #111113; border-radius: 4px; padding: 0 14px; color: #F4F2F1; font: inherit; font-size: 15px; border-color: {{ emailBd }};">
+<sc-if value="{{ emailBad }}" hint-placeholder-val="{{ false }}"><span role="alert" style="font-size: 13px; color: #F2777F;">{{ emailErr }}</span></sc-if>
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;"><button type="button" onClick="{{ closeEdit }}" style="height: 44px; background: transparent; color: #F4F2F1; border: 1px solid #26262A; border-radius: 4px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;">Cancel</button><button type="button" onClick="{{ saveEmail }}" style="height: 44px; background: #FFFFFF; color: #111113; border: 0; border-radius: 4px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;">Send New Code</button></div>
+</div>
+</sc-if>
 </div>
 </sc-if>
 
@@ -85,14 +93,17 @@ class Component extends DCLogic {
   constructor(props) { super(props); this.state = { code: (DC.qs('code') || '').replace(/\D/g, '').slice(0, 6), submitted: false, done: false, resent: false, me: null, err: '' }; }
   async componentDidMount() { const me = await FSX.me(); if (!me) { location.replace('/login?next=' + encodeURIComponent(location.pathname + location.search)); return; } this.setState({ me, done: !!me.verified }); if (!me.verified && this.state.code.length === 6) this.submit(); }
   async submit() { const st = this.state; this.setState({ submitted: true, err: '' }); if (!/^[0-9]{6}$/.test(st.code)) return; try { await DC.api('/api/auth/verify', { code: st.code }); this.setState({ done: true }); } catch (e) { this.setState({ err: e.message }); } }
+  async saveEmail() { const st = this.state; const em = (st.newEmail || '').trim(); if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(em)) return this.setState({ emailErr: 'Enter a valid email address.' }); try { const r = await DC.api('/api/auth/email', { email: em }); this.setState({ me: Object.assign({}, st.me, { email: r.email || em }), editing: false, resent: true, code: '', err: '', submitted: false }); } catch (e) { this.setState({ emailErr: e.message }); } }
   renderVals() {
     const st = this.state; const ok = /^[0-9]{6}$/.test(st.code); const codeBad = (st.submitted && !ok) || !!st.err;
-    const n = DC.qs('next'); const next = n && n.startsWith('/') && !n.startsWith('//') ? n : (FSX.cart.get() ? '/checkout/payment' : '/app');
+    const n = DC.qs('next'); const next = n && /^\/(?![\/\\])/.test(n) && !/[\u0000-\u001f\\]/.test(n) ? n : (FSX.cart.get() ? '/checkout/payment' : '/app');
     return {
       code: st.code, done: st.done, notDone: !st.done, resent: st.resent, notResent: !st.resent, email: st.me ? st.me.email : 'your email',
       setCode: (e) => this.setState({ code: e.target.value.replace(/[^0-9]/g, '').slice(0, 6), err: '' }),
       codeBad, codeBd: codeBad ? '#F2777F' : '', codeErr: st.err || 'Enter all 6 digits from the email.',
       submit: () => this.submit(), resend: async () => { try { await DC.api('/api/auth/resend', {}); } catch (e) { /* ignore */ } this.setState({ resent: true }); },
+      editing: !!st.editing, newEmail: st.newEmail || '', setNewEmail: (e) => this.setState({ newEmail: e.target.value, emailErr: '' }), emailBad: !!st.emailErr, emailErr: st.emailErr || '', emailBd: st.emailErr ? '#F2777F' : '',
+      openEdit: () => this.setState({ editing: true, newEmail: st.me ? st.me.email : '', emailErr: '' }), closeEdit: () => this.setState({ editing: false, emailErr: '' }), saveEmail: () => this.saveEmail(),
       loginHref: '/login', signupHref: '/signup', checkoutHref: '/checkout', nextHref: next, nextLabel: next === '/checkout/payment' ? 'Continue to Payment' : 'Go to Dashboard'
     };
   }

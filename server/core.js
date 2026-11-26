@@ -17,6 +17,18 @@ async function saveCatalog(data, by) {
 const planDef = (cat, id) => cat.plans.find((p) => p.id === id);
 const sizeDef = (cat, pid, size) => { const p = planDef(cat, pid); return p && p.sizes.find((s) => s.size === Number(size)); };
 const kLabel = (s) => '$' + s / 1000 + 'K';
+// Fees an account was sold with (accounts.fees, set at sale from the order line). Accounts sold before fees were kept fall back
+// to the size's current fees, then to the Back Office copy of a size that is no longer on sale. Never throws.
+function feesOf(cat, a, ord) {
+  const f = (a && a.fees) || {}; const s = sizeDef(cat, a.plan, a.size); const xs = ((((cat.x || {}).plans || {})[a.plan] || {}).sizes || {})[a.size] || {}; const xf = ((((cat.x || {}).fees || {})[a.plan]) || {})[a.size] || {};
+  const line = ord && Array.isArray(ord.items) ? ord.items.find((it) => it.plan === a.plan && Number(it.size) === Number(a.size)) : null;
+  const price = f.price != null ? Number(f.price) : s ? priceOf(s) : line && line.unit != null ? Number(line.unit) : Number(xs.price || 0);
+  const activation = f.activation != null ? Number(f.activation) : line && line.activation != null ? Number(line.activation) : s ? Number(s.activation || 0) : Number(xs.act || 0);
+  const reset = f.reset != null ? Number(f.reset) : line && line.reset != null ? Number(line.reset) : s && s.reset ? Number(s.reset) : xs.rst ? Number(xs.rst) : xf.reset ? Number(xf.reset) : Math.round(price * (cat.resetPct || 50) / 100);
+  return { price, activation, reset, onSale: !!s };
+}
+// Fees to keep on a new account of this size, as the catalog has them now
+function feesNow(cat, plan, size) { const s = sizeDef(cat, plan, size); if (!s) return null; const price = priceOf(s); return { price, activation: Number(s.activation || 0), reset: s.reset ? Number(s.reset) : Math.round(price * (cat.resetPct || 50) / 100) }; }
 const M = (...a) => require('./mail').t(...a);
 const etTime = (d) => new Date(d || Date.now()).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) + ' ET';
 const pName = async (id) => ((planDef(await catalog(), id) || {}).name || id);
@@ -48,7 +60,7 @@ async function priceCart(items, { promo, coupon, userId, country, kind } = {}) {
   const cat = await catalog(); const today = new Date().toISOString().slice(0, 10);
   if (!Array.isArray(items) || !items.length) bad('Your cart is empty');
   if (items.length > 10) bad('Too many accounts in one order');
-  const comps = []; const accts = []; const norm = []; let count = 0;
+  const comps = []; const accts = []; const norm = []; const notes = []; let count = 0;
   items.forEach((it, li) => {
     const p = planDef(cat, it.plan); if (!p || !p.active) bad('Unknown plan');
     const s = sizeDef(cat, it.plan, it.size); if (!s) bad('That size is not offered on the ' + p.name);
@@ -56,12 +68,13 @@ async function priceCart(items, { promo, coupon, userId, country, kind } = {}) {
     if (it.platform && !p.platforms.includes(it.platform)) bad(`${it.platform} is not offered on the ${p.name}`);
     const platform = it.platform || p.defPlatform || p.platforms[0];
     const addons = (it.addons || []).filter((x) => p.addons.includes(x) && cat.addons[x]);
+    (it.addons || []).filter((x) => !addons.includes(x)).forEach((x) => notes.push(`${(cat.addons[x] || {}).name || 'An add-on'} is not offered on the ${p.name}, so it was taken out of your cart.`));
     const unit = priceOf(s); count += qty;
     comps.push({ li, type: 'base', plan: p.id, size: s.size, label: `${p.short} ${kLabel(s.size)}${qty > 1 ? ' × ' + qty : ''}`, amt: unit * qty, rem: unit * qty, floor: Number(s.floor || 0) * qty });
     for (let i = 0; i < qty; i++) accts.push({ li, plan: p.id, size: s.size, price: unit });
     for (const ad of addons) { const a = cat.addons[ad]; const amt = round2((a.flat != null && Number(a.flat) > 0 ? Number(a.flat) : Math.round(unit * a.pct / 100)) * qty);
       comps.push({ li, type: 'addon', aid: ad, plan: p.id, size: s.size, label: `${a.name}${qty > 1 ? ' × ' + qty : ''}`, amt, rem: amt, floor: 0, discountable: a.discountable !== false }); }
-    norm.push({ plan: p.id, size: s.size, platform, addons, qty, unit });
+    const fz = feesNow(cat, p.id, s.size); norm.push({ plan: p.id, size: s.size, platform, addons, qty, unit, activation: fz.activation, reset: fz.reset });
   });
   const sub = round2(comps.reduce((n, c) => n + c.amt, 0));
   const u = userId ? await db.one("SELECT referred_by, country, (SELECT count(*)::int FROM orders WHERE user_id=$1 AND status='paid') n FROM users WHERE id=$1", [userId]) : null;
@@ -84,7 +97,7 @@ async function priceCart(items, { promo, coupon, userId, country, kind } = {}) {
       let take = 0;
       if (pr.vtype === 'free') { if (c.type === 'addon' && c.aid === pr.freeAddon) take = c.rem; }
       else { if (c.type === 'base' && !pr.lines.base) return; if (c.type === 'addon' && (!pr.lines.addon || !c.discountable)) return;
-        const pctV = pr.vtype === 'percent' ? Math.min(pr.value, pr.code && !pr.auto ? (cat.maxPromoPct || 100) : 100) : 0;
+        const pctV = pr.vtype === 'percent' ? Math.min(pr.value, pr.code || pr.auto ? (cat.maxPromoPct || 100) : 100) : 0;
         take = pr.vtype === 'percent' ? c.rem * pctV / 100 : pr.vtype === 'fixed' ? Math.min(c.rem, pr.value) : 0; }
       take = Math.min(take, Math.max(0, c.rem - c.floor)); if (pr.maxOff) take = Math.min(take, pr.maxOff - tot);
       take = Math.max(0, round2(take)); c.rem = round2(c.rem - take); tot += take; });
@@ -143,7 +156,7 @@ async function priceCart(items, { promo, coupon, userId, country, kind } = {}) {
     if (cc && left > 0) { const d = round2(left * Number(cc.pct) / 100); discount += d; lines.push({ label: cc.label, amount: -d, kind: 'coupon' }); applied = { ...(applied || {}), coupon: cc.code }; coupon = cc.code; }
   }
   const total = Math.max(0, round2(sub - discount));
-  return { items: norm, lines, subtotal: sub, discount: round2(discount), total, applied, promo: codeP && !codeP.aff ? codeP.code : affRow ? String(affRow.code).toUpperCase() : null, affiliate: affRow ? affRow.user : null, coupon: coupon || null };
+  return { items: norm, lines, subtotal: sub, discount: round2(discount), total, applied, promo: codeP && !codeP.aff ? codeP.code : affRow ? String(affRow.code).toUpperCase() : null, affiliate: affRow ? affRow.user : null, coupon: coupon || null, notes };
 }
 
 const ordCode = async (c) => 'FS-ORD-' + (await (c || db).one("SELECT nextval('seq_order') AS n")).n;
@@ -157,16 +170,16 @@ function simTraits(kind) {
   const sk = kind === 'funded' ? -0.06 + g() * 0.2 : -0.14 + g() * 0.18;
   return { skill: round2(sk), vol: round2(0.75 + Math.random() * 0.5), activity: round2(0.6 + Math.random() * 0.35), seed: Math.floor(Math.random() * 1e9) };
 }
-async function createAccount(c, { userId, orderId, plan, size, platform, addons, kind, parentId, rs }) {
-  const cat = await catalog();
+async function createAccount(c, { userId, orderId, plan, size, platform, addons, kind, parentId, rs, fees }) {
+  const cat = await catalog(); const fee = fees || feesNow(cat, plan, size);
   const snap = rs || R.snapshot(cat, plan, size);
   const k = kind || (plan === 'instant' ? 'funded' : 'evaluation');
   const id = await newAccountId(c, size);
   const st = R.initialState(cat, { plan, size, kind: k, rs: snap });
   const freeResets = (addons || []).includes('reset') ? 1 : 0;
-  await c.q(`INSERT INTO accounts(id,user_id,order_id,parent_id,plan,size,platform,kind,phase,start_bal,balance,peak_eod,floor,cycle_profit_start,addons,free_resets,today_date,sim,funded_at,rs)
-    VALUES($1,$2,$3,$4,$5,$6,$7,$8,'active',$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`,
-  [id, userId, orderId || null, parentId || null, plan, size, platform || 'Tradovate', k, st.start_bal, st.balance, st.peak_eod, st.floor, st.cycle_profit_start, JSON.stringify(addons || []), freeResets, tradeDate(), simTraits(k), k === 'funded' ? new Date() : null, snap]);
+  await c.q(`INSERT INTO accounts(id,user_id,order_id,parent_id,plan,size,platform,kind,phase,start_bal,balance,peak_eod,floor,cycle_profit_start,addons,free_resets,today_date,sim,funded_at,rs,fees)
+    VALUES($1,$2,$3,$4,$5,$6,$7,$8,'active',$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)`,
+  [id, userId, orderId || null, parentId || null, plan, size, platform || 'Tradovate', k, st.start_bal, st.balance, st.peak_eod, st.floor, st.cycle_profit_start, JSON.stringify(addons || []), freeResets, tradeDate(), simTraits(k), k === 'funded' ? new Date() : null, snap, fee ? JSON.stringify(fee) : null]);
   return id;
 }
 
@@ -190,7 +203,7 @@ async function fulfilOrder(orderId) {
     const cat = await catalog(); const made = [];
     if (o.kind === 'evaluation' || o.kind === 'instant' || o.kind === 'mixed') {
       for (const it of o.items) for (let i = 0; i < it.qty; i++) {
-        made.push(await createAccount(c, { userId: o.user_id, orderId: o.id, plan: it.plan, size: it.size, platform: it.platform, addons: it.addons }));
+        made.push(await createAccount(c, { userId: o.user_id, orderId: o.id, plan: it.plan, size: it.size, platform: it.platform, addons: it.addons, fees: it.unit != null && it.activation != null ? { price: Number(it.unit), activation: Number(it.activation), reset: Number(it.reset) } : undefined }));
       }
       for (const id of made) await notify(c, o.user_id, `Your account ${id} is ready`, 'Log in to your platform and place your first trade. Your rules are on the account page.', 'account?acct=' + id);
       for (const id of made) { const ac = await c.one('SELECT plan, size, platform FROM accounts WHERE id=$1', [id]); M('ready', o.user_id, { account: id, plan: await pName(ac.plan), size: kLabel(ac.size), platform: ac.platform, login: id, server: 'Funded Sky Simulated Feed', url: require('./auth').BASE() + '/app#account?acct=' + id }); }
@@ -243,12 +256,13 @@ async function resetAccount(c, accountId, userId, paid = 0) {
 
 // Passed evaluation -> funded account (Prime after agreement; Essential after activation fee)
 async function activateFunded(c, accountId, userId, orderId) {
+  const cat0 = await catalog();
   const a = await c.one('SELECT * FROM accounts WHERE id=$1 AND user_id=$2 FOR UPDATE', [accountId, userId]);
   if (!a) bad('Account not found', 404);
   if (a.phase !== 'passed') bad('This account has not passed yet');
   const existing = await c.one('SELECT id FROM accounts WHERE parent_id=$1', [a.id]);
   if (existing) return existing.id;
-  const id = await createAccount(c, { userId, orderId, plan: a.plan, size: a.size, platform: a.platform, addons: (a.addons || []).filter((x) => x === 'daily'), kind: 'funded', parentId: a.id, rs: a.rs || undefined });
+  const id = await createAccount(c, { userId, orderId, plan: a.plan, size: a.size, platform: a.platform, addons: (a.addons || []).filter((x) => x === 'daily'), kind: 'funded', parentId: a.id, rs: a.rs || undefined, fees: a.fees || feesOf(cat0, a) });
   const steps = { ...(a.steps || {}), funded: new Date().toISOString(), ...(orderId ? { activation: new Date().toISOString() } : {}) };
   await c.q("UPDATE accounts SET phase='closed', closed_at=now(), steps=$2 WHERE id=$1", [a.id, steps]);
   await c.q('UPDATE accounts SET steps=$2 WHERE id=$1', [id, steps]);
@@ -269,11 +283,41 @@ async function signAgreement(userId, accountId) {
     const steps = { ...(a.steps || {}), agreement: new Date().toISOString() };
     await c.q('UPDATE accounts SET steps=$2 WHERE id=$1', [a.id, steps]);
     await c.q("UPDATE users SET agreements = agreements || $2 WHERE id=$1", [userId, JSON.stringify({ funded: new Date().toISOString() })]);
-    const cat = await catalog(); const s = sizeDef(cat, a.plan, a.size);
-    if (!s.activation) { const id = await activateFunded(c, a.id, userId, null); return { funded: id }; }
-    if (!(a.steps && a.steps.agreement)) M('actfee', userId, { account: a.id, plan: await pName(a.plan), size: kLabel(a.size), fee: money(s.activation), url: require('./auth').BASE() + '/app#account?acct=' + a.id });
-    return { activation: s.activation };
+    const cat = await catalog(); const ord = a.order_id ? await c.one('SELECT items FROM orders WHERE id=$1', [a.order_id]) : null; const fee = feesOf(cat, a, ord).activation;
+    if (!fee) { const id = await activateFunded(c, a.id, userId, null); return { funded: id }; }
+    if (!(a.steps && a.steps.agreement)) M('actfee', userId, { account: a.id, plan: await pName(a.plan), size: kLabel(a.size), fee: money(fee), url: require('./auth').BASE() + '/app#account?acct=' + a.id });
+    return { activation: fee };
   });
+}
+
+// Payouts that still hold their gross out of the balance: in review, ready to send, or sent back by the provider
+const OPEN_PAY = ['requested', 'approved', 'failed'];
+const kvv = async (c, k) => ((await c.one('SELECT v FROM kv WHERE k=$1', [k])) || {}).v;
+// Why money cannot move on this account now: a dispute, a lost chargeback, a pause, or the account is closed
+async function payStop(c, a) {
+  const os = await c.all("SELECT id, meta FROM orders WHERE user_id=$1 AND meta ? 'chargeback'", [a.user_id]);
+  return R.payoutStop(a, R.cbFor(a, os)) || (['closed', 'breached'].includes(a.phase) ? `This account is ${a.phase}${a.breach_reason ? ' (' + a.breach_reason + ')' : ''}. Deny the payout instead.` : '');
+}
+const etDay = (d) => new Date(d || Date.now()).toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+// Checks before money is sent (Mark Sent, a batch, Rise): status, account, the Pause Payouts switch and Finance's daily limit
+async function sendCheck(c, p, a) {
+  if (p.status !== 'approved') bad('Approve the payout first');
+  const st = await payStop(c, a); if (st) bad(st);
+  if (((await kvv(c, 'store.risk.switches')) || {}).payouts) bad('Payouts are paused in Risk, Platform Health. Turn Pause Payouts off to send.');
+  const cap = Number(((await kvv(c, 'store.finance.settings')) || {}).dailyCap || 50000);
+  if (cap > 0) { const sent = (await c.one("SELECT COALESCE(sum(amount),0)::float n FROM payouts WHERE status='paid' AND (paid_at AT TIME ZONE 'America/New_York')::date = $1::date", [etDay()])).n;
+    if (sent + Number(p.amount) > cap) bad(`Sending this goes over the daily limit of ${money(cap)} (${money(sent)} sent today). Send it tomorrow or raise the limit in Finance Settings.`); }
+}
+async function canSend(code) { return db.tx(async (c) => { const p = await c.one('SELECT * FROM payouts WHERE code=$1', [code]); if (!p) bad('Payout not found', 404); const a = await c.one('SELECT * FROM accounts WHERE id=$1', [p.account_id]); await sendCheck(c, p, a); return true; }); }
+// Keep stored batches in step with their payouts
+async function syncBatches(c, code) {
+  const row = await c.one("SELECT v FROM kv WHERE k='store.batches' FOR UPDATE"); const list = (row && row.v) || []; let hit = null;
+  for (const bt of list) { if (!(bt.codes || []).includes(code) || bt.status === 'waiting') continue; hit = hit || bt;
+    const ps = await c.all('SELECT code, status FROM payouts WHERE code = ANY($1)', [bt.codes]); const n = (st) => ps.filter((x) => x.status === st).length;
+    bt.sentN = n('paid'); bt.fail = n('failed'); const why = Object.fromEntries((bt.manual || []).map((m) => [m.code, m.why])); bt.manual = ps.filter((x) => x.status === 'approved').map((x) => ({ code: x.code, why: why[x.code] || 'Send by hand, then use Mark Sent with the transaction hash' }));
+    const left = n('approved'); bt.status = !left && !bt.fail ? 'sent' : !bt.sentN && !bt.fail ? 'manual' : 'partial'; }
+  if (hit) await c.q("UPDATE kv SET v=$1, updated_at=now() WHERE k='store.batches'", [JSON.stringify(list)]);
+  return hit;
 }
 
 async function requestPayout(userId, accountId, amount, methodId) {
@@ -281,10 +325,13 @@ async function requestPayout(userId, accountId, amount, methodId) {
     const cat = await catalog();
     const a = await c.one('SELECT * FROM accounts WHERE id=$1 AND user_id=$2 FOR UPDATE', [accountId, userId]);
     if (!a) bad('Account not found', 404);
-    const pending = await c.one("SELECT 1 FROM payouts WHERE account_id=$1 AND status IN ('requested','approved')", [a.id]);
-    const qd = R.payoutQuote(cat, a, { pending: !!pending });
+    const open = await c.all('SELECT status, gross FROM payouts WHERE account_id=$1 AND status = ANY($2)', [a.id, OPEN_PAY]);
+    const os = await c.all("SELECT id, meta FROM orders WHERE user_id=$1 AND meta ? 'chargeback'", [userId]);
+    const qd = R.payoutQuote(cat, a, { pending: open.some((x) => x.status !== 'failed'), failed: open.some((x) => x.status === 'failed'), held: open.reduce((s, x) => s + Number(x.gross), 0), stop: R.payoutStop(a, R.cbFor(a, os)) });
     if (!qd.ok) bad(qd.reasons[0]);
-    const net = Math.floor(Number(amount) || qd.max);
+    const given = amount != null && amount !== '';
+    if (given && !Number.isFinite(Number(amount))) bad('Enter the amount as a number');
+    const net = Math.floor(given ? Number(amount) : qd.max);
     if (net < qd.payoutMin) bad(`The minimum payout is $${qd.payoutMin}`);
     if (net > qd.max) bad(`The most you can request right now is ${money(qd.max)}`);
     const m = await c.one('SELECT * FROM payout_methods WHERE id=$1 AND user_id=$2', [methodId, userId]);
@@ -293,58 +340,74 @@ async function requestPayout(userId, accountId, amount, methodId) {
     if (/usdc/i.test(m.rail) && (((await c.one("SELECT v FROM kv WHERE k='settings.flags'")) || {}).v || {}).cryptoPayouts === false) bad('USDC payouts are switched off right now. Pick another payout method.');
     const gross = round2(net / (qd.split / 100));
     const code = 'PO-' + (await c.one("SELECT nextval('seq_payout') n")).n;
-    await c.q(`INSERT INTO payouts(code,account_id,user_id,number,gross,split,amount,method,rail) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-      [code, a.id, userId, qd.number, gross, qd.split, net, m.label, m.rail]);
+    await c.q(`INSERT INTO payouts(code,account_id,user_id,number,gross,split,amount,method,rail,dest) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+      [code, a.id, userId, qd.number, gross, qd.split, net, m.label, m.rail, m.dest || null]);
     // Hold the gross amount out of the account while in review
     await c.q('UPDATE accounts SET balance=balance-$2 WHERE id=$1', [a.id, gross]);
     M('payreq', userId, { amount: money(net), account: a.id, time: etTime(), url: require('./auth').BASE() + '/app#payouts' });
     await notify(c, userId, `Payout ${code} requested`, `${money(net)} to ${m.label}. Reviewed in 1 to 2 business days.`, 'payouts');
-    require('./integrations').alert('payout', `:hourglass: Payout ${code} requested: ${money(net)} from ${a.id} (${m.rail})`);
+    { const wu = await c.one('SELECT tid, email FROM users WHERE id=$1', [userId]); require('./integrations').alert('payout', `:hourglass: Payout ${code} requested: ${money(net)} from ${a.id} (${m.rail})`, { payout: code, status: 'requested', account: a.id, number: qd.number, gross: Number(gross), split: qd.split, amount: Number(net), currency: 'USD', rail: m.rail, user: wu ? { id: wu.tid, email: wu.email } : null }); }
     return { code, net, gross };
   });
 }
 
-async function reviewPayout(actorId, code, action, note, batchId) {
+// opt: { tx } transaction hash or reference saved on a successful send; { sent: true } when the money already left (Rise)
+async function reviewPayout(actorId, code, action, note, batchId, opt = {}) {
   return db.tx(async (c) => {
     const p = await c.one('SELECT * FROM payouts WHERE code=$1 FOR UPDATE', [code]);
     if (!p) bad('Payout not found', 404);
     const a = await c.one('SELECT * FROM accounts WHERE id=$1 FOR UPDATE', [p.account_id]);
-    const cat = await catalog();
+    const cat = await catalog(); const url = require('./auth').BASE() + '/app#payouts';
     if (action === 'approve') {
       if (p.status !== 'requested') bad('Only requested payouts can be approved');
       const u = await c.one('SELECT kyc_status FROM users WHERE id=$1', [p.user_id]);
       if (u.kyc_status !== 'verified') bad('Verify this trader\'s identity before approving');
-      await c.q("UPDATE payouts SET status='approved', approved_at=now(), reviewed_by=$2, note=$3 WHERE id=$1", [p.id, actorId, note || '']);
-      M('payok', p.user_id, { amount: money(p.amount), method: p.method, url: require('./auth').BASE() + '/app#payouts' });
+      const st = await payStop(c, a); if (st) bad(st);
+      const who = await c.one('SELECT first, last FROM users WHERE id=$1', [actorId]);
+      const approvers = (opt.first ? [opt.first] : []).concat([{ id: actorId, name: who ? `${who.first} ${who.last || ''}`.trim() : '', note: note || '', at: new Date().toISOString() }]);
+      const notes = approvers.map((x) => x.note).filter(Boolean).join(' · ');
+      await c.q("UPDATE payouts SET status='approved', approved_at=now(), reviewed_by=$2, note=$3, approvers=$4 WHERE id=$1", [p.id, actorId, notes, JSON.stringify(approvers)]);
+      M('payok', p.user_id, { amount: money(p.amount), method: p.method, url });
       await notify(c, p.user_id, `Payout ${p.code} approved`, `${money(p.amount)} is being sent to ${p.method}.`, 'payouts');
     } else if (action === 'pay') {
-      if (p.status !== 'approved') bad('Approve the payout first');
-      const batch = batchId || ('PB-' + new Date().toISOString().slice(2, 10).replace(/-/g, ''));
-      await c.q("UPDATE payouts SET status='paid', paid_at=now(), batch=$2 WHERE id=$1", [p.id, batch]);
+      if (!opt.sent) await sendCheck(c, p, a); else if (p.status !== 'approved') bad('Approve the payout first');
+      const tx = opt.tx || null;
+      await c.q("UPDATE payouts SET status='paid', paid_at=now(), batch=COALESCE($2, batch), tx_hash=COALESCE($3, tx_hash), provider_ref=COALESCE(provider_ref, $3) WHERE id=$1", [p.id, batchId || null, tx]);
+      const bt = await syncBatches(c, p.code); if (bt && !batchId) await c.q('UPDATE payouts SET batch=$2 WHERE id=$1', [p.id, bt.id]);
       const r = R.rulesFor(cat, a);
       const count = a.payout_count + 1;
       const phase = r.reviewAfter && count >= r.reviewAfter ? 'review' : a.phase;
       await c.q(`UPDATE accounts SET payout_count=$2, paid_total=paid_total+$3, floor=${r.ddType === 'static' ? 'floor' : 'LEAST(floor, start_bal)'}, cycle_profit_start=balance, cycle_win_days=0, cycle_best=0, cycle_scalp=0, last_payout_at=now(), phase=$4, perks = perks - 'payCons' WHERE id=$1`, [a.id, count, p.amount, phase]);
       await points(c, p.user_id, 250, 'Payout ' + p.code);
-      M('paysent', p.user_id, { amount: money(p.amount), method: p.method, ref: p.provider_ref || p.code, url: require('./auth').BASE() + '/app#payouts' });
+      M('paysent', p.user_id, { amount: money(p.amount), method: p.method, ref: p.provider_ref || tx || p.code, url });
       await notify(c, p.user_id, `Payout ${p.code} sent`, `${money(p.amount)} sent to ${p.method}.`, 'payouts');
-      const I2 = require('./integrations'); I2.alert('payout', `:white_check_mark: Payout ${p.code} sent: ${money(p.amount)}`); I2.announce(`Another payout sent: ${money(p.amount)} to a ${a.size / 1000}K ${a.plan === 'instant' ? 'Instant' : 'funded'} trader. Congrats!`);
+      const I2 = require('./integrations'); { const wu = await c.one('SELECT tid, email FROM users WHERE id=$1', [p.user_id]); I2.alert('payout', `:white_check_mark: Payout ${p.code} sent: ${money(p.amount)}`, { payout: p.code, status: 'paid', account: a.id, number: p.number, gross: Number(p.gross), split: p.split, amount: Number(p.amount), currency: 'USD', rail: p.rail, method: p.method, ref: p.provider_ref || null, user: wu ? { id: wu.tid, email: wu.email } : null }); } I2.announce(`Another payout sent: ${money(p.amount)} to a ${a.size / 1000}K ${a.plan === 'instant' ? 'Instant' : 'funded'} trader. Congrats!`);
     } else if (action === 'fail') {
       if (p.status !== 'approved') bad('Only payouts ready to send can be marked failed');
-      await c.q("UPDATE payouts SET status='failed', note=$2 WHERE id=$1", [p.id, note || 'Sending failed']);
-      await notify(c, p.user_id, `Payout ${p.code} could not be sent`, (note || 'The payment provider sent it back.') + ' Check your payout details, then contact support.', 'payouts');
+      const why = note || 'Sending failed';
+      // The gross stays held: the payout is retried or denied (which returns it). New requests on the account wait until then.
+      await c.q("UPDATE payouts SET status='failed', note=$2, tries=tries+1, failed_at=now() WHERE id=$1", [p.id, why]);
+      await syncBatches(c, p.code);
+      M('payfail', p.user_id, { amount: money(p.amount), method: p.method, reason: why, url });
+      await notify(c, p.user_id, `Payout ${p.code} could not be sent`, why + '. Check your payout details, then contact support.', 'payouts');
     } else if (action === 'retry') {
       if (p.status !== 'failed') bad('Only failed payouts can be retried');
-      await c.q("UPDATE payouts SET status='approved', note='' WHERE id=$1", [p.id]);
+      const st = await payStop(c, a); if (st) bad(st);
+      await c.q("UPDATE payouts SET status='approved' WHERE id=$1", [p.id]);
+      await syncBatches(c, p.code);
+      M('payretry', p.user_id, { amount: money(p.amount), method: p.method, url });
+      await notify(c, p.user_id, `Payout ${p.code} is being sent again`, `${money(p.amount)} to ${p.method}.`, 'payouts');
     } else if (action === 'deny') {
-      if (!['requested', 'approved', 'failed'].includes(p.status)) bad('This payout can no longer be denied');
+      if (!OPEN_PAY.includes(p.status)) bad('This payout can no longer be denied');
       await c.q("UPDATE payouts SET status='denied', denied_at=now(), reviewed_by=$2, note=$3 WHERE id=$1", [p.id, actorId, note || '']);
       await c.q('UPDATE accounts SET balance=balance+$2 WHERE id=$1', [a.id, p.gross]);
+      await syncBatches(c, p.code);
+      M('paydeny', p.user_id, { amount: money(p.amount), account: a.id, reason: note || 'Support will contact you with details.', url });
       await notify(c, p.user_id, `Payout ${p.code} was not approved`, note || 'Support will contact you with details.', 'payouts');
     } else bad('Unknown action');
-    await c.q('INSERT INTO audit(actor_id,action,target,meta) VALUES($1,$2,$3,$4)', [actorId, 'payout.' + action, p.code, { note }]);
+    await c.q('INSERT INTO audit(actor_id,action,target,meta) VALUES($1,$2,$3,$4)', [actorId, 'payout.' + action, p.code, { note, tx: opt.tx || undefined }]);
     return { ok: true };
   });
 }
 
-module.exports = { agreementReady, referralSettings, priceOf, normPromo, catalog, saveCatalog, planDef, sizeDef, kLabel, priceCart, promoFor, ordCode, createAccount, fulfilOrder, resetAccount, activateFunded, signAgreement, requestPayout, reviewPayout, notify, points, audit };
+module.exports = { feesOf, feesNow, agreementReady, referralSettings, priceOf, normPromo, catalog, saveCatalog, planDef, sizeDef, kLabel, priceCart, promoFor, ordCode, createAccount, fulfilOrder, resetAccount, activateFunded, signAgreement, requestPayout, reviewPayout, canSend, OPEN_PAY, notify, points, audit };

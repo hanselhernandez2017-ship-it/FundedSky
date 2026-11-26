@@ -15,7 +15,11 @@ const { migrate } = require('./migrate');
 const { HttpError, bad, clean, round2 } = require('./util');
 
 const app = express();
-app.set('trust proxy', 1);
+// Client address (req.ip) for the staff network allowlist, the blocklist and rate limits. On Railway exactly one proxy (its edge)
+// sits in front of the app and it overwrites X-Forwarded-For, so trust one hop there. Anywhere else nothing is trusted by default,
+// or anyone could choose their own address with that header. TRUST_PROXY (a hop count, or false) overrides this.
+const TP = String(process.env.TRUST_PROXY || '').trim();
+app.set('trust proxy', /^\d+$/.test(TP) ? +TP : TP === 'true' ? 1 : TP === 'false' ? false : TP ? TP : (process.env.RAILWAY_ENVIRONMENT_NAME || process.env.RAILWAY_ENVIRONMENT || process.env.RAILWAY_PROJECT_ID ? 1 : false));
 app.disable('x-powered-by');
 app.use((req, res, next) => { res.setHeader('X-Content-Type-Options', 'nosniff'); res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin'); res.setHeader('X-Frame-Options', 'SAMEORIGIN'); next(); });
 const raw = express.raw({ type: '*/*', limit: '1mb' });
@@ -29,7 +33,10 @@ const REQSTAT = global.FS_REQSTAT = { hours: {}, routes: {} };
 app.use((req, res, next) => { if (!req.path.startsWith('/api')) return next(); const t0 = process.hrtime.bigint(); res.on('finish', () => { const ms = Number(process.hrtime.bigint() - t0) / 1e6; const hk = new Date().toISOString().slice(0, 13); const hb = REQSTAT.hours[hk] = REQSTAT.hours[hk] || { n: 0, fail: 0, ms: [] }; hb.n++; if (res.statusCode >= 500) hb.fail++; if (hb.ms.length < 2000) hb.ms.push(ms);
   const rk = req.path.replace(/\/[A-Za-z0-9_-]*\d[A-Za-z0-9_-]*/g, '/:id').split('/').slice(0, 4).join('/'); if (res.statusCode >= 400) { const r2 = REQSTAT.routes[rk] = REQSTAT.routes[rk] || {}; r2[hk] = (r2[hk] || 0) + 1; }
   const keys = Object.keys(REQSTAT.hours).sort(); while (keys.length > 25) delete REQSTAT.hours[keys.shift()]; }); next(); });
+// Back office settings such as the catalog version history can be larger than other requests
+app.use('/api/admin/store', express.json({ limit: '2mb' }));
 app.use(express.json({ limit: '200kb' }));
+app.use((err, req, res, next) => (err && (err.type === 'entity.too.large' || err.status === 413) ? res.status(413).json({ error: 'This is too large to save. Remove some entries and try again.' }) : err && err.type === 'entity.parse.failed' ? res.status(400).json({ error: 'The request was not valid JSON' }) : next(err)));
 app.use((req, res, next) => auth.loadUser(req, res, next).catch(next));
 
 // Basic rate limit for auth endpoints
@@ -47,13 +54,13 @@ app.get('/api/health', h(async () => ({ ok: true, db: !!(await db.one('SELECT 1 
 app.get('/api/catalog', h(async () => { const c = await core.catalog(); const RR = require('./rules');
   // Effective rules per plan and size, the same numbers the rule engine uses for a new account
   const rules = {}; c.plans.filter((p) => p.active).forEach((p) => { rules[p.id] = {}; p.sizes.forEach((z) => { const inst = p.id === 'instant' || p.kind === 'funded'; const ev = RR.rulesFor(c, { plan: p.id, size: z.size, kind: inst ? 'funded' : 'evaluation', payout_count: 0 }); const fu = inst ? ev : RR.rulesFor(c, { plan: p.id, size: z.size, kind: 'funded', payout_count: 0 }); const ov = ((c.planRules || {})[p.id] || {})[z.size] || {};
-    rules[p.id][z.size] = { target: inst ? ev.goal : ev.target, dll: ev.dll, maxLoss: ev.maxLoss, contracts: ev.fullContracts || ev.contracts, minDays: ev.minDays || 0, consistency: ev.consistency, split: fu.split, splitText: inst && ov.split == null ? `${c.instantCommon.splitFirst}%, then ${c.instantCommon.splitLater}%` : fu.split + '%', payoutMin: fu.payoutMin }; }); });
+    const sf = fu.splitFirst != null && fu.splitFirstCount ? [fu.splitFirst, fu.splitFirstCount, fu.splitLater] : inst && !ov.funded && ov.split == null ? [c.instantCommon.splitFirst, c.instantCommon.splitFirstCount, c.instantCommon.splitLater] : null;
+    rules[p.id][z.size] = { target: inst ? ev.goal : ev.target, dll: ev.dllOff ? 0 : ev.dll, dllOff: !!ev.dllOff || !ev.dll, dllMode: ev.dllMode, ddType: ev.ddType || 'eod', maxLoss: ev.maxLoss, contracts: ev.fullContracts || ev.contracts, minDays: ev.minDays || 0, consistency: ev.consOff ? null : ev.consistency, consOff: !!ev.consOff, split: fu.split, splitText: sf && sf[0] !== sf[2] ? `${sf[0]}% for the first ${sf[1]}, then ${sf[2]}%` : fu.split + '%', payoutMin: fu.payoutMin, winDayMin: fu.winDayMin }; }); });
   const pubPlans = c.plans.filter((p) => p.active).map((p) => Object.assign({}, p, { sizes: p.sizes.map((z) => ({ size: z.size, price: core.priceOf(z), activation: z.activation, compare: z.compare && z.compare > core.priceOf(z) ? z.compare : undefined })), bundleOff: undefined }));
-  return { rules, plans: pubPlans, evalRules: c.evalRules, evalCommon: c.evalCommon, fundedCommon: c.fundedCommon, fundedCaps: c.fundedCaps, instantRules: c.instantRules, instantCommon: c.instantCommon, instantCaps: c.instantCaps, addons: c.addons, resetPct: c.resetPct, bundles: c.bundles, promos: (c.promos || []).filter((p) => p.active && !(Number(p.total) === 1) && (!p.ends || p.ends >= new Date().toISOString().slice(0, 10))).map(({ code, name, pct, plans, starts, ends, desc }) => ({ code, name, pct, plans, starts, ends, desc })), payments: pay.mode(), packLadder: await require('./packs').publicLadder(), credits: await require('./packs').publicCredits() }; }));
-app.get('/api/public-config', h(async () => { const m = await pay.refreshMode(); const crisp = await I.cfg('crisp'); const ph = await I.cfg('posthog'); const ss = await I.cfg('sumsub');
+  return { rules, plans: pubPlans, evalRules: c.evalRules, evalCommon: c.evalCommon, fundedCommon: c.fundedCommon, fundedCaps: c.fundedCaps, instantRules: c.instantRules, instantCommon: c.instantCommon, instantCaps: c.instantCaps, addons: c.addons, resetPct: c.resetPct, bundles: c.bundles, promos: (c.promos || []).filter((p) => p.active && !(Number(p.total) === 1) && !p.once && !p.first && !String(p.countries || '').trim() && (!p.ends || p.ends >= new Date().toISOString().slice(0, 10))).map(({ code, name, pct, plans, starts, ends, desc }) => ({ code, name, pct, plans, starts, ends, desc })), payments: pay.mode(), packLadder: await require('./packs').publicLadder(), credits: await require('./packs').publicCredits() }; }));
+app.get('/api/public-config', h(async (req) => { const m = await pay.refreshMode(); const crisp = await I.cfg('crisp'); const ph = await I.cfg('posthog'); const ss = await I.cfg('sumsub');
   const kv2 = await db.all("SELECT k, v FROM kv WHERE k IN ('settings.flags','settings.maint')"); const g = (k) => (kv2.find((r) => r.k === k) || {}).v || {};
-  const ann = await db.one("SELECT v FROM kv WHERE k='list.announcements'"); const now = new Date().toISOString().slice(0, 10);
-  return { announcements: ((ann && ann.v) || []).filter((a) => a.live && (!a.ends || a.ends >= now) && (!a.starts || a.starts <= new Date().toISOString())), flags: g('settings.flags'), maint: g('settings.maint').on ? g('settings.maint').msg : '', card: m.card, stripePk: m.stripePk || '', backup: m.backup || '', stripeBackup: m.backup === 'stripe', crypto: m.crypto, live: m.live, tokenizationKey: m.tokenizationKey || '', gatewayUrl: m.gatewayUrl || '', crisp: crisp ? crisp.websiteId : '', support: await require('./support').publicInfo(), posthog: ph ? { key: ph.projectKey, host: ph.host } : null, sumsub: !!ss }; }));
+  return { announcements: await require('./announce').banners(req.user || null), flags: g('settings.flags'), maint: g('settings.maint').on ? g('settings.maint').msg : '', card: m.card, stripePk: m.stripePk || '', backup: m.backup || '', stripeBackup: m.backup === 'stripe', crypto: m.crypto, live: m.live, tokenizationKey: m.tokenizationKey || '', gatewayUrl: m.gatewayUrl || '', crisp: crisp ? crisp.websiteId : '', support: await require('./support').publicInfo(), posthog: ph ? { key: ph.projectKey, host: ph.host } : null, sumsub: !!ss }; }));
 app.get('/api/me', h(async (req) => (req.user ? { user: { email: req.user.email, first: req.user.first, last: req.user.last, role: req.user.role, verified: req.user.verified, country: req.user.country } } : { user: null })));
 app.post('/api/auth/signup', limit(8, 60000), h((req, res) => auth.signup(req, res)));
 app.post('/api/auth/login', limit(10, 60000), h((req, res) => auth.login(req, res)));
@@ -64,9 +71,14 @@ app.post('/api/auth/mfa/enable', needStaffUser, limit(10, 60000), h((req) => req
 app.post('/api/auth/logout', h((req, res) => auth.logout(req, res)));
 app.post('/api/auth/forgot', limit(5, 60000), h((req) => auth.forgot(req)));
 app.post('/api/auth/reset', limit(10, 60000), h((req, res) => auth.resetPassword(req, res)));
+app.post('/api/auth/reset/check', limit(20, 60000), h((req) => auth.resetCheck(req)));
 app.post('/api/auth/verify', limit(10, 60000), h((req) => auth.verifyEmail(req)));
 app.post('/api/auth/resend', auth.needUser, limit(4, 60000), h((req) => auth.resendVerify(req)));
-app.post('/api/cart/price', h(async (req) => core.priceCart(req.body.items, { promo: req.body.promo, coupon: req.body.coupon, userId: req.user && req.user.id })));
+app.post('/api/auth/email', auth.needUser, limit(4, 60000), h((req) => auth.changeEmail(req)));
+app.post('/api/cart/price', h(async (req) => { const out = await core.priceCart(req.body.items, { promo: req.body.promo, coupon: req.body.coupon, userId: req.user && req.user.id });
+  // the same limits the order is checked against (blocked countries, caps), so checkout can say why before payment
+  if (req.user) { try { await pay.checkLimits(req.user, out.items); } catch (e) { if (!e.status || e.status >= 500) throw e; out.blocked = e.message; } }
+  return out; }));
 
 // ---------- trader ----------
 const T = express.Router(); T.use((req, res, next) => (req.path.startsWith('/admin/') ? next('router') : auth.needUser(req, res, next)));
@@ -99,7 +111,9 @@ T.post('/payout-methods', h(async (req) => {
   if (rail === 'USDC' && !/^0x[a-fA-F0-9]{40}$/.test(raw)) bad('Enter a full wallet address that starts with 0x');
   const label = rail === 'USDC' ? `USDC · Wallet ${raw.slice(0, 6)}…${raw.slice(-4)}` : `Rise · Bank •••• ${raw.replace(/\D/g, '').slice(-4) || raw.slice(-4)}`;
   const n = (await db.one('SELECT count(*)::int n FROM payout_methods WHERE user_id=$1', [req.user.id])).n; if (n >= 5) bad('You can keep up to 5 payout methods');
-  await db.q("INSERT INTO payout_methods(user_id,rail,label,is_default,unlock_at) VALUES($1,$2,$3,$4, now() + interval '48 hours')", [req.user.id, rail, label, n === 0]);
+  // The full wallet address is stored encrypted for Finance; traders and other staff only see the masked label. The keyed hash finds one destination saved by several traders.
+  const norm = rail === 'USDC' ? raw.toLowerCase() : raw.replace(/[^0-9a-z]/gi, '').toLowerCase();
+  await db.q("INSERT INTO payout_methods(user_id,rail,label,is_default,unlock_at,dest,dest_hash) VALUES($1,$2,$3,$4, now() + interval '48 hours',$5,$6)", [req.user.id, rail, label, n === 0, rail === 'USDC' ? I.enc(raw) : null, I.mac(rail + ':' + norm)]);
   await core.notify(null, req.user.id, 'New payout method added', `${label}. It can be used in 48 hours. If this wasn't you, contact support now.`, 'settings?tab=pay');
   if (rail === 'Rise') { const r = await flows.riseInvite(req.user); if (r === 'invited') await core.notify(null, req.user.id, 'Check your email for a Rise invite', 'Finish Rise onboarding so we can send your payouts.', 'settings?tab=pay'); }
 }));
@@ -147,7 +161,8 @@ const SETTING_KEYS = ['nEmail', 'nSms', 'nPush', 'nNews', 'nMkt', 'nComp', 'mfaP
 T.post('/settings', h(async (req) => { const o = {}; for (const k of SETTING_KEYS) if (k in req.body) o[k] = !!req.body[k]; await db.q('UPDATE users SET settings = settings || $2 WHERE id=$1', [req.user.id, JSON.stringify(o)]); }));
 T.post('/profile', h(async (req) => { const ph = require('./phone').parse(req.body.phoneIso, req.body.phone); if (ph.err) bad(ph.err); await db.q("UPDATE users SET phone=$2, settings=COALESCE(settings,'{}'::jsonb)||jsonb_build_object('phoneIso',$3::text) WHERE id=$1", [req.user.id, ph.phone, ph.iso]); return { ok: true, phone: ph.phone }; }));
 T.post('/password', h((req) => auth.changePassword(req)));
-T.post('/sessions/:prefix/revoke', h(async (req) => { await db.q("DELETE FROM sessions WHERE user_id=$1 AND token LIKE $2 || '%' AND token<>$3", [req.user.id, clean(req.params.prefix, 20), req.sess]); }));
+T.post('/sessions/:prefix/revoke', h(async (req) => { const p = String(req.params.prefix || ''); if (!/^[A-Za-z0-9_-]{6,20}$/.test(p)) bad('Unknown session'); await db.q("DELETE FROM sessions WHERE user_id=$1 AND left(token, length($2)) = $2 AND token<>$3", [req.user.id, p, req.sess]); }));
+T.post('/sessions/revoke-all', h(async (req) => { await db.q('DELETE FROM sessions WHERE user_id=$1 AND token<>$2', [req.user.id, req.sess]); }));
 T.post('/journal/note', h(async (req) => {
   const day = clean(req.body.day, 10); if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) bad('Pick a day first');
   await db.q("UPDATE users SET settings = jsonb_set(settings, '{notes}', COALESCE(settings->'notes','{}'::jsonb) || jsonb_build_object($2::text, $3::text)) WHERE id=$1", [req.user.id, day, clean(req.body.text, 2000)]);
@@ -193,10 +208,20 @@ T.post('/certs/:id/share', h(async (req) => {
   return { url: require('./auth').BASE() + '/cert/' + c.id, points: recent ? 0 : 50 };
 }));
 T.post('/kyc/sumsub', h((req) => flows.sumsubToken(req.user)));
-T.post('/tax/form', h((req) => flows.taxForm(req.user)));
+T.post('/tax/form', h((req) => flows.taxForm(req.user, req.body || {})));
+// Identity details typed in by the trader (used when Sumsub is not connected). Staff review them by hand.
+const ID_TYPES = ['Passport', "Driver's License", 'National ID Card'];
 T.post('/kyc', h(async (req) => {
-  const b = req.body; const k = { name: clean(b.name, 120), dob: clean(b.dob, 12), country: clean(b.country, 60), idType: clean(b.idType, 40), idLast4: clean(b.idNumber, 40).slice(-4), at: new Date().toISOString() };
-  if (!k.name || !k.dob) bad('Fill in every field');
+  const b = req.body || {}; if (req.user.kyc_status === 'verified') bad('Your identity is already verified. Nothing more to send.');
+  const name = clean(b.name, 120); if (name.length < 3 || !/\s/.test(name)) bad('Enter your full legal name, first and last, as it is on your ID');
+  const dob = clean(b.dob, 12); const dm = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dob); const dd = dm && new Date(Date.UTC(+dm[1], +dm[2] - 1, +dm[3]));
+  if (!dd || dd.getUTCMonth() !== +dm[2] - 1 || dd.getUTCDate() !== +dm[3]) bad('Enter your date of birth');
+  const now = new Date(); const age = now.getUTCFullYear() - +dm[1] - ((now.getUTCMonth() + 1) * 100 + now.getUTCDate() < +dm[2] * 100 + +dm[3] ? 1 : 0);
+  if (dd > now) bad('Your date of birth cannot be in the future'); if (age < 18) bad('You must be 18 or older to trade with Funded Sky'); if (age > 120) bad('Check the year of your date of birth');
+  const crow = require('./phone').DIAL.find((x) => x[0].toLowerCase() === clean(b.country, 60).toLowerCase()); if (!crow) bad('Choose your country of residence from the list');
+  const idType = ID_TYPES.find((x) => x === clean(b.idType, 40)); if (!idType) bad('Choose your ID type');
+  const idn = clean(b.idNumber, 40).replace(/[\s-]/g, ''); if (!/^[A-Za-z0-9]{5,20}$/.test(idn) || !/\d/.test(idn)) bad('Enter the ID number exactly as it is on the document (5 to 20 letters and numbers)');
+  const k = { name, dob, country: crow[0], idType, idLast4: idn.slice(-4), at: new Date().toISOString() };
   await db.q("UPDATE users SET kyc=$2, kyc_status='submitted' WHERE id=$1 AND kyc_status<>'verified'", [req.user.id, k]);
 }));
 T.post('/affiliate/apply', needFlag('affiliates', 'The affiliate program is not taking applications right now'), h(async (req) => { const b = req.body || {}; await db.q("UPDATE users SET settings = settings || $2 WHERE id=$1", [req.user.id, JSON.stringify({ affApplied: true, affAt: new Date().toISOString(), affWhere: clean(b.where, 120), affAudience: clean(b.audience, 200) })]); }));
@@ -212,8 +237,12 @@ app.use('/api/admin', (req, res, next) => (req.user && req.user.id === 0 ? next(
 // ---------- pages ----------
 const DIST = path.join(__dirname, '..', 'web', 'dist');
 const page = (f) => (req, res) => res.sendFile(path.join(DIST, f));
-const needPage = (staff) => (req, res, next) => { if (!req.user) return res.redirect('/login?next=' + encodeURIComponent(req.originalUrl)); if (staff && !auth.STAFF.includes(req.user.role)) return res.redirect('/app'); if (staff && !auth.staffOk(req.user)) return res.redirect('/admin-2fa?next=' + encodeURIComponent(req.originalUrl)); next(); };
-app.get('/admin-2fa', (req, res) => { if (!req.user) return res.redirect('/login?next=/admin'); if (!auth.STAFF.includes(req.user.role)) return res.redirect('/app'); if (auth.staffOk(req.user)) return res.redirect('/admin'); res.sendFile(path.join(__dirname, 'mfa-setup.html')); });
+const needPage = (staff) => (req, res, next) => { if (!req.user) return res.redirect('/login?next=' + encodeURIComponent(req.originalUrl)); if (staff && !auth.STAFF.includes(req.user.role)) return res.redirect('/app'); if (staff && req.user.netBlocked) return res.status(403).send(blockedPage(req)); if (staff && !auth.staffOk(req.user)) return res.redirect('/admin-2fa?next=' + encodeURIComponent(req.originalUrl)); next(); };
+app.get('/admin-2fa', (req, res) => { if (!req.user) return res.redirect('/login?next=/admin'); if (!auth.STAFF.includes(req.user.role)) return res.redirect('/app'); if (auth.staffOk(req.user)) return res.redirect('/admin'); if (req.user.netBlocked && req.user.mfa_on && req.user.sess_mfa) return res.status(403).send(blockedPage(req)); res.setHeader('Vary', 'Cookie'); if (!/(?:^|;\s*)fs_theme=light/.test(req.headers.cookie || '')) return res.sendFile(path.join(__dirname, 'mfa-setup.html')); res.type('html').send(MFA_LIGHT || (MFA_LIGHT = require('../scripts/lighten').lighten(require('fs').readFileSync(path.join(__dirname, 'mfa-setup.html'), 'utf8')))); });
+let MFA_LIGHT = null; // light-theme copy of the two-step setup page, made once
+// Staff outside Team > Security > Allowed Networks: say why instead of showing the two-step login page
+function blockedPage(req) { const hd = fs.readFileSync(path.join(__dirname, 'mfa-setup.html'), 'utf8'); const ip = String(req.ip || '').replace(/^::ffff:/, '').replace(/[^0-9a-fA-F:.]/g, '');
+  return hd.slice(0, hd.indexOf('<body>')).replace(/<title>[^<]*<\/title>/, '<title>Network Not Allowed · Funded Sky</title>') + `<body><main class="card"><h1>This Network Is Not Allowed</h1><p>The back office only opens from your company network or VPN. You are connecting from <b>${ip || 'an unknown address'}</b>.</p><p>Connect to the office network or VPN and refresh, or ask an admin to add this address in Team, Security, Allowed Networks.</p><p class="foot"><a href="/logout?next=/login">Log Out</a></p></main></body></html>`; }
 app.use('/static', express.static(path.join(DIST, 'static'), { maxAge: '1h' }));
 // Visitor counting for Analytics: one count per browser per day on public pages, with the traffic source (first touch kept in fs_src).
 const VPAGES = new Set(['/', '/checkout', '/checkout/payment', '/signup', '/login', '/terms', '/privacy', '/refund-policy', '/rules', '/faq', '/status']);
@@ -243,7 +272,7 @@ app.use((req, res, next) => {
 });
 app.get('/', async (req, res) => {
   if (req.query.ref) {
-    const code = clean(req.query.ref, 40); res.setHeader('Set-Cookie', `fs_ref=${encodeURIComponent(code)}; Path=/; Max-Age=${30 * 86400}; SameSite=Lax`);
+    const code = clean(req.query.ref, 40); res.append('Set-Cookie', `fs_ref=${encodeURIComponent(code)}; Path=/; Max-Age=${30 * 86400}; SameSite=Lax`);
     const d = new Date().toISOString().slice(0, 10);
     if (/^[A-Za-z0-9_-]{2,40}$/.test(code)) await db.q("INSERT INTO kv(k,v) VALUES($1, jsonb_build_object($2::text, 1)) ON CONFLICT (k) DO UPDATE SET v = kv.v || jsonb_build_object($2::text, COALESCE((kv.v->>$2)::int,0)+1), updated_at=now()", ['refclicks.' + code, d]).catch(() => {});
     return res.redirect(req.user ? '/app' : '/signup?ref=' + encodeURIComponent(code));
@@ -257,12 +286,14 @@ app.get('/checkout/confirmed', themed('confirmed.html'));
 app.get('/checkout/credits', needPage(false), async (req, res, next) => { if (!(await require('./packs').enabled())) return res.redirect('/app'); themed('credits.html')(req, res, next); });
 app.get('/login', (req, res, next) => (req.user && !req.query.next ? res.redirect(auth.STAFF.includes(req.user.role) && req.query.admin ? '/admin' : '/app') : next()), themed('login.html'));
 app.get('/signup', (req, res) => themed('signup.html')(req, res));
-const editable = (slug, f) => async (req, res) => {
-  const pg = ((await db.one("SELECT v FROM kv WHERE k='content.pages'").catch(() => null)) || {}).v || {}; const p = pg[slug];
-  if (!p || p.status !== 'Published' || !p.txt) return res.sendFile(path.join(DIST, f));
-  const e = (x) => String(x || '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  const body = String(p.txt).split(/\n\n+/).map((para) => (/^#+\s/.test(para) ? `<h2>${e(para.replace(/^#+\s*/, ''))}</h2>` : `<p>${e(para).replace(/\n/g, '<br>')}</p>`)).join('');
-  res.send(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Funded Sky: ${e(p.title)}</title><style>body{margin:0;background:#08080A;color:#D4CFCD;font-family:"Mona Sans",system-ui;line-height:1.6}main{max-width:720px;margin:0 auto;padding:56px 24px}h1{color:#F4F2F1;font-size:32px;margin:0 0 6px}h2{color:#F4F2F1;font-size:18px;margin:28px 0 6px}a{color:#7CC4FF}.n{color:#9C9693;font-size:14px}</style></head><body><main><p><a href="/">← Funded Sky</a></p><h1>${e(p.title)}</h1><p class="n">Last updated ${e(new Date(p.at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }))}</p>${body}</main></body></html>`);
+// Policy pages: the text published in Content > Website Pages, otherwise the built-in summary (FAQ has none: it is a 404 until one is published)
+const PO = require('./policy');
+const editable = (slug) => async (req, res) => {
+  const pg = ((await db.one("SELECT v FROM kv WHERE k='content.pages'").catch(() => null)) || {}).v || {}; const p = pg[slug]; res.setHeader('Vary', 'Cookie');
+  if (p && p.status === 'Published' && p.txt) { const d = p.at && new Date(p.at); return res.send(PO.page({ req, title: p.title || slug, note: d && !isNaN(d) ? 'Last updated ' + PO.esc(d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'America/New_York' })) : '', body: PO.fromText(p.txt) })); }
+  const bi = PO.builtIn(slug, (await require('./mail').company()).support);
+  if (bi) return res.send(PO.page(Object.assign({ req }, bi)));
+  res.status(404).sendFile(path.join(DIST, '404.html'), (e) => e && res.status(404).send('Not found'));
 };
 // One-click unsubscribe from marketing emails (signed link in every marketing email)
 async function unsub(req, res) {
@@ -292,20 +323,21 @@ app.get('/status', async (req, res) => {
   const rows = [['Website and Checkout', 'ok'], ['Trader Dashboard', 'ok']].concat(list.filter((x) => ['tailoredpay', 'stripe', 'confirmo', 'rise', 'sumsub', 'resend'].includes(x.id)).map((x) => [x.name, x.status === 'live' ? 'ok' : 'w']));
   res.send(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Funded Sky Status</title><meta http-equiv="refresh" content="60"><style>body{margin:0;background:#08080A;color:#D4CFCD;font-family:"Mona Sans",system-ui;line-height:1.5}main{max-width:720px;margin:0 auto;padding:56px 24px}h1{color:#F4F2F1;font-size:28px;margin:0 0 18px}.bar{padding:14px 18px;border-radius:12px;background:${open.length ? '#2A2113' : '#10241A'};color:${open.length ? '#F2C46D' : '#5FD39A'};font-weight:600;margin-bottom:22px}.r{display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid #26262A}.ok{color:#5FD39A}.w{color:#F2C46D}h2{color:#F4F2F1;font-size:17px;margin:30px 0 8px}.i{padding:12px 0;border-bottom:1px solid #26262A}.n{color:#9C9693;font-size:13px}a{color:#7CC4FF}</style></head><body><main><p><a href="/">← Funded Sky</a></p><h1>System Status</h1><div class="bar">${open.length ? e(open[0].t) : 'Everything is working'}</div>${rows.map(([n, st]) => `<div class="r"><span>${e(n)}</span><span class="${st}">${st === 'ok' ? 'Normal' : 'Slower than usual'}</span></div>`).join('')}<h2>Recent Incidents</h2>${inc.map((x) => `<div class="i"><b>${e(x.t)}</b> <span class="n">· ${x.st === 'resolved' ? 'Resolved' : 'Ongoing'} · ${e(new Date(x.at).toUTCString().slice(0, 22))} UTC</span>${(x.upd || []).slice(-1).map((u) => `<div class="n">${e(typeof u === 'string' ? u : u.text)}</div>`).join('')}</div>`).join('') || '<p class="n">No incidents reported.</p>'}</main></body></html>`);
 });
-app.get('/terms', editable('terms', 'terms.html'));
-app.get('/privacy', editable('privacy', 'privacy.html'));
-app.get('/refund-policy', editable('refund-policy', 'refund-policy.html'));
+app.get('/terms', editable('terms'));
+app.get('/privacy', editable('privacy'));
+app.get('/refund-policy', editable('refund-policy'));
 // Rules page: staff-written text if published in Content, otherwise the live rules for every plan and size from the catalog
 app.get('/rules', async (req, res, next) => {
-  const pg = ((await db.one("SELECT v FROM kv WHERE k='content.pages'").catch(() => null)) || {}).v || {}; if (pg.rules && pg.rules.status === 'Published' && pg.rules.txt) return editable('rules', 'terms.html')(req, res, next);
+  const pg = ((await db.one("SELECT v FROM kv WHERE k='content.pages'").catch(() => null)) || {}).v || {}; if (pg.rules && pg.rules.status === 'Published' && pg.rules.txt) return editable('rules')(req, res, next);
   try { const c = await core.catalog(); const RR = require('./rules'); const e = (x) => String(x == null ? '' : x).replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch])); const m = (v) => '$' + Number(v || 0).toLocaleString('en-US');
     const RT = require('./ruletable');
     const tables = c.plans.filter((p) => p.active).map((p) => { const t = RT.planTable(c, p.id); if (!t || !t.sizes.length) return '';
       return `<h2>${e(p.name || p.short)}</h2><p>${e(p.desc || '')}</p><div class="tw"><table><thead><tr><th></th>${t.sizes.map((z) => `<th>$${z / 1000}K</th>`).join('')}</tr></thead><tbody>${t.rows.map((r) => (r.length === 1 ? `<tr class="g"><th colspan="${t.sizes.length + 1}">${e(r[0])}</th></tr>` : `<tr><th>${e(r[0])}</th>${r.slice(1).map((v) => `<td>${e(v)}</td>`).join('')}</tr>`)).join('')}</tbody></table></div>`; }).join('');
-    res.send(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Funded Sky: Trading Rules</title><style>body{margin:0;background:#08080A;color:#D4CFCD;font-family:"Mona Sans",system-ui,sans-serif;line-height:1.6}main{max-width:900px;margin:0 auto;padding:56px 24px}h1{color:#F4F2F1;font-size:32px;margin:0 0 8px}h2{color:#F4F2F1;font-size:21px;margin:36px 0 4px}a{color:#7CC4FF}.lg{font-weight:700;color:#F4F2F1;text-decoration:none;font-size:20px}.lg i{font-style:normal;background:#7CC4FF;color:#08080A;border-radius:4px;padding:1px 6px;margin-left:6px;font-size:14px}.tw{overflow-x:auto;border:1px solid #26262A;border-radius:10px;margin-top:12px}table{border-collapse:collapse;width:100%;font-size:14px;min-width:560px}th,td{padding:10px 14px;border-bottom:1px solid #1C1C20;text-align:right;white-space:nowrap}tbody th{text-align:left;color:#9C9693;font-weight:500}thead th{color:#F4F2F1}tr:last-child th,tr:last-child td{border-bottom:0}tr.g th{color:#F4F2F1;font-weight:600;padding-top:18px;text-align:left}td{white-space:normal;min-width:120px}</style></head><body><main><a class="lg" href="/">fundedsky<i>futures</i></a><h1 style="margin-top:28px">Trading Rules</h1><p>The rules every new account starts with, straight from our live catalog. Your own accounts show their rules in the dashboard. Questions: <a href="mailto:support@fundedsky.com">support@fundedsky.com</a></p>${tables}<p style="margin-top:32px"><a href="/checkout">Choose an account</a> · <a href="/terms">Terms of Service</a></p></main></body></html>`); } catch (err) { next(err); }
+    const sup = e((await require('./mail').company()).support); res.setHeader('Vary', 'Cookie');
+    res.send(PO.page({ req, wide: true, title: 'Trading Rules', note: `The rules every new account starts with, straight from our live catalog. Your own accounts show their rules in the dashboard. Questions: <a href="mailto:${sup}">${sup}</a>`, css: 'h2{font-size:21px;margin:36px 0 4px}.tw{overflow-x:auto;border:1px solid var(--ln);border-radius:10px;margin-top:12px}table{border-collapse:collapse;width:100%;font-size:14px;min-width:560px}th,td{padding:10px 14px;border-bottom:1px solid var(--ln2);text-align:right;white-space:nowrap}tbody th{text-align:left;color:var(--mu);font-weight:500}thead th{color:var(--hd)}tr:last-child th,tr:last-child td{border-bottom:0}tr.g th{color:var(--hd);font-weight:600;padding-top:18px;text-align:left}td{white-space:normal;min-width:120px}', body: `${tables}<p style="margin-top:32px"><a href="/checkout">Choose an Account</a> · <a href="/terms">Terms of Service</a></p>` })); } catch (err) { next(err); }
 });
-app.get('/faq', editable('faq', 'terms.html'));
-app.get('/logout', async (req, res) => { await auth.logout(req, res); const n = String(req.query.next || '/login'); res.redirect(n.startsWith('/') && !n.startsWith('//') ? n : '/login'); });
+app.get('/faq', editable('faq'));
+app.get('/logout', async (req, res) => { await auth.logout(req, res); const n = String(req.query.next || '/login'); res.redirect(/^\/(?![\/\\])/.test(n) && !/[\u0000-\u001f\\]/.test(n) ? n : '/login'); });
 app.get('/forgot-password', (req, res) => themed('forgot.html')(req, res));
 app.get('/reset-password', (req, res) => themed('reset-password.html')(req, res));
 app.get('/verify-email', (req, res) => themed('verify.html')(req, res));

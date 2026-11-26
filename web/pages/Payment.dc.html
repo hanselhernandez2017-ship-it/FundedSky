@@ -75,13 +75,14 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 <legend style="font-size: 18px; line-height: 24px; font-weight: 600; letter-spacing: -0.01em; margin-bottom: 4px; padding: 0;">Create Your Account</legend>
 <p style="margin: 0 0 4px; font-size: 14px; line-height: 20px; color: #9C9693;">Already have an account? <a href="{{ loginHref }}">Log In</a></p>
 <div style="display: flex; flex-direction: column; gap: 6px;"><label for="email" style="font-size: 13px; color: #9C9693;">Email</label><input id="email" class="fs-in" value="{{ f_email }}" onChange="{{ set_email }}" type="email" autocomplete="email" placeholder="you@example.com" style="height: 48px; box-sizing: border-box; background: #111113; border-radius: 4px; padding: 0 14px; color: #F4F2F1; font: inherit; font-size: 15px;"></div>
-<div style="display: flex; flex-direction: column; gap: 6px;"><label for="pw" style="font-size: 13px; color: #9C9693;">Password</label><input id="pw" class="fs-in" value="{{ f_pw }}" onChange="{{ set_pw }}" type="password" autocomplete="new-password" placeholder="At least 8 characters" style="height: 48px; box-sizing: border-box; background: #111113; border-radius: 4px; padding: 0 14px; color: #F4F2F1; font: inherit; font-size: 15px;"></div>
+<div style="display: flex; flex-direction: column; gap: 6px;"><label for="pw" style="font-size: 13px; color: #9C9693;">Password</label><input id="pw" class="fs-in" value="{{ f_pw }}" onChange="{{ set_pw }}" type="password" autocomplete="new-password" aria-invalid="{{ pwBad }}" aria-describedby="pw-rules" style="height: 48px; box-sizing: border-box; background: #111113; border-radius: 4px; padding: 0 14px; color: #F4F2F1; font: inherit; font-size: 15px; border-color: {{ pwBd }};"><div id="pw-rules" aria-live="polite" style="display: flex; flex-direction: column; gap: 6px; margin-top: 2px;"><div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px;" role="meter" aria-label="Password Strength" aria-valuemin="0" aria-valuemax="4" aria-valuenow="{{ strengthNow }}" aria-valuetext="{{ strengthLabel }}"><sc-for list="{{ segs }}" as="s" hint-placeholder-count="4"><span style="height: 4px; border-radius: 2px; background: {{ s.bg }}; transition: background .2s;"></span></sc-for></div><div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 13px;"><span style="color: {{ hintColor }};">{{ strengthHint }}</span><sc-if value="{{ hasLevel }}"><span style="color: {{ strengthColor }}; font-weight: 600; white-space: nowrap;">{{ strengthLabel }}</span></sc-if></div></div></div>
 <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px;">
 <div style="display: flex; flex-direction: column; gap: 6px; min-width: 0;"><label for="first" style="font-size: 13px; color: #9C9693;">First Name</label><input id="first" class="fs-in" value="{{ f_first }}" onChange="{{ set_first }}" type="text" autocomplete="given-name" style="height: 48px; min-width: 0; box-sizing: border-box; background: #111113; border-radius: 4px; padding: 0 14px; color: #F4F2F1; font: inherit; font-size: 15px;"></div>
 <div style="display: flex; flex-direction: column; gap: 6px; min-width: 0;"><label for="last" style="font-size: 13px; color: #9C9693;">Last Name</label><input id="last" class="fs-in" value="{{ f_last }}" onChange="{{ set_last }}" type="text" autocomplete="family-name" style="height: 48px; min-width: 0; box-sizing: border-box; background: #111113; border-radius: 4px; padding: 0 14px; color: #F4F2F1; font: inherit; font-size: 15px;"></div>
 </div>
 <div style="display: flex; flex-direction: column; gap: 6px;"><label for="country" style="font-size: 13px; color: #9C9693;">Country</label><select id="country" class="fs-in" onChange="{{ set_country }}" style="height: 48px; box-sizing: border-box; background: #111113; border-radius: 4px; padding: 0 14px; color: #F4F2F1; font: inherit; font-size: 15px;"><sc-for list="{{ countries }}" as="c"><option selected="{{ c.on }}">{{ c.n }}</option></sc-for></select></div>
 <div style="display: flex; flex-direction: column; gap: 6px;"><label for="phone" style="font-size: 13px; color: #9C9693;">Phone Number</label><div style="display: grid; grid-template-columns: 148px minmax(0, 1fr); gap: 8px;"><select id="dial" class="fs-in" aria-label="Country Code" onChange="{{ setDial }}" style="height: 48px; box-sizing: border-box; background: #111113; border-radius: 4px; padding: 0 14px; color: #F4F2F1; font: inherit; font-size: 15px; min-width: 0;"><sc-for list="{{ dials }}" as="d"><option value="{{ d.v }}" selected="{{ d.sel }}" title="{{ d.title }}">{{ d.label }}</option></sc-for></select><input id="phone" class="fs-in" type="tel" inputmode="tel" autocomplete="tel-national" placeholder="{{ phoneHint }}" value="{{ phone }}" onChange="{{ setPhone }}" aria-invalid="{{ phoneBad }}" aria-describedby="phone-note" style="height: 48px; box-sizing: border-box; background: #111113; border-radius: 4px; padding: 0 14px; color: #F4F2F1; font: inherit; font-size: 15px; min-width: 0; border-color: {{ phoneBd }};"></div><sc-if value="{{ phoneBad }}"><span style="font-size: 13px; color: #F2777F;">Enter a valid phone number for {{ dialName }}.</span></sc-if><span id="phone-note" style="font-size: 12.5px; color: #9C9693;">Only for account security and urgent notices about your accounts. Never shared.</span></div>
+<label style="display: flex; align-items: center; gap: 12px; font-size: 14px; color: #D4CFCD; cursor: pointer;"><input type="checkbox" class="fs-check" checked="{{ offers }}" onChange="{{ toggleOffers }}">Send Me Product Updates and Offers</label>
 </fieldset>
 
 <fieldset style="border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; min-width: 0;">
@@ -140,6 +141,7 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 <sc-if value="{{ notAgreed }}" hint-placeholder-val="{{ false }}"><button type="button" disabled style="height: 48px; padding: 0 28px; background: #26262A; color: #9C9693; border: 0; border-radius: 4px; font: inherit; font-size: 15px; font-weight: 600; font-stretch: 112%;">Pay</button></sc-if>
 </div>
 <sc-if value="{{ notAgreed }}" hint-placeholder-val="{{ false }}"><p style="margin: 0; font-size: 12px; line-height: 16px; color: #9C9693;">Agree to the rules and terms to pay.</p></sc-if>
+<sc-if value="{{ err }}"><p role="alert" style="margin: 0; font-size: 13px; line-height: 18px; color: #F2777F;">{{ err }}</p></sc-if>
 </div>
 </div>
 </x-dc>
@@ -157,14 +159,15 @@ class Component extends DCLogic {
   async submit(backup) {
     const st = this.state; if (st.busy) return;
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(st.email)) return this.setState({ err: 'Enter a valid email address' });
-    if (st.pw.length < 8) return this.setState({ err: 'Use at least 8 characters for your password' });
+    if (!this.renderVals().pwOk) return this.setState({ err: 'Use at least 8 characters, with a number and an uppercase letter', pwTried: true });
     if (!st.first.trim() || !st.last.trim()) return this.setState({ err: 'Enter your first and last name' });
     if (this.renderVals().phoneBadNow) return this.setState({ err: 'Enter a valid phone number', phoneTried: true });
     if (st.method === 'crypto') return this.setState({ err: '{{ cryptoNote }}' });
     if (st.method === 'apple' && st.sum.cat.payments === 'test') return this.setState({ err: 'Apple Pay is not available in test mode. Use the test card.' });
     this.setState({ busy: true, err: '', fallback: false }); st.backup = !!backup;
     try {
-      await DC.api('/api/auth/signup', { email: st.email.trim(), password: st.pw, first: st.first.trim(), last: st.last.trim(), country: st.country, phoneIso: st.dial, phone: st.phone.trim() });
+      if (!st.signedUp) await DC.api('/api/auth/signup', { email: st.email.trim(), password: st.pw, first: st.first.trim(), last: st.last.trim(), country: st.country, phoneIso: st.dial, phone: st.phone.trim(), offers: !!st.offers, ref: DC.qs('ref') || undefined });
+      st.signedUp = true; this.setState({ signedUp: true });
       location.href = await FSX.checkout.pay(st.sum, st);
     } catch (e) { this.setState({ busy: false, err: e.message, fallback: !!e.fallback }); }
   }
@@ -175,6 +178,15 @@ class Component extends DCLogic {
     const dRow = DIAL.find((x) => x[1] === st0.dial) || DIAL[0]; let digits = (st0.phone || '').replace(/\D/g, ''); if ((st0.phone || '').trim().startsWith('+') && digits.startsWith(dRow[2])) digits = digits.slice(dRow[2].length); if (digits.length > 6 && digits.startsWith('0') && !['IT', 'SM', 'VA'].includes(dRow[1])) digits = digits.replace(/^0+/, '');
     const phoneBadNow = digits.length < 6 || digits.length + dRow[2].length > 15;
     const PH = { dials: DIAL.map(([n, iso, code]) => ({ v: iso, label: `${flag(iso)}${iso} +${code}`, title: n, sel: iso === st0.dial })), setDial: (e) => this.setState({ dial: e.target.value, dialTouched: true, err: '' }), phone: st0.phone, setPhone: (e) => this.setState({ phone: e.target.value, err: '' }), phoneHint: dRow[2] === '1' ? '555 000 0000' : 'Phone number', dialName: dRow[0], phoneBad: !!st0.phoneTried && phoneBadNow, phoneBadNow };
+    // Password strength: same rule and meter as the sign-up page (8+ characters, a number and an uppercase letter)
+    const pw = st0.pw || ''; const need = [[pw.replace(/\s/g, '').length >= 8, 'at least 8 characters'], [/[0-9]/.test(pw), 'a number'], [/[A-Z]/.test(pw), 'an uppercase letter']];
+    const missing = need.filter(([ok]) => !ok).map(([, t]) => t); const extra = [pw.length >= 12, /[^A-Za-z0-9]/.test(pw), pw.length >= 16].filter(Boolean).length;
+    const level = !pw ? 0 : missing.length ? 1 : 2 + Math.min(2, extra); const lvColor = ['#9C9693', '#F2777F', '#7CC4FF', '#7CC4FF', '#5FD39B'][level];
+    const hintList = (a) => (a.length > 1 ? a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1] : a[0]);
+    const PW = { segs: [1, 2, 3, 4].map((i) => ({ bg: i <= level ? lvColor : '#26262A' })), strengthLabel: ['', 'Too Weak', 'Fair', 'Good', 'Strong'][level], strengthColor: lvColor, hasLevel: level > 0, strengthNow: level,
+      strengthHint: level === 0 ? 'Use 8+ characters with a number and an uppercase letter.' : level === 1 ? 'Add ' + hintList(missing) + '.' : level === 4 ? 'Great password.' : 'Stronger with ' + hintList([pw.length < 12 ? '12+ characters' : '', /[^A-Za-z0-9]/.test(pw) ? '' : 'a symbol'].filter(Boolean)) + '.',
+      hintColor: level <= 1 && st0.pwTried ? '#F2777F' : '#9C9693', pwOk: !missing.length, pwBad: !!st0.pwTried && !!missing.length, pwBd: st0.pwTried && missing.length ? '#F2777F' : '',
+      offers: !!st0.offers, toggleOffers: () => this.setState({ offers: !st0.offers }) };
     const st = this.state; const sum = st.sum; const cfg = st.cfg || { card: 'test' }; const test = cfg.card === 'test' && !cfg.live; const tp = cfg.card === 'tailoredpay'; const sx = cfg.card === 'stripe' && !!cfg.stripePk; if (sx) FSPAY.watchCard();
     const methods = [['card', 'Card'], ['apple', 'Apple Pay'], ['crypto', 'Crypto']].map(([id, label]) => {
       const sel = st.method === id;
@@ -182,14 +194,14 @@ class Component extends DCLogic {
     });
     const set = (k) => (e) => this.setState({ [k]: e.target.value, err: '' });
     const total = sum ? FSX.money(sum.total) : '…';
-    return { ...PH,
+    return { ...PH, ...PW,
       methods, isCard: st.method === 'card', isApple: st.method === 'apple', isCrypto: st.method === 'crypto', stripe: !test, testMode: test, sx, cardForm: test || sx, hostedNote: !test && !sx,
       cardNote: sx ? 'Card details go straight to Stripe. Funded Sky never sees your card number.' : 'Test mode: use 4242 4242 4242 4242, any future date and any CVC. No real charge.',
       appleNote: String(cfg.card).startsWith('stripe') || cfg.stripeBackup ? "You'll confirm with Apple Pay on Stripe's secure page." : 'Apple Pay is not available yet. Use a card.',
       agreed: st.agreed, notAgreed: !st.agreed, toggleAgree: () => this.setState({ agreed: !st.agreed }),
       f_email: st.email, f_pw: st.pw, f_first: st.first, f_last: st.last, card: st.card, exp: st.exp, cvc: st.cvc,
       set_email: set('email'), set_pw: set('pw'), set_first: set('first'), set_last: set('last'), set_country: (e) => { const v = e.target.value; const c = DIAL.find((x) => x[0] === v); this.setState(Object.assign({ country: v, err: '' }, !st0.dialTouched && c ? { dial: c[1] } : {})); }, set_card: set('card'), set_exp: set('exp'), set_cvc: set('cvc'),
-      countries: COUNTRIES.map((n) => ({ n, on: n === st.country })),
+      countries: DIAL.map(([n]) => ({ n, on: n === st.country })),
       sumTitle: sum ? sum.title : 'Loading…', sumSub: sum ? sum.sub : '', lines: sum ? sum.lines : [], total,
       payLabel: st.busy ? 'Working…' : 'Pay ' + total, payLabel0: 'Pay ' + total, payShort: st.busy ? '…' : 'Pay', busy: st.busy, err: st.err, submit: () => this.submit(), fallback: !!st.fallback, payBackup: () => this.submit(true),
       secureNote: tp ? 'Press Pay and enter your card in the secure payment window. Funded Sky never sees your card number.' : sx ? '' : 'You enter your card on our payment processor\'s secure page after you press Pay.',
@@ -199,7 +211,6 @@ class Component extends DCLogic {
     };
   }
 }
-const COUNTRIES = ["United States", "Canada", "United Kingdom", "Ireland", "Australia", "New Zealand", "Germany", "France", "Spain", "Italy", "Netherlands", "Belgium", "Switzerland", "Austria", "Sweden", "Norway", "Denmark", "Finland", "Poland", "Portugal", "Czech Republic", "Romania", "Greece", "Israel", "United Arab Emirates", "Saudi Arabia", "South Africa", "Nigeria", "Ghana", "Kenya", "India", "Pakistan", "Bangladesh", "Philippines", "Singapore", "Malaysia", "Thailand", "Vietnam", "Indonesia", "Japan", "South Korea", "Taiwan", "Hong Kong", "Mexico", "Brazil", "Argentina", "Chile", "Colombia", "Peru", "Dominican Republic", "Puerto Rico", "Turkey", "Egypt", "Morocco", "Other"];
 </script>
 </body>
 </html>

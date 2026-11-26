@@ -18,7 +18,7 @@ function startCatalog(root) {
     const addonIds = [...new Set(Object.keys(cat.addons || {}).concat((X.addons || []).map((a) => a.id)))];
     const plans = cat.plans.map((p, k) => { const xp = XP[p.id] || {};
       return { id: p.id, name: p.short || p.name, full: p.name, kind: p.kind, slug: xp.slug || p.id, badge: p.badge || '', billing: xp.billing || 'one-time', status: p.active ? 'live' : (xp.status === 'draft' ? 'draft' : 'hidden'), sort: xp.sort || k + 1, desc: p.desc || '',
-        sizes: SIZES.map((sz) => { const z = p.sizes.find((y) => y.size === sz); const xz = (xp.sizes || {})[sz] || {}; return { size: sz, price: z ? z.price : (xz.price || 0), compare: xz.compare == null ? null : xz.compare, floor: xz.floor || 0, active: !!z, sched: xz.sched || null, act: z ? (z.activation || 0) : (xz.act || 0) }; }),
+        sizes: SIZES.map((sz) => { const z = p.sizes.find((y) => y.size === sz); const xz = (xp.sizes || {})[sz] || {}; return { size: sz, price: z ? z.price : (xz.price || 0), compare: xz.compare == null ? null : xz.compare, floor: xz.floor || 0, active: !!z, sched: xz.sched || null, act: z ? (z.activation || 0) : (xz.act || 0), rst: z ? (z.reset == null ? null : z.reset) : (xz.rst == null ? null : xz.rst) }; }),
         platforms: Object.fromEntries(Object.keys(PLAT_NAME).map((id) => [id, (p.platforms || []).includes(PLAT_NAME[id])])), defPlatform: xp.defPlatform || PLAT_ID[(p.platforms || [])[0]] || 'tradovate',
         addons: Object.fromEntries(addonIds.map((a) => [a, (p.addons || []).includes(a)])), bundles: xp.bundles || { tier: true } }; });
     const addons = addonIds.map((id) => { const a = (cat.addons || {})[id]; const xa = (X.addons || []).find((y) => y.id === id) || {}; return a ? { id, name: a.name, pricing: a.flat != null ? 'flat' : 'percent', value: a.flat != null ? a.flat : a.pct, discountable: a.discountable !== false, effect: a.desc || '', status: 'live' } : Object.assign({ status: 'off' }, xa); });
@@ -42,7 +42,12 @@ function startCatalog(root) {
     fromCat(LIVE), DRAFT && DRAFT.base === (LIVE.version || 1) ? DRAFT.s : {});
   S.tester = S.tester || { lines: [{ plan: S.plans[0].id, size: (S.plans[0].sizes.find((z) => z.active) || S.plans[0].sizes[0]).size, platform: S.plans[0].defPlatform, addons: [], qty: 1 }], code: '', newTrader: true, affiliate: false };
   { const lp = F.st('catalog.labPrice', null); if (lp && lp.plan) { const pl = S.plans.find((x) => x.id === lp.plan); const z = pl && pl.sizes.find((y) => y.size === lp.size); if (z) { S.changes.unshift({ id: 'c' + Date.now().toString(36), area: 'Prices', text: `${pl.name} $${lp.size / 1000}K price from the Price Lab`, who: lp.by || 'Price Lab', when: F.md(lp.at), before: '$' + z.price, after: '$' + lp.price, approve: true, approved: false }); z.price = lp.price; } F.put('catalog.labPrice', null).catch(() => {}); } }
-  if (!S.history.length) S.history = [{ v: S.version, text: 'Catalog as it is live now', who: 'Funded Sky', when: '', count: 0 }];
+  // Live rule sets are re-read from the live catalog (older drafts kept fields worked out by an earlier version of this page)
+  S.rules.forEach((r) => { if (r.status === 'live' && r.ph) Object.keys(r).filter((k) => /^[ef]_/.test(k)).forEach((k) => { delete r[k]; }); });
+  // A draft started from an older version is set aside (not loaded) so it can't undo what was published since; it can be brought back
+  const STALE = DRAFT && DRAFT.s && DRAFT.base !== (LIVE.version || 1) && ((DRAFT.s.changes || []).length) ? DRAFT : null;
+  if (!S.history.some((h) => h.v === S.version)) S.history.unshift({ v: S.version, text: S.history.length ? 'Published outside the Back Office (system update, API or script)' : 'Catalog as it is live now', who: 'Funded Sky', when: '', count: 0 });
+  S.history.sort((a, b) => b.v - a.v);
   const plan = (id) => S.plans.find((p) => p.id === id);
   const addon = (id) => S.addons.find((a) => a.id === id);
   const plat = (id) => S.platforms.find((p) => p.id === id);
@@ -56,7 +61,7 @@ function startCatalog(root) {
     if (p.total && p.uses >= p.total) return ['Used Up', 'ended'];
     return ['Live', 'live'];
   };
-  const log = (area, text, ex = {}) => { S.changes.unshift({ id: uid('c'), area, text, who: ME, whoId: BO.me.id, when: 'Just now', before: ex.before, after: ex.after, approve: !!ex.approve, approved: false }); };
+  const log = (area, text, ex = {}) => { if (ex.before != null && ex.before === ex.after) return; S.changes.unshift({ id: uid('c'), area, text, who: ME, whoId: BO.me.id, when: 'Just now', before: ex.before, after: ex.after, approve: !!ex.approve, approved: false }); };
   const toast = (t) => { S.toast = t; render(); clearTimeout(toast.t); toast.t = setTimeout(() => { S.toast = ''; render(); }, 2200); };
 
   // ---------- checks before publish ----------
@@ -104,7 +109,7 @@ function startCatalog(root) {
       ln.addons.forEach((aid) => {
         const a = addon(aid);
         if (!a || a.status !== 'live' || !p.addons[aid]) { msgs.push(['✕', `Line ${li + 1}: ${a ? a.name : 'add-on'} is not offered on ${p.name}`]); return; }
-        const unit = a.pricing === 'flat' ? a.value : Math.round(z.price * a.value) / 100;
+        const unit = a.pricing === 'flat' ? a.value : Math.round(z.price * a.value / 100); // whole dollars, as checkout charges
         comps.push({ li, type: 'addon', aid, label: `${a.name} × ${qty}`, unit, qty, amt: unit * qty, rem: unit * qty, floor: 0, plan: p.id, size: z.size, discountable: a.discountable, bundled: false });
       });
     });
@@ -181,10 +186,10 @@ function startCatalog(root) {
   // ---------- publishing: draft to the live catalog ----------
   const DRAFT_KEYS = ['plans', 'platforms', 'addons', 'bundles', 'promos', 'rules', 'changes', 'fees', 'upgrades', 'content', 'limits', 'agreements', 'campaigns', 'tests', 'batches', 'currencies', 'tax', 'roles', 'tester'];
   const draftOf = () => { const o = {}; DRAFT_KEYS.forEach((k) => { o[k] = S[k]; }); o.recovery = { on: S.recovery.on, delay: S.recovery.delay, pct: S.recovery.pct, expiry: S.recovery.expiry, oneTime: S.recovery.oneTime, firstOnly: S.recovery.firstOnly }; return o; };
-  function toCat() {
+  function toCat0() {
     const c = JSON.parse(JSON.stringify(LIVE)); const live = (p, z) => S.rules.filter((r) => r.plan === p && r.size === z && (r.status === 'live' || r.status === 'draft')).sort((a, b) => b.version - a.version)[0];
     c.plans = S.plans.slice().sort((x, y) => (+x.sort || 0) - (+y.sort || 0)).map((p) => { const old = LIVE.plans.find((x) => x.id === p.id) || {}; return { id: p.id, name: old.name && old.short === p.name ? old.name : p.name + ' Plan', short: p.name, kind: p.kind || old.kind || 'evaluation', desc: p.desc, badge: p.badge, active: p.status === 'live', defPlatform: PLAT_NAME[p.defPlatform] || undefined, bundleOff: Object.fromEntries(S.bundles.filter((b) => (p.bundles || {})[b.id] === false).map((b) => [b.id, true])),
-      sizes: p.sizes.filter((z) => z.active && +z.price > 0).map((z) => Object.assign({ size: z.size, price: +z.price, activation: +(((S.fees[p.id] || {})[z.size] || {}).activation || 0) }, z.floor ? { floor: +z.floor } : {}, z.compare ? { compare: +z.compare } : {}, z.sched && z.sched.price ? { sched: { price: +z.sched.price, at: z.sched.at || z.sched.date || z.sched.when } } : {}, ((S.fees[p.id] || {})[z.size] || {}).reset ? { reset: +S.fees[p.id][z.size].reset } : {})), addons: Object.keys(p.addons || {}).filter((a) => p.addons[a] && S.addons.some((x) => x.id === a && x.status === 'live')), platforms: Object.keys(p.platforms || {}).filter((k) => p.platforms[k] && (S.platforms.find((x) => x.id === k) || {}).visible !== false).map((k) => PLAT_NAME[k]).filter(Boolean) }; });
+      sizes: p.sizes.filter((z) => z.active && +z.price > 0).map((z) => Object.assign({ size: z.size, price: +z.price, activation: +(((S.fees[p.id] || {})[z.size] || {}).activation || 0) }, z.floor ? { floor: +z.floor } : {}, z.compare ? { compare: +z.compare } : {}, z.sched && z.sched.price ? { sched: { price: +z.sched.price, at: z.sched.at || z.sched.date || z.sched.when } } : {}, ((S.fees[p.id] || {})[z.size] || {}).reset ? { reset: +S.fees[p.id][z.size].reset } : {})), addons: Object.keys(p.addons || {}).filter((a) => p.addons[a] && S.addons.some((x) => x.id === a && x.status === 'live')), platforms: Object.keys(p.platforms || {}).filter((k) => p.platforms[k] && (S.platforms.find((x) => x.id === k) || {}).visible !== false).map((k) => PLAT_NAME[k]).filter(Boolean).sort((a, b) => { const o = old.platforms || []; const ia = o.indexOf(a), ib = o.indexOf(b); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib); }) }; });
     c.addons = {}; S.addons.filter((a) => a.status === 'live').forEach((a) => { c.addons[a.id] = Object.assign({ name: a.name, desc: a.effect || '', discountable: a.discountable !== false }, a.pricing === 'flat' ? { flat: +a.value, pct: 0 } : { pct: +a.value }); });
     const tb = S.bundles.find((b) => b.type === 'tier' && b.status === 'live'); c.bundles = tb ? (tb.tiers || []).map((t) => ({ id: 'b' + t.min, buy: `Buy ${t.min} Accounts`, get: `Save ${t.pct}%`, min: +t.min, pct: +t.pct })) : []; c.bundleName = tb ? tb.name : undefined; c.bundleSamePlan = tb ? !!tb.samePlan : undefined; c.bundleRules = S.bundles.filter((b) => b.status === 'live' && b.type !== 'tier').map((b) => b.type === 'mix' ? { id: b.id, type: 'mix', name: b.name, mixPlans: b.mixPlans || [], min: +b.min || 2, pct: +b.pct || 0 } : { id: b.id, type: 'fixed', name: b.name, items: (b.items || []).map((it) => ({ plan: it.plan, size: +it.size, qty: +it.qty || 1 })), price: +b.price || 0 });
     const promoOut = (q) => ({ code: q.code ? q.code.toUpperCase() : undefined, pct: q.vtype === 'percent' ? +q.value : 0, vtype: q.vtype || 'percent', value: +q.value || 0, freeAddon: q.freeAddon || undefined, name: q.name, desc: q.desc || (q.vtype === 'fixed' ? `$${q.value} off` : q.vtype === 'free' ? 'Free add-on' : `${q.value}% off`), plans: q.plans || [], sizes: (q.sizes || []).map(Number), lines: q.lines, withBundles: !!q.withBundles, first: !!q.first, minCart: +q.minCart || 0, countries: q.countries || '', total: +q.total || 0, maxOff: +q.maxOff || 0, perTrader: +q.perTrader || 0, once: +q.perTrader === 1, exclusive: !!q.exclusive, priority: +q.priority || 10, active: q.status === 'on', starts: q.start || undefined, ends: q.end || undefined });
@@ -194,12 +199,20 @@ function startCatalog(root) {
     c.planRules = {}; S.plans.forEach((p) => p.sizes.forEach((z) => { const r = live(p.id, z.size); if (!r || !z.active) return; const inst = p.kind === 'funded'; (c.planRules[p.id] = c.planRules[p.id] || {})[z.size] = Object.assign(inst ? { goal: +r.target } : { target: +r.target }, { dll: +r.daily, maxLoss: +r.dd, contracts: +r.contracts, minDays: +r.minDays, consistency: +r.consistency, split: +r.split, payoutMin: +r.payoutMin, version: r.version }, rulePhases(r));
       const base = inst ? (c.instantRules = c.instantRules || {}) : c.evalRules; if (!base[z.size] || p.id === (S.plans.find((x) => (x.kind === 'funded') === inst && x.sizes.some((y) => y.size === z.size && y.active)) || {}).id) base[z.size] = inst ? { dll: +r.daily, goal: +r.target, maxLoss: +r.dd, contracts: +r.contracts } : { dll: +r.daily, target: +r.target, maxLoss: +r.dd, contracts: +r.contracts };
       if (inst && +r.capFirst > 0) (c.instantCaps = c.instantCaps || {})[z.size] = { first: +r.capFirst, later: +r.capLater || +r.capFirst, lifetime: +r.capLife || 0 }; }));
-    const rp = []; S.plans.forEach((p) => p.sizes.forEach((z) => { const f = (S.fees[p.id] || {})[z.size]; if (z.active && +z.price > 0 && f && f.reset) rp.push(f.reset / z.price * 100); })); if (rp.length) c.resetPct = Math.round(rp.reduce((a, b) => a + b, 0) / rp.length);
-    const oldRules = {}; S.rules.filter((r) => r.status === 'retired').forEach((r) => { (oldRules[r.plan + ':' + r.size] = oldRules[r.plan + ':' + r.size] || []).push({ version: r.version, target: r.target, daily: r.daily, dd: r.dd, ddType: r.ddType, contracts: r.contracts, minDays: r.minDays, consistency: r.consistency, split: r.split, payoutMin: r.payoutMin }); });
-    const xp = {}; S.plans.forEach((p) => { xp[p.id] = { slug: p.slug, billing: p.billing, status: p.status, sort: p.sort, defPlatform: p.defPlatform, bundles: p.bundles, sizes: Object.fromEntries(p.sizes.map((z) => [z.size, { compare: z.compare, floor: z.floor, sched: z.sched, price: z.price, act: z.act }])) }; });
+        const oldRules = {}; S.rules.filter((r) => r.status === 'retired').forEach((r) => { (oldRules[r.plan + ':' + r.size] = oldRules[r.plan + ':' + r.size] || []).push({ version: r.version, target: r.target, daily: r.daily, dd: r.dd, ddType: r.ddType, contracts: r.contracts, minDays: r.minDays, consistency: r.consistency, split: r.split, payoutMin: r.payoutMin }); });
+    const xp = {}; S.plans.forEach((p) => { xp[p.id] = { slug: p.slug, billing: p.billing, status: p.status, sort: p.sort, defPlatform: p.defPlatform, bundles: p.bundles, sizes: Object.fromEntries(p.sizes.map((z) => [z.size, { compare: z.compare, floor: z.floor, sched: z.sched, price: z.price, act: +(((S.fees[p.id] || {})[z.size] || {}).activation || 0), rst: +(((S.fees[p.id] || {})[z.size] || {}).reset || 0) || null }])) }; });
     c.x = Object.assign({}, draftOf(), { plans: xp, oldRules, changes: undefined, rules: undefined, tester: undefined });
     c.version = (LIVE.version || 1) + 1; return c; }
-  function publish(text, count, cat) { const c = cat || toCat(); return F.api('/catalog', c, 'PUT').then(() => { const v = { v: c.version, text, who: ME, when: new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }), count, cat: c }; return F.put('catalog.versions', [v].concat(VERS).slice(0, 15)); }).then(() => F.put('catalog.draft', null)).then(() => { toast(`Published v${c.version}. The checkout is updated.`); setTimeout(() => location.reload(), 700); }).catch((x) => toast(x.message)); }
+  // What publishing the live catalog unchanged produces, so rule sets nobody edited are published exactly as they are live
+  let BASE_CAT = null;
+  function baseCat() { if (BASE_CAT) return BASE_CAT; const B = fromCat(LIVE); B.fees = feesFor(B.plans, JSON.parse(JSON.stringify(XX.fees || {})), false); const keep = {}; Object.keys(B).forEach((k) => { keep[k] = S[k]; S[k] = B[k]; });
+    try { BASE_CAT = toCat0(); } finally { Object.keys(keep).forEach((k) => { S[k] = keep[k]; }); } return BASE_CAT; }
+  function toCat() {
+    const c = toCat0(); const B = baseCat(); const same = (a, b) => a !== undefined && JSON.stringify(a) === JSON.stringify(b); const cp = (v) => JSON.parse(JSON.stringify(v));
+    Object.keys(c.planRules || {}).forEach((pid) => Object.keys(c.planRules[pid]).forEach((z) => { const lv = ((LIVE.planRules || {})[pid] || {})[z]; if (lv && same(c.planRules[pid][z], ((B.planRules || {})[pid] || {})[z])) c.planRules[pid][z] = cp(lv); }));
+    ['evalRules', 'instantRules', 'instantCaps'].forEach((k) => Object.keys(c[k] || {}).forEach((z) => { const lv = (LIVE[k] || {})[z]; if (lv && same(c[k][z], (B[k] || {})[z])) c[k][z] = cp(lv); }));
+    return c; }
+  function publish(text, count, cat) { const c = cat || toCat(); return flushDraft().then(() => F.api('/catalog', c, 'PUT')).then(() => { const v = { v: c.version, text, who: ME, when: new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }), count, cat: c }; return F.put('catalog.versions', [v].concat(VERS).slice(0, 15)); }).then(() => F.put('catalog.draft', null)).then(() => { toast(`Published v${c.version}. The checkout is updated.`); setTimeout(() => location.reload(), 700); }).catch((x) => toast(x.message)); }
   // ---------- views ----------
   const sw = (on, act, data, label) => `<button type="button" class="sw ${on ? 'on' : ''}" role="switch" aria-checked="${on}" aria-label="${esc(label || '')}" data-act="${act}" ${data}></button>`;
   const badgeSt = (s) => s === 'live' ? '<span class="b live">Live</span>' : s === 'draft' ? '<span class="b draft">Draft</span>' : '<span class="b ret">Retired</span>';
@@ -244,13 +257,13 @@ function startCatalog(root) {
   function vPlan() {
     const p = plan(S.planId); if (!p) return vPlans();
     const sizeRows = p.sizes.map((z, i) => { const r = liveRule(p.id, z.size); return `<tr><td class="swc">${sw(z.active, 'sizeActive', `data-i="${i}"`, 'Sell ' + K(z.size))}</td><td><b>${K(z.size)}</b><div class="hint mono">${p.slug.toUpperCase().replace('PLAN-', 'PLAN')}-${z.size / 1000}K</div></td>
-      <td style="width:130px"><input type="number" min="0" value="${z.price || ''}" placeholder="Price" data-bind="size.price" data-i="${i}" aria-label="Price ${K(z.size)}"></td>
-      <td style="width:130px"><input type="number" min="0" value="${z.compare || ''}" placeholder="None" data-bind="size.compare" data-i="${i}" aria-label="Compare-at ${K(z.size)}"></td>
-      <td style="width:120px"><input type="number" min="0" value="${z.floor || ''}" placeholder="None" data-bind="size.floor" data-i="${i}" aria-label="Floor ${K(z.size)}"></td>
+      <td style="width:110px"><input type="number" min="0" value="${z.price || ''}" placeholder="Price" data-bind="size.price" data-i="${i}" style="width:80px" aria-label="Price ${K(z.size)}"></td>
+      <td style="width:110px"><input type="number" min="0" value="${z.compare || ''}" placeholder="None" data-bind="size.compare" data-i="${i}" style="width:80px" aria-label="Compare-at ${K(z.size)}"></td>
+      <td style="width:110px"><input type="number" min="0" value="${z.floor || ''}" placeholder="None" data-bind="size.floor" data-i="${i}" style="width:80px" aria-label="Floor ${K(z.size)}"></td>
       <td style="white-space:nowrap">${z.sched ? `<span class="il" style="gap:6px"><span class="b sched">${money(z.sched.price)} on ${fmtD(z.sched.date)}</span><button class="ic" title="Cancel scheduled price" data-act="unsched" data-i="${i}">✕</button></span>` : `<button class="lnk" data-act="sched" data-i="${i}">Schedule</button>`}</td>
-      <td class="nw">${r ? `<span class="il"><button class="lnk" data-act="go" data-v="rules">v${r.version}</button><span class="hint">${money(r.target)} Target · ${money(r.dd)} Drawdown</span></span>` : (z.active ? `<span class="il"><span class="b err plain">None</span><button class="lnk" data-act="firstRule" data-id="${p.id}|${z.size}">Create Rule Set</button></span>` : '<span class="hint">—</span>')}</td></tr>`; }).join('');
+      <td style="min-width:120px">${r ? `<button class="lnk" data-act="go" data-v="rules">v${r.version}</button><div class="hint nw">${money(r.target)} Target</div><div class="hint nw">${money(r.dd)} Drawdown</div>` : (z.active ? `<span class="il"><span class="b err plain">None</span><button class="lnk" data-act="firstRule" data-id="${p.id}|${z.size}">Create Rule Set</button></span>` : '<span class="hint">—</span>')}</td></tr>`; }).join('');
     const platRows = S.platforms.map((x) => `<tr><td class="swc">${sw(p.platforms[x.id], 'planPlat', `data-id="${x.id}"`, x.name)}</td><td><b>${x.name}</b></td><td><span class="b plain">${x.adapter}</span></td><td class="nw"><label class="chk"><input type="radio" name="defp" ${p.defPlatform === x.id ? 'checked' : ''} data-act="defPlat" data-id="${x.id}" ${p.platforms[x.id] ? '' : 'disabled'}> Default</label></td></tr>`).join('');
-    const adRows = S.addons.map((a) => `<tr><td class="swc">${sw(p.addons[a.id], 'planAddon', `data-id="${a.id}"`, a.name)}</td><td><b>${esc(a.name)}</b><div class="hint">${esc(a.effect)}</div></td><td>${a.pricing === 'flat' ? money(a.value) : a.value + '% of size price'}</td><td>${p.sizes.filter((z) => z.active && z.price).map((z) => `<span class="hint">${K(z.size)} ${money(a.pricing === 'flat' ? a.value : z.price * a.value / 100)}</span>`).join(' · ')}</td></tr>`).join('');
+    const adRows = S.addons.map((a) => `<tr><td class="swc">${sw(p.addons[a.id], 'planAddon', `data-id="${a.id}"`, a.name)}</td><td><b>${esc(a.name)}</b><div class="hint">${esc(a.effect)}</div></td><td>${a.pricing === 'flat' ? money(a.value) : a.value + '% of size price'}</td><td>${p.sizes.filter((z) => z.active && z.price).map((z) => `<span class="hint">${K(z.size)} ${money(a.pricing === 'flat' ? a.value : Math.round(z.price * a.value / 100))}</span>`).join(' · ')}</td></tr>`).join('');
     const bRows = S.bundles.map((b) => `<tr><td class="swc">${sw(p.bundles[b.id], 'planBundle', `data-id="${b.id}"`, b.name)}</td><td class="nw"><b>${esc(b.name)}</b></td><td>${bundleSummary(b)}</td><td class="nw" style="color:var(--mu)">${b.stacks ? 'Codes stack' : 'No codes on top'}</td></tr>`).join('');
     return `<div class="crumb"><a data-act="go" data-v="plans">Plans</a> / ${esc(p.name)}</div>
     <div class="ph"><div><h1>${esc(p.name)}</h1><p>Changes here are saved to the draft and go live together when you publish.</p></div><div class="act"><button class="pill" data-act="dupPlan">Duplicate</button>${p.status !== 'retired' ? '<button class="pill dng" data-act="retirePlan">Retire</button>' : '<button class="pill" data-act="restorePlan">Restore</button>'}<button class="pill" data-act="pvFrom" data-id="${p.id}">Preview at Checkout</button></div></div>
@@ -302,7 +315,7 @@ function startCatalog(root) {
   const scalArr = (t) => String(t || '').split(',').map((x) => x.trim().split(':').map(Number)).filter((x) => x.length === 2 && x.every((n) => !isNaN(n)) && x[1] > 0);
   function ruleFull(r) {
     if (r.e_dd != null || r.f_dd != null) return r;
-    const inst = (plan(r.plan) || {}).kind === 'funded'; const ph = r.ph || {}; const E = ph.eval || {}, U = ph.funded || {}; const fd = r.fd || {};
+    const inst = (plan(r.plan) || {}).kind === 'funded'; const ph = r.ph || {}; const E = ph.eval || {}, U = ph.funded || {}; const fd = r.fd || {}; const hasU = !!(ph.funded && typeof ph.funded === 'object');
     const v = (o, k, d) => (o[k] !== undefined && o[k] !== null && o[k] !== '' ? o[k] : d);
     const flags = (o, p, d) => ({ [p + 'scalp']: o.scalp ? 'limited' : 'allowed', [p + 'scalpHold']: (o.scalp || {}).hold || 11, [p + 'scalpPct']: (o.scalp || {}).pct || 50,
       [p + 'news']: 'news' in o ? (o.news ? 'restricted' : 'allowed') : 'restricted', [p + 'newsWin']: (o.news || {}).win || 2,
@@ -311,7 +324,7 @@ function startCatalog(root) {
       e_contracts: v(E, 'contracts', r.contracts), e_scaling: scalTxt(E.scaling), e_minDays: v(E, 'minDays', r.minDays), e_consistency: 'consistency' in E ? (E.consistency || 0) : r.consistency }, flags(E, 'e_'));
     Object.assign(r, { f_goal: inst ? v(U, 'goal', r.target) : 0, f_dd: v(U, 'maxLoss', v(fd, 'maxLoss', r.dd)), f_ddType: v(U, 'ddType', 'eod'), f_lockAt: v(U, 'lockAt', v(fd, 'lockAt', 100)), f_dll: 'dll' in U ? (U.dll || 0) : v(fd, 'dll', r.daily), f_dllMode: v(U, 'dllMode', 'pause'),
       f_contracts: v(U, 'contracts', v(fd, 'contracts', r.contracts)), f_half: (U.half != null ? U.half : v(fd, 'half', !inst)) ? 'yes' : 'no', f_scaling: scalTxt(U.scaling), f_minDays: v(U, 'minDays', v(fd, 'winDays', 5)), f_winDayMin: v(U, 'winDayMin', v(fd, 'winDayMin', 100)),
-      f_consistency: 'consistency' in U ? (U.consistency || 0) : v(fd, 'consistency', r.consistency), f_split: v(U, 'split', r.split), f_splitFirst: v(U, 'splitFirst', v(fd, 'splitFirst', 0)), f_splitFirstCount: v(U, 'splitFirstCount', v(fd, 'splitFirstCount', 0)),
+      f_consistency: 'consistency' in U ? (U.consistency || 0) : v(fd, 'consistency', r.consistency), f_split: v(U, 'split', r.split), f_splitFirst: v(U, 'splitFirst', hasU ? 0 : v(fd, 'splitFirst', 0)), f_splitFirstCount: v(U, 'splitFirstCount', hasU ? 0 : v(fd, 'splitFirstCount', 0)),
       f_capFirst: v(U.cap || {}, 'first', r.capFirst || v(fd, 'capFirst', 0)), f_capLater: v(U.cap || {}, 'later', r.capLater || v(fd, 'capLater', 0)), f_capLife: v(U.cap || {}, 'lifetime', r.capLife || v(fd, 'capLife', 0)),
       f_payoutMin: v(U, 'payoutMin', r.payoutMin), f_daysBetween: v(U, 'daysBetween', 0), f_buffer: 'buffer' in U ? (U.buffer || 0) : v(fd, 'buffer', 100), f_reviewAfter: v(U, 'reviewAfter', v(fd, 'reviewAfter', 6)) }, flags(U, 'f_'));
     return r;
@@ -321,10 +334,10 @@ function startCatalog(root) {
     ruleFull(r); const inst = (plan(r.plan) || {}).kind === 'funded'; const n = (x) => +x || 0;
     const flags = (p) => ({ scalp: r[p + 'scalp'] === 'limited' ? { hold: n(r[p + 'scalpHold']), pct: n(r[p + 'scalpPct']) } : null, news: r[p + 'news'] === 'restricted' ? { win: n(r[p + 'newsWin']) || 2 } : null,
       overnight: r[p + 'overnight'] !== 'no', weekend: r[p + 'weekend'] !== 'no', closeAt: r[p + 'closeAt'] || '16:55', inactivity: n(r[p + 'inactivity']) || null });
-    const out = { funded: Object.assign({ maxLoss: n(r.f_dd), ddType: r.f_ddType, lockAt: n(r.f_lockAt), dll: n(r.f_dll) || null, dllMode: r.f_dllMode, contracts: n(r.f_contracts), half: r.f_half === 'yes', scaling: scalArr(r.f_scaling),
+    const out = { funded: Object.assign({ maxLoss: n(r.f_dd), ddType: r.f_ddType, lockAt: n(r.f_lockAt), dll: n(r.f_dll) || null, dllMode: r.f_dllMode, contracts: n(r.f_contracts), half: r.f_half === 'yes', scaling: scalArr(r.f_scaling).length ? scalArr(r.f_scaling) : null,
       minDays: n(r.f_minDays), winDayMin: n(r.f_winDayMin), consistency: n(r.f_consistency) || null, split: n(r.f_split), splitFirst: n(r.f_splitFirst) || undefined, splitFirstCount: n(r.f_splitFirst) ? n(r.f_splitFirstCount) : undefined,
       cap: { first: n(r.f_capFirst), later: n(r.f_capLater) || n(r.f_capFirst), lifetime: n(r.f_capLife) }, payoutMin: n(r.f_payoutMin), daysBetween: n(r.f_daysBetween), buffer: n(r.f_buffer), reviewAfter: n(r.f_reviewAfter) || null }, inst ? { goal: n(r.f_goal) } : {}, flags('f_')) };
-    if (!inst) out.eval = Object.assign({ target: n(r.e_target), maxLoss: n(r.e_dd), ddType: r.e_ddType, dll: n(r.e_dll) || null, dllMode: r.e_dllMode, contracts: n(r.e_contracts), scaling: scalArr(r.e_scaling), minDays: n(r.e_minDays), consistency: n(r.e_consistency) || null }, flags('e_'));
+    if (!inst) out.eval = Object.assign({ target: n(r.e_target), maxLoss: n(r.e_dd), ddType: r.e_ddType, dll: n(r.e_dll) || null, dllMode: r.e_dllMode, contracts: n(r.e_contracts), scaling: scalArr(r.e_scaling).length ? scalArr(r.e_scaling) : null, minDays: n(r.e_minDays), consistency: n(r.e_consistency) || null }, flags('e_'));
     return out;
   }
   function ruleSync(r) { const inst = (plan(r.plan) || {}).kind === 'funded'; const p = inst ? 'f_' : 'e_';
@@ -430,14 +443,19 @@ function startCatalog(root) {
     <div class="card m0"><div class="ch"><h3>Checks Before Publish</h3><div class="r">${errs.length ? `<span class="b err">${errs.length} Blocking</span>` : '<span class="b live">Ready</span>'}</div></div><div class="cb" style="padding:6px 16px">${ch.map((x) => `<div class="msg"><i style="color:${x.lvl === 'err' ? 'var(--no)' : x.lvl === 'warn' ? 'var(--wa)' : 'var(--sky)'}">${x.lvl === 'err' ? '✕' : x.lvl === 'warn' ? '!' : 'i'}</i><span>${esc(x.text)} <button class="lnk" data-act="goCheck" data-go="${esc(JSON.stringify(x.go))}">Fix</button></span></div>`).join('') || '<div class="empty">Everything checks out.</div>'}</div></div>
     </div>
     <div class="card" style="margin-top:14px"><div class="ch"><h3>Version History</h3><span class="lab">Live: v${S.version}</span></div><div class="tsc"><table class="t"><thead><tr><th>Version</th><th>What Changed</th><th class="num">Changes</th><th>Published By</th><th>When</th><th></th></tr></thead><tbody>${S.history.map((h) => `<tr><td class="nw"><span class="mono">v${h.v}</span>${h.v === S.version ? ' <span class="b live" style="margin-left:8px">Live</span>' : ''}</td><td>${esc(h.text)}</td><td class="num">${h.count}</td><td class="nw" style="color:var(--mu)">${esc(h.who)}</td><td class="nw" style="color:var(--mu)">${esc(h.when)}</td><td class="nw">${h.v !== S.version ? `<button class="lnk" data-act="rollback" data-v="${h.v}">Roll Back to v${h.v}</button>` : ''}</td></tr>`).join('')}</tbody></table></div></div>
-    <p class="hint">Price and rule changes never touch orders already placed: each order line and account keeps the prices and rules it was sold with. Only owners can publish price and rule changes.</p>`;
+    <p class="hint">Price and rule changes never touch orders already placed: each order line and account keeps the prices, fees and rules it was sold with. Only owners can publish, and price and rule changes also need approval from someone else who can approve price changes.</p>`;
   }
 
 
   // ================= EXTENSIONS =================
-  const APPROVER = 'a second admin'; const SOLO = (BO.users || []).filter((u) => u.role && u.role !== 'trader').length < 2 || (F.st('team.rules', {}) || {}).price === false; // same as the server: a lone admin, or the price approval rule switched off in Team
+  // Approvals are decided by the server (Team › Approval Rules and Permissions › Approve Price Changes); S.appr is its answer for this draft
   const XX = LIVE.x || {}; const DX = (DRAFT && DRAFT.base === (LIVE.version || 1) && DRAFT.s) || {};
   const pick = (k, d) => (DX[k] !== undefined ? DX[k] : XX[k] !== undefined ? XX[k] : d);
+  // Reset price and activation fee per size: a draft keeps its own values; otherwise they are the live size's fees
+  function feesFor(plans, fees, fromDraft) { fees = fees || {};
+    plans.forEach((p) => { fees[p.id] = fees[p.id] || {}; p.sizes.forEach((z) => { const f = fees[p.id][z.size] || {}; const live = { activation: z.act || 0, reset: z.rst != null ? z.rst : 0 };
+      fees[p.id][z.size] = Object.assign({ renewal: 0, resetDiscountable: true }, f, fromDraft ? Object.assign({}, f.activation == null ? { activation: live.activation } : {}, f.reset === undefined ? { reset: live.reset } : {}) : live); }); });
+    return fees; }
   const AFL = (BO.lists && BO.lists.affiliates) || [];
   Object.assign(S, {
     fees: pick('fees', {}), upgrades: pick('upgrades', []), content: pick('content', {}), limits: pick('limits', { maxActive: 5, maxFunded: 3, maxFundedBalance: 450000, blocked: '', vpn: true, plans: {} }),
@@ -451,12 +469,16 @@ function startCatalog(root) {
     roles: pick('roles', { names: ['Owner', 'Finance', 'Marketing', 'Support', 'Risk'], caps: ['View the Catalog', 'Edit Plans and Sizes', 'Change Prices', 'Change Rule Sets', 'Create Promotions and Codes', 'Manage Affiliates', 'Run Price Tests and Campaigns', 'Approve Price Changes', 'Publish', 'Export'], grid: { Finance: [1, 0, 1, 0, 0, 1, 0, 1, 1, 1], Marketing: [1, 0, 0, 0, 1, 1, 1, 0, 0, 0], Support: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0], Risk: [1, 0, 0, 1, 0, 0, 0, 1, 0, 0] } }),
     preview: { device: 'desktop', plan: S.plans[0].id, size: (S.plans[0].sizes.find((z) => z.active) || S.plans[0].sizes[0]).size, platform: S.plans[0].defPlatform, addons: [], qty: 1, code: '', drafts: false }
   });
+  function soldThisMonth(pid) { const m0 = new Date(NOW.getFullYear(), NOW.getMonth(), 1); return paidOrders.filter((o) => ['evaluation', 'instant', 'mixed'].includes(o.kind) && new Date(o.paid || o.created) >= m0).reduce((a, o) => a + (o.items || []).filter((it) => it.plan === pid).reduce((x, it) => x + (it.qty || 1), 0), 0); }
+  S.fees = feesFor(S.plans, S.fees, DX.fees !== undefined);
   S.plans.forEach((p) => {
-    S.fees[p.id] = S.fees[p.id] || {}; p.sizes.forEach((z) => { S.fees[p.id][z.size] = Object.assign({ reset: z.price ? Math.round(z.price * (LIVE.resetPct || 50) / 100) : 0, renewal: 0, resetDiscountable: true }, S.fees[p.id][z.size] || {}, { activation: z.act || 0 }); });
     S.content[p.id] = S.content[p.id] || { agreement: S.agreements[0], tagline: p.desc, bullets: [], faq: [] };
-    S.limits.plans[p.id] = Object.assign({ perTrader: 5, cap: 0, countries: '' }, S.limits.plans[p.id] || {}, { sold: paidOrders.filter((o) => (o.items || []).some((it) => it.plan === p.id)).reduce((a, o) => a + (o.items || []).filter((it) => it.plan === p.id).reduce((x, it) => x + (it.qty || 1), 0), 0) });
+    S.limits.plans[p.id] = Object.assign({ perTrader: 5, cap: 0, countries: '' }, S.limits.plans[p.id] || {}, { sold: soldThisMonth(p.id) });
   });
-  const pending = () => (SOLO ? [] : S.changes.filter((c) => c.approve && !c.approved));
+  const awaiting = () => (S.appr ? !!(S.appr.needs && !S.appr.approved) : S.changes.some((c) => c.approve && !c.approved));
+  const pending = () => { if (!awaiting()) return []; const f = S.changes.filter((c) => c.approve && !c.approved); return f.length ? f : S.changes.filter((c) => c.approve).concat(S.changes.filter((c) => !c.approve)).slice(0, Math.max(1, S.changes.length)); };
+  const loadCat = (c) => { const n = fromCat(Object.assign({}, LIVE, c)); ['plans', 'platforms', 'addons', 'bundles', 'promos', 'rules'].forEach((k) => { S[k] = n[k]; }); if (c.x) ['upgrades', 'content', 'limits', 'campaigns', 'currencies', 'tax', 'roles'].forEach((k) => { if (c.x[k]) S[k] = JSON.parse(JSON.stringify(c.x[k])); });
+    S.fees = feesFor(S.plans, JSON.parse(JSON.stringify((c.x && c.x.fees) || {})), false); S.plans.forEach((p) => { S.content[p.id] = S.content[p.id] || { agreement: S.agreements[0], tagline: p.desc, bullets: [], faq: [] }; S.limits.plans = S.limits.plans || {}; S.limits.plans[p.id] = Object.assign({ perTrader: 5, cap: 0, countries: '' }, S.limits.plans[p.id] || {}, { sold: soldThisMonth(p.id) }); }); };
   const campState = (c) => { if (c.paused) return ['Paused', 'ret']; const s = new Date(c.start), e = new Date(c.end); if (s > NOW) return ['Scheduled', 'sched']; if (e < NOW) return ['Ended', 'ended']; return ['Running', 'live']; };
   const fmtDT = (v) => v ? new Date(v).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—';
   const conv = (b, v) => v ? (b / v * 100) : 0;
@@ -467,13 +489,13 @@ function startCatalog(root) {
 
   function vFees() {
     const rows = S.plans.map((p) => p.sizes.filter((z) => z.active).map((z) => { const f = S.fees[p.id][z.size]; return `<tr><td class="nw"><b>${esc(p.name)}</b></td><td>${K(z.size)}</td><td class="num">${money(z.price)}</td>
-      <td style="width:120px"><input type="number" min="0" value="${f.reset || ''}" placeholder="None" data-bind="fee.reset" data-p="${p.id}" data-s="${z.size}" aria-label="Reset price"></td>
+      <td style="width:120px"><input type="number" min="0" value="${f.reset || ''}" placeholder="${z.price ? money(Math.round(z.price * (LIVE.resetPct || 50) / 100)) + ' Default' : 'None'}" data-bind="fee.reset" data-p="${p.id}" data-s="${z.size}" aria-label="Reset price"></td>
       <td style="width:120px"><input type="number" min="0" value="${f.activation || ''}" placeholder="None" data-bind="fee.activation" data-p="${p.id}" data-s="${z.size}" aria-label="Activation fee"></td>
       <td style="width:120px">${p.billing === 'monthly' ? `<input type="number" min="0" value="${f.renewal || ''}" data-bind="fee.renewal" data-p="${p.id}" data-s="${z.size}" aria-label="Monthly renewal">` : '<span class="hint">One-Time Plan</span>'}</td>
       <td class="swc">${sw(f.resetDiscountable, 'feeDisc', `data-p="${p.id}" data-s="${z.size}"`, 'Resets can be discounted')}</td></tr>`; }).join('')).join('');
     const up = S.upgrades.map((u, i) => `<tr><td class="nw"><b>${esc(plan(u.plan).name)}</b></td><td>${K(u.from)} → ${K(u.to)}</td><td style="width:140px"><input type="number" min="0" value="${u.price}" data-bind="upg.price" data-i="${i}" aria-label="Upgrade price"></td><td class="hint">Keeps the trader's progress; the new size's rule set applies from the upgrade</td><td><button class="ic" title="Remove" data-act="upDel" data-i="${i}">✕</button></td></tr>`).join('');
     return `<div class="ph"><div><h1>Resets and Fees</h1><p>What traders pay after the first purchase: resets after a breach, the activation fee when funded, monthly renewals and upgrades to a bigger size.</p></div></div>
-    <div class="card"><div class="ch"><h3>Per Size</h3><span class="lab">Leave a fee empty to charge nothing</span></div><div class="tsc"><table class="t"><thead><tr><th>Plan</th><th>Size</th><th class="num">Price</th><th>Reset ($)</th><th>Activation Fee ($)</th><th>Monthly Renewal ($)</th><th>Resets Discountable</th></tr></thead><tbody>${rows}</tbody></table></div></div>
+    <div class="card"><div class="ch"><h3>Per Size</h3><span class="lab">Leave the activation fee empty to charge none. An empty reset price uses the default shown. Accounts already sold keep their fees.</span></div><div class="tsc"><table class="t"><thead><tr><th>Plan</th><th>Size</th><th class="num">Price</th><th>Reset ($)</th><th>Activation Fee ($)</th><th>Monthly Renewal ($)</th><th>Resets Discountable</th></tr></thead><tbody>${rows}</tbody></table></div></div>
     <div class="card"><div class="ch"><h3>Upgrades</h3><div class="r"><button class="pill sm" data-act="upAdd">+ Add Upgrade</button></div></div><div class="tsc"><table class="t"><thead><tr><th>Plan</th><th>From → To</th><th>Price ($)</th><th>How It Works</th><th></th></tr></thead><tbody>${up || '<tr><td colspan="5" class="empty">No upgrade paths yet.</td></tr>'}</tbody></table></div></div>
     <p class="hint">"Reset After Breach" and other promotions that target resets use these prices. Fees are priced by the same engine as checkout.</p>`;
   }
@@ -508,10 +530,9 @@ function startCatalog(root) {
       <div class="fl"><label>Max Active Evaluations</label><input type="number" min="0" value="${L.maxActive}" data-bind="lim.maxActive"></div>
       <div class="fl"><label>Max Funded Accounts</label><input type="number" min="0" value="${L.maxFunded}" data-bind="lim.maxFunded"></div>
       <div class="fl"><label>Max Total Funded Balance ($)</label><input type="number" min="0" value="${L.maxFundedBalance}" data-bind="lim.maxFundedBalance"></div></div>
-      <div class="fl"><label>Blocked Countries</label><input value="${esc(L.blocked)}" data-bind="lim.blocked"><span class="hint">Checked at sign-up, checkout, KYC and payout. Set by your lawyer.</span></div>
-      <label class="chk"><input type="checkbox" ${L.vpn ? 'checked' : ''} data-act="limVpn"> Block Checkout When a VPN or Proxy Hides the Trader's Country</label></div></div>
+      <div class="fl"><label>Blocked Countries</label><input value="${esc(L.blocked)}" data-bind="lim.blocked"><span class="hint">Checked at checkout and when the order is placed, using the country on the trader's profile. Set by your lawyer.</span></div></div></div>
     <div class="card"><div class="ch"><h3>Per Plan</h3><span class="lab">Caps reset on the 1st of each month</span></div><div class="tsc"><table class="t"><thead><tr><th>Plan</th><th>Max per Trader</th><th>Monthly Sales Cap</th><th>Sold This Month</th><th>Extra Blocked Countries</th></tr></thead><tbody>${rows}</tbody></table></div></div>
-    <p class="hint">When a trader hits a limit, checkout explains why and the option is shown as unavailable instead of failing at payment.</p>`;
+    <p class="hint">When a trader hits a limit or is in a blocked country, checkout explains why before payment and the order is refused.</p>`;
   }
 
   function vCurrency() {
@@ -542,7 +563,7 @@ function startCatalog(root) {
       <div><div class="lab" style="margin-bottom:8px;font-size:12.5px;color:var(--mu)">Choose Your Account</div><div style="display:flex;flex-wrap:wrap;gap:8px">${plans.map((x) => chip(x.id === p.id, 'pvPlan', `data-id="${x.id}"`, esc(x.name) + (x.badge ? `<span class="b sched plain" style="display:flex;width:max-content;margin:6px 0 2px">${esc(x.badge)}</span>` : ''), x.billing === 'monthly' ? 'Monthly' : 'One-Time')).join('')}</div></div>
       <div><div class="lab" style="margin-bottom:8px;font-size:12.5px;color:var(--mu)">Account Size</div><div style="display:flex;flex-wrap:wrap;gap:8px">${sizes.map((x) => chip(x.size === pv.size, 'pvSize', `data-s="${x.size}"`, K(x.size), (x.compare ? `<s style="color:var(--fa)">${money(x.compare)}</s> ` : '') + money(x.price))).join('')}</div></div>
       <div><div class="lab" style="margin-bottom:8px;font-size:12.5px;color:var(--mu)">Platform</div><div style="display:flex;flex-wrap:wrap;gap:8px">${plats.map((x) => chip(x.id === pv.platform, 'pvPlat', `data-id="${x.id}"`, x.name)).join('')}</div></div>
-      ${ads.length ? `<div><div class="lab" style="margin-bottom:8px;font-size:12.5px;color:var(--mu)">Add-Ons</div><div style="display:grid;gap:8px">${ads.map((a) => `<label class="chk" style="padding:12px 14px;border:1px solid var(--ln);border-radius:10px;justify-content:space-between"><span style="display:flex;gap:8px;align-items:center"><input type="checkbox" ${pv.addons.includes(a.id) ? 'checked' : ''} data-act="pvAddon" data-id="${a.id}"> ${esc(a.name)}</span><span style="color:var(--mu)">+${money(a.pricing === 'flat' ? a.value : z.price * a.value / 100)}</span></label>`).join('')}</div></div>` : ''}
+      ${ads.length ? `<div><div class="lab" style="margin-bottom:8px;font-size:12.5px;color:var(--mu)">Add-Ons</div><div style="display:grid;gap:8px">${ads.map((a) => `<label class="chk" style="padding:12px 14px;border:1px solid var(--ln);border-radius:10px;justify-content:space-between"><span style="display:flex;gap:8px;align-items:center"><input type="checkbox" ${pv.addons.includes(a.id) ? 'checked' : ''} data-act="pvAddon" data-id="${a.id}"> ${esc(a.name)}</span><span style="color:var(--mu)">+${money(a.pricing === 'flat' ? a.value : Math.round(z.price * a.value / 100))}</span></label>`).join('')}</div></div>` : ''}
     </div>`;
     const right = `<div style="border:1px solid var(--ln);border-radius:12px;padding:16px;background:var(--p2)"><b style="font-size:15px">Your Order</b>
       <div style="display:flex;align-items:center;gap:10px;margin:12px 0"><span style="font-size:13px;color:var(--mu)">How Many?</span><button class="ic" data-act="pvQty" data-d="-1" style="border:1px solid var(--ln)">−</button><b>${pv.qty}</b><button class="ic" data-act="pvQty" data-d="1" style="border:1px solid var(--ln)">+</button></div>
@@ -622,22 +643,32 @@ function startCatalog(root) {
     const R = S.roles;
     return `<div class="ph"><div><h1>Permissions</h1><p>Who on the team can do what in the catalog. Owners can do everything; every action is still recorded with who did it.</p></div></div>
     <div class="card"><div class="tsc"><table class="mx"><thead><tr><th>Can</th>${R.names.map((n) => `<th>${n}</th>`).join('')}</tr></thead><tbody>${R.caps.map((c, ci) => `<tr><td>${c}</td>${R.names.map((n) => n === 'Owner' ? '<td><button type="button" class="ck on na" aria-pressed="true" aria-label="Owner always">✓</button></td>' : `<td><button type="button" class="ck ${R.grid[n][ci] ? 'on' : ''}" aria-pressed="${!!R.grid[n][ci]}" aria-label="${esc(c)} for ${n}" data-act="roleCk" data-r="${n}" data-c="${ci}">✓</button></td>`).join('')}</tr>`).join('')}</tbody></table></div></div>
-    <p class="hint">Price and rule changes need someone with "Approve Price and Rule Changes" other than the person who made them.</p>`;
+    <p class="hint">Price and rule changes need approval from someone whose role has "Approve Price Changes" and who didn't edit the draft. Owners can always approve. Changes to this table count as rule changes and take effect when published.</p>`;
   }
 
   // Rewritten changes view with before/after and approvals
   vChanges = function () {
     const ch = checks(); const errs = ch.filter((x) => x.lvl === 'err'); const pend = pending();
-    const can = S.changes.length && !errs.length && !pend.length;
+    const can = S.changes.length && !errs.length && !pend.length && !awaiting();
     return `<div class="ph"><div><h1>Changes and Publishing</h1><p>Every edit sits in a draft. Price and rule changes need a second person to approve them. Publishing switches everything on at once as a new version you can roll back to.</p></div>
     <div class="act"><button class="pill" data-act="exportCat">Export</button><button class="pill" data-act="importCat">Import</button><button class="pill" data-act="discardAll" ${S.changes.length ? '' : 'disabled'}>Discard All</button><button class="pill pri" data-act="publish" ${can ? '' : 'disabled'}>Publish v${S.version + 1}</button></div></div>
-    ${pend.length ? `<div class="card" style="border-color:rgba(242,196,109,.45)"><div class="cb" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><span class="b draft">${pend.length} Waiting for Approval</span><span style="color:var(--t2);font-size:13.5px">Price and rule changes can't be published until ${APPROVER} approves them.</span><button class="pill sm" style="margin-left:auto" data-act="approveAll">Approve All as ${APPROVER}</button></div></div>` : ''}
+    ${staleCard()}${apprCard()}
     <div class="card"><div class="ch"><h3>Unpublished Changes</h3><span class="lab">${S.changes.length}</span></div><div class="tsc"><table class="t"><thead><tr><th>Area</th><th>Change</th><th>Before</th><th>After</th><th>Approval</th><th>By</th><th></th></tr></thead><tbody>${S.changes.map((x) => `<tr><td><span class="b plain">${esc(x.area)}</span></td><td style="min-width:260px">${esc(x.text)}<div class="hint">${esc(x.when)}</div></td><td class="nw" style="color:var(--no)">${x.before != null ? esc(x.before) : '—'}</td><td class="nw" style="color:var(--ok)">${x.after != null ? esc(x.after) : '—'}</td>
-      <td class="nw">${x.approve ? (x.approved ? `<span class="b live">Approved</span><div class="hint">${APPROVER}</div>` : `<button class="pill sm" data-act="approveOne" data-id="${x.id}">Approve</button>`) : '<span class="hint">Not Needed</span>'}</td><td class="nw" style="color:var(--mu)">${esc(x.who)}</td><td><button class="ic" title="Discard this change" data-act="dropChange" data-id="${x.id}">✕</button></td></tr>`).join('') || '<tr><td colspan="7" class="empty">No draft changes. The checkout matches v' + S.version + '.</td></tr>'}</tbody></table></div></div>
+      <td class="nw">${x.approve ? (x.approved ? `<span class="b live">Approved</span>${x.by2 ? `<div class="hint">${esc(x.by2)}</div>` : ''}` : '<span class="b draft">Waiting</span>') : '<span class="hint">Not Needed</span>'}</td><td class="nw" style="color:var(--mu)">${esc(x.who)}</td><td><button class="ic" title="Discard this change" data-act="dropChange" data-id="${x.id}">✕</button></td></tr>`).join('') || '<tr><td colspan="7" class="empty">No draft changes. The checkout matches v' + S.version + '.</td></tr>'}</tbody></table></div></div>
     <div class="two eq"><div class="card m0"><div class="ch"><h3>Checks Before Publish</h3><div class="r">${errs.length ? `<span class="b err">${errs.length} Blocking</span>` : '<span class="b live">Ready</span>'}</div></div><div class="cb" style="padding:6px 16px">${ch.map((x) => `<div class="msg"><i style="color:${x.lvl === 'err' ? 'var(--no)' : x.lvl === 'warn' ? 'var(--wa)' : 'var(--sky)'}">${x.lvl === 'err' ? '✕' : x.lvl === 'warn' ? '!' : 'i'}</i><span>${esc(x.text)} <button class="lnk" data-act="goCheck" data-go="${esc(JSON.stringify(x.go))}">Fix</button></span></div>`).join('') || '<div class="empty">Everything checks out.</div>'}</div></div>
-    <div class="card m0"><div class="ch"><h3>Version History</h3><span class="lab">Live: v${S.version}</span></div><div class="tsc"><table class="t"><tbody>${S.history.map((h) => `<tr><td class="nw"><span class="mono">v${h.v}</span>${h.v === S.version ? ' <span class="b live" style="margin-left:8px">Live</span>' : ''}</td><td>${esc(h.text)}<div class="hint">${esc(h.who)} · ${esc(h.when)}</div></td><td class="nw">${h.v !== S.version ? `<button class="lnk" data-act="rollback" data-v="${h.v}">Roll Back</button>` : ''}</td></tr>`).join('')}</tbody></table></div></div></div>
-    <p class="hint" style="margin-top:14px">Changes never touch orders already placed: each order line and account keeps the prices and rules it was sold with.</p>`;
+    <div class="card m0"><div class="ch"><h3>Version History</h3><span class="lab">Live: v${S.version}</span></div><div class="tsc"><table class="t"><tbody>${S.history.map((h) => `<tr><td class="nw"><span class="mono">v${h.v}</span>${h.v === S.version ? ' <span class="b live" style="margin-left:8px">Live</span>' : ''}</td><td>${esc(h.text)}<div class="hint">${esc([h.who, h.when].filter(Boolean).join(' · '))}</div></td><td class="nw">${h.v !== S.version ? `<button class="lnk" data-act="rollback" data-v="${h.v}">Roll Back</button>` : ''}</td></tr>`).join('')}</tbody></table></div></div></div>
+    <p class="hint" style="margin-top:14px">Changes never touch orders already placed: each order line and account keeps the prices, fees and rules it was sold with.</p>`;
   };
+  function apprCard() {
+    const A = S.appr; if (!A || !A.needs) return '';
+    if (A.approved) return `<div class="card" style="border-color:rgba(95,211,155,.4)"><div class="cb" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><span class="b live">Approved</span><span style="color:var(--t2);font-size:13.5px">${esc(A.approved.name)} approved these price and rule changes. They can be published now.</span></div></div>`;
+    const who = (A.approvers || []).slice(0, 4).join(', ') + ((A.approvers || []).length > 4 ? ` and ${A.approvers.length - 4} more` : '');
+    return `<div class="card" style="border-color:rgba(242,196,109,.45)"><div class="cb" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><span class="b draft">Waiting for Approval</span><span style="color:var(--t2);font-size:13.5px;flex:1 1 320px">${A.canApprove ? "This draft changes prices or rules. You didn't edit it, so you can approve it." : `This draft changes prices or rules. Someone whose role can approve price changes, and who didn't edit this draft, must approve it before it can be published.${who ? ' Can approve: ' + esc(who) + '.' : ' Nobody else can approve it right now: give a role "Approve Price Changes" in Permissions.'}`}</span>${A.canApprove ? '<button class="pill sm pri" data-act="approveAll">Approve Changes</button>' : ''}</div></div>`;
+  }
+  function staleCard() {
+    if (!STALE || S.staleDone) return '';
+    return `<div class="card" style="border-color:rgba(242,196,109,.45)"><div class="cb" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><span class="b draft">Older Draft Set Aside</span><span style="color:var(--t2);font-size:13.5px;flex:1 1 320px">A draft with ${STALE.s.changes.length} change${STALE.s.changes.length === 1 ? '' : 's'} was started from v${STALE.base}, and v${S.version} has been published since, so it wasn't loaded. Loading it brings back every value in it, including ones changed since v${STALE.base}.</span><button class="pill sm" data-act="staleLoad">Load Older Draft</button><button class="pill sm" data-act="staleDrop">Discard It</button></div></div>`;
+  }
 
   function extDrawer(d) {
     const f = d.f;
@@ -688,7 +719,7 @@ function startCatalog(root) {
     if (kind === 'batch') { const pre = (f.prefix || 'CODE').toUpperCase().replace(/[^A-Z0-9]/g, ''); const AB = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; const codes = Array.from({ length: Math.min(500, +f.count || 1) }, () => pre + '-' + Array.from({ length: 4 }, () => AB[Math.floor(Math.random() * AB.length)]).join('')); const b = Object.assign({}, f, { id: uid('cb'), prefix: pre, used: 0, created: F.md(new Date()), codes }); S.batches.unshift(b); log('Codes', `Generated ${b.count} codes ${b.prefix}-XXXX`); return true; }
     if (kind === 'aff') { f.code = (f.code || '').toUpperCase().replace(/\s+/g, ''); if (!f.id) { f.id = uid('af'); f.uses = 0; f.revenue = 0; S.affiliates.push(f); } else Object.assign(S.affiliates.find((x) => x.id === f.id), f); log('Affiliates', `${f.name}: code ${f.code}, ${f.pct}% off, ${f.commission}% commission`); return true; }
     if (kind === 'test') { const a = (sizeOf(f.plan, +f.size) || {}).price || 0; S.tests.unshift({ id: uid('t'), name: f.name, plan: f.plan, size: +f.size, a, b: +f.b, split: +f.split, status: 'running', start: 'Today', va: 0, vb: 0, ba: 0, bb: 0 }); log('Price Tests', `Started ${f.name}: ${money(a)} vs ${money(+f.b)}`); return true; }
-    if (kind === 'import') { let c; try { c = JSON.parse(f.text); } catch (e) { toast('That is not a catalog file'); return false; } if (!c || !Array.isArray(c.plans)) { toast('That file has no plans in it'); return false; } const n = fromCat(Object.assign({}, LIVE, c)); ['plans', 'platforms', 'addons', 'bundles', 'promos', 'rules'].forEach((k) => { S[k] = n[k]; }); if (c.x) ['fees', 'upgrades', 'content', 'limits', 'campaigns', 'currencies', 'tax', 'roles'].forEach((k) => { if (c.x[k]) S[k] = c.x[k]; }); log('Import', 'Imported a catalog file into the draft'); return true; }
+    if (kind === 'import') { let c; try { c = JSON.parse(f.text); } catch (e) { toast('That is not a catalog file'); return false; } if (!c || !Array.isArray(c.plans)) { toast('That file has no plans in it'); return false; } loadCat(c); log('Import', 'Imported a catalog file into the draft'); return true; }
     return false;
   }
 
@@ -728,14 +759,15 @@ function startCatalog(root) {
       case 'testApply': { const t = S.tests.find((x) => x.id === id); const w = el.dataset.w; const z = sizeOf(t.plan, t.size); const np = w === 'B' ? t.b : t.a; const old = z.price; z.price = np; t.status = 'ended'; t.applied = 'Used ' + money(np); log('Prices', `${plan(t.plan).name} ${K(t.size)} price from ${t.name}`, { before: money(old), after: money(np), approve: old !== np }); toast('Price change added to the draft'); return 'noRender'; }
       case 'perfRange': S.perfRange = +el.dataset.k; return true;
       case 'newBatch': S.drawer = { kind: 'batch', f: { promo: 'p2', prefix: 'CREATOR', count: 50, usesEach: 1 } }; return true;
-      case 'batchExport': { const b = S.batches.find((x) => x.id === id) || S.batches[0]; if (!b || !(b.codes || []).length) { toast('This batch has no codes yet'); return 'noRender'; } const used = (c) => paidOrders.filter((o) => String(o.promo || '').toUpperCase() === c).length; const csv = 'Code,Times Used\n' + b.codes.map((c) => c + ',' + used(c)).join('\n'); const a2 = document.createElement('a'); a2.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a2.download = b.prefix.toLowerCase() + '-codes.csv'; document.body.appendChild(a2); a2.click(); setTimeout(() => a2.remove(), 500); toast('CSV of codes downloaded'); return 'noRender'; }
+      case 'batchExport': { const b = S.batches.find((x) => x.id === id) || S.batches[0]; if (!b || !(b.codes || []).length) { toast('This batch has no codes yet'); return 'noRender'; } const used = (c) => paidOrders.filter((o) => String(o.promo || '').toUpperCase() === c).length; window.FSG.csvDl(b.prefix.toLowerCase() + '-codes.csv', [['Code', 'Times Used']].concat(b.codes.map((c) => [c, used(c)]))); toast('CSV of codes downloaded'); return 'noRender'; }
       case 'editAff': { const af = S.affiliates.find((x) => x.id === id) || { id: '', name: 'New Affiliate', code: '', pct: 10, commission: 15, status: 'active' }; S.drawer = { kind: 'aff', f: JSON.parse(JSON.stringify(af)) }; return true; }
       case 'flagDone': S.flags[i].done = true; return true;
       case 'recOn': S.recovery.on = !S.recovery.on; log('Abandoned Checkout', `Recovery emails ${S.recovery.on ? 'on' : 'off'}`); return true;
       case 'recFlag': S.recovery[el.dataset.k] = el.checked; log('Abandoned Checkout', 'Recovery settings changed'); return true;
       case 'roleCk': { const g = S.roles.grid[el.dataset.r]; const c = +el.dataset.c; g[c] = g[c] ? 0 : 1; log('Permissions', `${el.dataset.r}: ${g[c] ? 'can' : "can't"} ${S.roles.caps[c].toLowerCase()}`); return true; }
-      case 'approveOne': { const c = S.changes.find((x) => x.id === id); if ((c.whoId ? c.whoId === BO.me.id : c.who === ME) && !SOLO) { toast('Someone other than ' + ME + ' must approve this'); return 'noRender'; } F.put('catalog.draft', { base: LIVE.version || 1, s: draftOf() }).then(() => F.api('/catalog/changes/' + c.id + '/approve', {})).then(() => { c.approved = true; c.by2 = ME; render(); }).catch((e) => toast(e.message)); return 'noRender'; }
-      case 'approveAll': { const own = (c) => (c.whoId ? c.whoId === BO.me.id : c.who === ME); const mine = SOLO ? [] : pending().filter(own); const L = pending().filter((c) => SOLO || !own(c)); F.put('catalog.draft', { base: LIVE.version || 1, s: draftOf() }).then(() => Promise.all(L.map((c) => F.api('/catalog/changes/' + c.id + '/approve', {}).then(() => { c.approved = true; c.by2 = ME; })))).then(() => { toast(mine.length ? `Approved. ${mine.length} of your own changes still need someone else.` : 'Approved'); render(); }).catch((e) => toast(e.message)); } return 'noRender';
+      case 'approveOne': case 'approveAll': approveDraft(); return 'noRender';
+      case 'staleLoad': { if (!STALE) return 'noRender'; Object.assign(S, JSON.parse(JSON.stringify(STALE.s))); S.fees = feesFor(S.plans, S.fees, true); S.plans.forEach((p) => { S.limits.plans[p.id] = Object.assign({ perTrader: 5, cap: 0, countries: '' }, S.limits.plans[p.id] || {}, { sold: soldThisMonth(p.id) }); }); S.staleDone = true; toast('Older draft loaded. Check it before publishing.'); return true; }
+      case 'staleDrop': S.staleDone = true; return true;
       case 'exportCat': { const blob = new Blob([JSON.stringify(toCat(), null, 2)], { type: 'application/json' }); const a2 = document.createElement('a'); a2.href = URL.createObjectURL(blob); a2.download = 'funded-sky-catalog-v' + S.version + '.json'; document.body.appendChild(a2); a2.click(); setTimeout(() => { URL.revokeObjectURL(a2.href); a2.remove(); }, 500); toast('Catalog downloaded'); return 'noRender'; }
       case 'importCat': S.drawer = { kind: 'import', f: { text: '' } }; return true;
     }
@@ -897,7 +929,7 @@ function startCatalog(root) {
     ];
     return `<h2>${esc(h)}</h2><p>${esc(p)}</p><h5>Worth a Look</h5>${items.map(([t, s, n, cls, v]) => `<button class="att" data-act="go" data-v="${v}"><div><b>${t}</b><small>${s}</small></div><em class="${n ? cls : ''}">${n}</em></button>`).join('')}
     <h5 style="margin-top:24px">Live Version</h5><div class="qrow"><span style="color:var(--mu)">Catalog</span><span>v${S.version}</span></div><div class="qrow"><span style="color:var(--mu)">Last published</span><span>${esc(S.history[0].when || '—')}</span></div><div class="qrow" style="border:0"><span style="color:var(--mu)">Your role</span><span>${esc(String((BO.me || {}).role || 'admin').replace(/^./, (c) => c.toUpperCase()))}</span></div>
-    <p class="hint" style="margin-top:14px">Publishing updates the live checkout right away. Accounts already sold keep the rules they were bought with until reset.</p>`;
+    <p class="hint" style="margin-top:14px">Publishing updates the live checkout right away. Accounts already sold keep the rules, activation fee and reset price they were bought with, including after a reset.</p>`;
   }
 
 
@@ -992,8 +1024,8 @@ function startCatalog(root) {
       case 'tFlag': S.tester[el.dataset.k] = el.checked; break;
       case 'dropChange': S.changes = S.changes.filter((x) => x.id !== id); break;
       case 'discardAll': F.put('catalog.draft', null).then(() => { toast('Draft discarded'); setTimeout(() => location.reload(), 500); }).catch((x) => toast(x.message)); return;
-      case 'publish': { if (pending().length) { toast('Price changes need a second person to approve them first'); return; } const n = S.changes.length; publish(S.changes.slice(0, 2).map((x) => x.text).join('; ') + (n > 2 ? `; and ${n - 2} more` : '') || 'Published the catalog', n); return; }
-      case 'rollback': { const v = +el.dataset.v; const old = VERS.find((x) => x.v === v); if (!old || !old.cat) { toast('That version was not saved here, so it cannot be restored'); return; } const c = JSON.parse(JSON.stringify(old.cat)); c.version = (LIVE.version || 1) + 1; publish(`Rolled back to the catalog from v${v}`, 1, c); return; }
+      case 'publish': { if (awaiting()) { toast('Price and rule changes need approval before publishing'); return; } const n = S.changes.length; publish(S.changes.slice(0, 2).map((x) => x.text).join('; ') + (n > 2 ? `; and ${n - 2} more` : '') || 'Published the catalog', n); return; }
+      case 'rollback': { const v = +el.dataset.v; const old = VERS.find((x) => x.v === v); if (!old || !old.cat) { toast('That version was not saved here, so it cannot be restored'); return; } loadCat(JSON.parse(JSON.stringify(old.cat))); log('Publishing', `Rolled back to the catalog from v${v}`, { approve: true }); toast(`v${v} is in the draft now. Review it, then publish.`); break; }
       case 'pvFrom': S.preview.plan = id; S.view = 'preview'; S.drawer = null; break;
       default: { const r = extClick(a, el); if (!r || r === 'noRender') return; }
     }
@@ -1057,6 +1089,18 @@ function startCatalog(root) {
     S.drawer = null; toast('Saved to the draft'); render();
   }
 
-  F.watch(() => ({ base: LIVE.version || 1, s: draftOf() }), 'catalog.draft');
+  // Draft autosave. The page sends the catalog it would publish so the server can tie approvals to exactly those prices and rules.
+  let lastDraft = JSON.stringify(draftOf()); let saving = null;
+  function saveDraft() { const s0 = draftOf(); lastDraft = JSON.stringify(s0); const v = { base: LIVE.version || 1, s: s0 }; BO.store['catalog.draft'] = v;
+    saving = F.api('/store/catalog.draft', { value: Object.assign({ cat: toCat() }, v) }, 'PUT').then((r) => { const by = {}; (((r || {}).draft || {}).changes || []).forEach((c) => { by[c.id] = c; });
+      S.changes.forEach((c) => { const x = by[c.id]; if (x) Object.assign(c, { who: x.who, whoId: x.whoId, approved: !!x.approved, by2: x.by2 }); }); lastDraft = JSON.stringify(draftOf());
+      const was = JSON.stringify(S.appr); if (r && r.approval) S.appr = r.approval; if (JSON.stringify(S.appr) !== was && ['changes', 'overview'].includes(S.view)) render(); }).catch((e) => console.error(e)).then(() => { saving = null; });
+    return saving; }
+  const flushDraft = () => (saving || Promise.resolve()).then(() => (JSON.stringify(draftOf()) !== lastDraft ? saveDraft() : null));
+  setInterval(() => { if (!saving && JSON.stringify(draftOf()) !== lastDraft) saveDraft(); }, 800);
+  function approveDraft() { return flushDraft().then(() => F.api('/catalog/approve', { cat: toCat() })).then((r) => { S.appr = r.approval; S.changes.forEach((c) => { if (c.approve) { c.approved = true; c.by2 = ME; } }); lastDraft = JSON.stringify(draftOf()); toast('Approved. The draft can be published now.'); }).catch((e) => toast(e.message)); }
+  // The approval state of what is in the draft now (an older draft without a saved signature is saved once to get one)
+  if (DRAFT && DRAFT.base === (LIVE.version || 1) && DRAFT.s && !DRAFT.sig) saveDraft();
+  else F.api('/catalog/approval', { cat: toCat() }).then((a) => { S.appr = a; if (['changes', 'overview'].includes(S.view)) render(); }).catch(() => {});
   render();
 }

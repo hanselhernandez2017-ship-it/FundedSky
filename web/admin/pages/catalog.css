@@ -138,7 +138,8 @@ table.t{width:100%;border-collapse:collapse}
 .side-bg{display:none}
 .ph .act{flex-wrap:nowrap;justify-content:flex-end;flex:none}
 .ph>div:first-child{min-width:0}
-@media (max-width:1500px){.tb-stats div:nth-child(3){display:none}}
+@media (max-width:1500px){.tb-stats div:nth-child(3),.tb-stats div:nth-child(4){display:none}}
+.tb-t,.tb .envchip{flex:none;white-space:nowrap}.tb-mid{overflow:hidden}.tb-stats{justify-content:safe center}
 @media (max-width:1380px){.tb-stats{display:none}}
 @media (max-width:1060px){.igs{display:none}}
 @media (max-width:1280px){

@@ -10,13 +10,16 @@ const b32dec = (s) => { let bits = ''; for (const c of String(s).replace(/=+$/, 
 function totp(secret, step) { const c = Buffer.alloc(8); c.writeBigUInt64BE(BigInt(step)); const h = crypto.createHmac('sha1', b32dec(secret)).update(c).digest(); const o = h[h.length - 1] & 15;
   return String(((h.readUInt32BE(o) & 0x7fffffff) % 1e6)).padStart(6, '0'); }
 const stepNow = () => Math.floor(Date.now() / 30000);
-function checkCode(secret, code) { code = String(code || '').replace(/\D/g, ''); if (code.length !== 6 || !secret) return false; const n = stepNow(); return [n - 1, n, n + 1].some((s) => crypto.timingSafeEqual(Buffer.from(totp(secret, s)), Buffer.from(code))); }
+// Returns the time step the code belongs to (so it can be used only once), or false
+function checkCode(secret, code) { code = String(code || '').replace(/\D/g, ''); if (code.length !== 6 || !secret) return false; const n = stepNow(); const hit = [n - 1, n, n + 1].find((s) => crypto.timingSafeEqual(Buffer.from(totp(secret, s)), Buffer.from(code))); return hit === undefined ? false : hit; }
+// Marks a code's time step as used; false if this or a later code was already used (stops replays inside the 90-second window)
+async function useStep(uid, step) { return !!(await db.one('UPDATE users SET mfa_step=$2 WHERE id=$1 AND COALESCE(mfa_step,0) < $2 RETURNING id', [uid, step])); }
 
 // Wrong guesses per sign-in attempt and per person
 const tries = new Map(); const bump = (k) => { const v = (tries.get(k) || 0) + 1; tries.set(k, v); setTimeout(() => tries.delete(k), 15 * 60000).unref(); return v; };
 
 async function verify(user, code) {
-  if (checkCode(user.mfa_secret, code)) return true;
+  const step = checkCode(user.mfa_secret, code); if (step !== false) return useStep(user.id, step);
   const raw = String(code || '').replace(/[^a-z0-9]/gi, '').toLowerCase(); if (raw.length !== 10) return false;
   const list = user.mfa_backup || [];
   for (let i = 0; i < list.length; i++) if (await bcrypt.compare(raw, list[i])) { list.splice(i, 1); await db.q('UPDATE users SET mfa_backup=$2 WHERE id=$1', [user.id, JSON.stringify(list)]); return 'backup'; }
@@ -33,21 +36,22 @@ async function challenge(ticket, code) {
   return { user: u, backup: ok === 'backup', left: (u.mfa_backup || []).length };
 }
 async function setup(user) {
-  if (user.mfa_on) bad('Two-step login is already on');
-  const secret = b32enc(crypto.randomBytes(20)); await db.q('UPDATE users SET mfa_secret=$2 WHERE id=$1', [user.id, secret]);
+  const u = await db.one('SELECT mfa_on, mfa_secret FROM users WHERE id=$1', [user.id]); if (u.mfa_on) bad('Two-step login is already on');
+  // Reopening setup (a reload or a second tab) shows the same key, so a QR code already scanned keeps working
+  let secret = u.mfa_secret; if (!secret) { secret = b32enc(crypto.randomBytes(20)); const w = await db.one('UPDATE users SET mfa_secret=$2 WHERE id=$1 AND mfa_secret IS NULL AND mfa_on=false RETURNING mfa_secret', [user.id, secret]); if (!w) secret = (await db.one('SELECT mfa_secret FROM users WHERE id=$1', [user.id])).mfa_secret; }
   const uri = `otpauth://totp/${encodeURIComponent('Funded Sky:' + user.email)}?secret=${secret}&issuer=${encodeURIComponent('Funded Sky')}&digits=6&period=30`;
   const qr = await require('qrcode').toString(uri, { type: 'svg', margin: 1, color: { dark: '#111113', light: '#FFFFFF' } });
   return { secret: secret.replace(/(.{4})/g, '$1 ').trim(), uri, qr };
 }
 async function enable(user, sess, code) {
   const u = await db.one('SELECT * FROM users WHERE id=$1', [user.id]); if (u.mfa_on) bad('Two-step login is already on');
-  if (!checkCode(u.mfa_secret, code)) { bump('u' + u.id); bad('That code is not right. Check the time on your phone and try again.'); }
-  const codes = Array.from({ length: 8 }, () => crypto.randomBytes(8).toString('base64').replace(/[^a-z0-9]/gi, '').toLowerCase().slice(0, 10).padEnd(10, '7'));
+  const step = checkCode(u.mfa_secret, code); if (step === false || !(await useStep(u.id, step))) { bump('u' + u.id); bad(step === false ? 'That code is not right. Check the time on your phone and try again.' : 'That code was just used. Wait for the next one.'); }
+  const AB = 'abcdefghjkmnpqrstuvwxyz23456789'; const codes = Array.from({ length: 8 }, () => Array.from({ length: 10 }, () => AB[crypto.randomInt(AB.length)]).join('')); // no 0/o, 1/l/i to mix up
   await db.q('UPDATE users SET mfa_on=true, mfa_backup=$2 WHERE id=$1', [u.id, JSON.stringify(await Promise.all(codes.map((c) => bcrypt.hash(c, 8))))]);
   await db.q('UPDATE sessions SET mfa=true WHERE token=$1', [sess]); await db.q('DELETE FROM sessions WHERE user_id=$1 AND token<>$2', [u.id, sess]);
   require('./mail').t('twofa', u.id, { url: require('./auth').BASE() + '/admin' });
   return { codes: codes.map((c) => c.slice(0, 5) + '-' + c.slice(5)) };
 }
-async function reset(uid) { await db.q('UPDATE users SET mfa_on=false, mfa_secret=NULL, mfa_backup=NULL WHERE id=$1', [uid]); await db.q('DELETE FROM sessions WHERE user_id=$1', [uid]); }
+async function reset(uid) { await db.q('UPDATE users SET mfa_on=false, mfa_secret=NULL, mfa_backup=NULL, mfa_step=0 WHERE id=$1', [uid]); await db.q('DELETE FROM sessions WHERE user_id=$1', [uid]); }
 
 module.exports = { totp, checkCode, challenge, setup, enable, reset, b32enc, stepNow, bump };

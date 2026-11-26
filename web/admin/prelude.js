@@ -73,5 +73,11 @@
     BO.accounts.filter((a) => a.phase === 'active' && a.dll && a.today < 0 && -a.today / a.dll >= 0.8).slice(0, 5).forEach((a) => add('dll' + a.id, 'Risk', 'Account near daily loss limit', `${a.id} · ${a.name} · ${Math.round(-a.today / a.dll * 100)}% used`, BO.now, '/admin/risk#accounts?acct=' + a.id));
     return N.sort((a, b) => b.at - a.at);
   };
+  // CSV files built in the browser: every cell quoted, and text that a spreadsheet would run as a formula (=, +, -, @, tab, return) gets a leading '
+  F.csvCell = (v) => { let t = v == null ? '' : String(v); if (/^[=+\-@\t\r]/.test(t) && !/^-?\d+(\.\d+)?$/.test(t)) t = "'" + t; return '"' + t.replace(/"/g, '""') + '"'; };
+  F.csv = (rows) => rows.map((r) => r.map(F.csvCell).join(',')).join('\r\n');
+  F.csvDl = (name, rows) => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['\ufeff' + F.csv(rows)], { type: 'text/csv;charset=utf-8' })); a.download = /\.csv$/i.test(name) ? name : name + '.csv'; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500); };
+  // Referral link clicks for a set of codes (links are stored as typed, so letter case is ignored)
+  F.clicksOf = (codes) => { const want = new Set(codes.filter(Boolean).map((c) => String(c).toUpperCase())); let n = 0; Object.entries(BO.clicks || {}).forEach(([k, v]) => { if (want.has(k.toUpperCase())) n += typeof v === 'object' && v ? Object.values(v).reduce((a, x) => a + (+x || 0), 0) : (+v || 0); }); return n; };
   window.FSG = F;
 })();

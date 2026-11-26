@@ -139,6 +139,7 @@ const pub = (cd) => ({ uid: cd.uid, id: cd.id, r: cd.r, kind: cd.kind, big: cd.b
 
 // Buy a pack with credits and open it
 async function buy(user, packId) {
+  await require('./payments').maintGuard();
   await need(); const cfg = await config(); const p = cfg.packs.find((x) => x.id === packId && x.on);
   if (!p) bad('That pack is not on sale');
   return db.tx(async (c) => {
@@ -240,6 +241,7 @@ function summarize(cfg, list) { const m = {}; list.forEach((k) => { m[k] = (m[k]
 
 // ---------- buying credits ----------
 async function createCreditsOrder(user, body) {
+  await require('./payments').maintGuard();
   await need(); const cfg = await config(); const R = cfg.rules;
   let usd, cr, bonus = 0, label;
   if (body.custom != null && body.bundle == null) {
@@ -319,16 +321,20 @@ async function publicCredits() {
 // ---------- back office ----------
 async function adminData() {
   const cfg = await config(true); const on = await enabled();
-  const [opened, perPack, drawn, used, bought, outstanding, act, daily, ladderOrders] = await Promise.all([
+  const [opened, perPack, drawn, used, bought, outstanding, act, daily, ladderOrders, granted, src] = await Promise.all([
     db.one("SELECT count(*)::int n FROM user_packs WHERE status='opened' AND opened_at > now() - interval '30 days'"),
-    db.all("SELECT pack, count(*) FILTER (WHERE source='bought')::int sold, count(*) FILTER (WHERE source='checkout')::int free, count(*) FILTER (WHERE status='opened')::int opened, COALESCE(sum(price),0)::int credits FROM user_packs WHERE created_at > now() - interval '30 days' GROUP BY pack"),
-    db.all("SELECT card, rarity, count(*)::int n FROM user_cards WHERE created_at > now() - interval '30 days' GROUP BY card, rarity"),
+    // sold and free count packs handed out in the last 30 days; opened counts packs opened in the last 30 days, the same window as the cards drawn from them
+    db.all("SELECT pack, count(*) FILTER (WHERE source='bought' AND created_at > now() - interval '30 days')::int sold, count(*) FILTER (WHERE source='checkout' AND created_at > now() - interval '30 days')::int free, count(*) FILTER (WHERE status='opened' AND opened_at > now() - interval '30 days')::int opened, COALESCE(sum(price) FILTER (WHERE created_at > now() - interval '30 days'),0)::int credits FROM user_packs WHERE created_at > now() - interval '30 days' OR opened_at > now() - interval '30 days' GROUP BY pack"),
+    db.all("SELECT c.card, c.rarity, count(*)::int n FROM user_cards c JOIN user_packs p ON p.id=c.pack_id WHERE p.opened_at > now() - interval '30 days' GROUP BY c.card, c.rarity"),
     db.all("SELECT card, count(*)::int n FROM user_cards WHERE status='used' AND used_at > now() - interval '30 days' GROUP BY card"),
     db.one("SELECT COALESCE(sum(total),0)::numeric usd, count(*)::int n FROM orders WHERE kind='credits' AND status='paid' AND paid_at > now() - interval '30 days'"),
     db.one("SELECT COALESCE(sum(points),0)::bigint n FROM users WHERE points > 0"),
     db.all("SELECT l.id, l.created_at, l.label, l.delta, l.kind, u.first, u.last, u.tid, a.first AS by FROM points_log l JOIN users u ON u.id=l.user_id LEFT JOIN users a ON a.id=l.actor_id WHERE l.kind IN ('bought','spent','grant','reward','refund','card') ORDER BY l.id DESC LIMIT 200"),
     db.all("SELECT to_char(date_trunc('day', opened_at AT TIME ZONE 'America/New_York'), 'YYYY-MM-DD') d, count(*) FILTER (WHERE source='bought')::int paid, count(*) FILTER (WHERE source<>'bought')::int free FROM user_packs WHERE status='opened' AND opened_at > now() - interval '30 days' GROUP BY 1 ORDER BY 1"),
-    db.all("SELECT (meta->'packsGranted'->>'label') label, count(*)::int n FROM orders WHERE meta ? 'packsGranted' AND paid_at > now() - interval '30 days' GROUP BY 1")
+    db.all("SELECT (meta->'packsGranted'->>'label') label, count(*)::int n FROM orders WHERE meta ? 'packsGranted' AND paid_at > now() - interval '30 days' GROUP BY 1"),
+    db.one("SELECT count(*)::int n FROM user_cards WHERE pack_id IS NULL AND created_at > now() - interval '30 days'"),
+    // how much of all credits ever given out were bought for cash (the rest are grants and rewards)
+    db.one("SELECT COALESCE(sum(delta) FILTER (WHERE kind='bought'),0)::float bought, COALESCE(sum(delta) FILTER (WHERE delta > 0),0)::float given FROM points_log")
   ]);
   const byPack = Object.fromEntries(perPack.map((r) => [r.pack, r]));
   const byRar = {}; drawn.forEach((r) => { byRar[r.rarity] = (byRar[r.rarity] || 0) + r.n; });
@@ -339,7 +345,7 @@ async function adminData() {
   const cat = await core.catalog();
   return {
     on, cfg, rarities: RN, plans: cat.plans.filter((p) => p.active !== false && p.id !== 'instant' && p.kind !== 'funded').map((p) => ({ id: p.id, name: p.short || p.name, sizes: p.sizes.map((z) => z.size) })),
-    stats: { opened30: opened.n, creditsSold30: Number(bought.usd), creditsOrders30: bought.n, outstanding: Number(outstanding.n), drawn30: totalDrawn },
+    stats: { opened30: opened.n, creditsSold30: Number(bought.usd), creditsOrders30: bought.n, outstanding: Number(outstanding.n), boughtShare: src.given ? Math.min(1, src.bought / src.given) : 0, drawn30: totalDrawn, granted30: granted.n },
     perPack: byPack, drawn: Object.fromEntries(drawn.map((r) => [r.card, r.n])), used: Object.fromEntries(used.map((r) => [r.card, r.n])),
     fair: RN.map((r, i) => ({ r, got: totalDrawn ? (byRar[r] || 0) / totalDrawn * 100 : 0, want: expN ? exp[i] / expN * 100 : 0, n: byRar[r] || 0 })),
     daily, ladderOrders,

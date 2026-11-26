@@ -85,7 +85,7 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 <script type="text/x-dc" data-dc-script data-props='{"mobileLinks":{"editor":"boolean","default":false},"$preview":{"width":1280,"height":1100}}'>
 class Component extends DCLogic {
   constructor(props) { super(props); this.state = { first: '', last: '', email: '', pw: '', country: 'United States', dial: 'US', dialTouched: false, phone: '', offers: false, show: false, agreed: false, submitted: false, busy: false, err: '' }; }
-  componentDidMount() {}
+  componentDidMount() { this._k = (e) => { if (e.key === 'Enter' && e.target && e.target.tagName === 'INPUT') { e.preventDefault(); this.submit(); } }; document.addEventListener('keydown', this._k); }
   async submit() {
     this.setState({ submitted: true });
     const v = this.renderVals(); if (!v.valid || this.state.busy) return;
@@ -99,7 +99,7 @@ class Component extends DCLogic {
     const flag = (iso) => (iso === 'XK' ? '' : String.fromCodePoint(...[...iso].map((ch) => 127397 + ch.charCodeAt(0))) + ' ');
     const dRow = DIAL.find((x) => x[1] === st.dial) || DIAL[0]; let digits = st.phone.replace(/\D/g, ''); if (st.phone.trim().startsWith('+') && digits.startsWith(dRow[2])) digits = digits.slice(dRow[2].length); if (digits.length > 6 && digits.startsWith('0') && !['IT', 'SM', 'VA'].includes(dRow[1])) digits = digits.replace(/^0+/, '');
     // Password strength: minimum is 8+ characters, a number and an uppercase letter (same rule as the server)
-    const need = [[st.pw.length >= 8, 'at least 8 characters'], [/[0-9]/.test(st.pw), 'a number'], [/[A-Z]/.test(st.pw), 'an uppercase letter']];
+    const need = [[st.pw.replace(/\s/g, '').length >= 8, 'at least 8 characters'], [/[0-9]/.test(st.pw), 'a number'], [/[A-Z]/.test(st.pw), 'an uppercase letter']];
     const checks = need.map(([ok]) => ({ ok }));
     const missing = need.filter(([ok]) => !ok).map(([, t]) => t);
     const extra = [st.pw.length >= 12, /[^A-Za-z0-9]/.test(st.pw), st.pw.length >= 16].filter(Boolean).length;
@@ -109,7 +109,7 @@ class Component extends DCLogic {
     const strengthLabel = ['', 'Too Weak', 'Fair', 'Good', 'Strong'][level];
     const hintList = (a) => (a.length > 1 ? a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1] : a[0]);
     const strengthHint = level === 0 ? 'Use 8+ characters with a number and an uppercase letter.' : level === 1 ? 'Add ' + hintList(missing) + '.' : level === 4 ? 'Great password.' : 'Stronger with ' + hintList([st.pw.length < 12 ? '12+ characters' : '', /[^A-Za-z0-9]/.test(st.pw) ? '' : 'a symbol'].filter(Boolean)) + '.';
-    const hintColor = level === 1 && st.submitted ? '#F2777F' : '#9C9693';
+    const hintColor = level <= 1 && st.submitted ? '#F2777F' : '#9C9693';
     const meter = { segs, strengthLabel, strengthColor: lvColor, strengthHint, hintColor, hasLevel: level > 0, strengthNow: level };
     const ok = { first: st.first.trim().length > 0, last: st.last.trim().length > 0, email: /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(st.email), pw: checks.every((c) => c.ok), phone: digits.length >= 6 && digits.length + dRow[2].length <= 15, agree: st.agreed };
     const bad = (k) => st.submitted && !ok[k];

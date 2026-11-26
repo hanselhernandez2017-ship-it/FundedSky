@@ -37,7 +37,8 @@ async function ingestTrade(c, a, t, day) {
   await c.q('INSERT INTO trades(account_id,ts,day,instrument,side,qty,pnl,hold_min,tag) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)', [a.id, t.ts, day, t.instrument, t.side, t.qty, t.pnl, t.hold_min, t.tag]);
   await c.q('UPDATE accounts SET balance=$2, today_pnl=$3, halted_today=$4, phase=$5, breached_at=$6, breach_reason=$7, floor=$8, peak_eod=$9, scalp_profit=$10, cycle_scalp=$11, last_trade_at=$12 WHERE id=$1', [a.id, na.balance, na.today_pnl, na.halted_today, na.phase, na.breached_at || null, na.breach_reason || null, na.floor, na.peak_eod, na.scalp_profit || 0, na.cycle_scalp || 0, na.last_trade_at || new Date()]);
   for (const e of events) {
-    if (e.type === 'breach') { require('./mail').t(a.kind === 'funded' ? 'fbreach' : 'breach', a.user_id, { account: a.id, size: core.kLabel(a.size), platform: a.platform, rule: String(e.msg || '').split(/[:.(]/)[0].trim() || 'Account rule', floor: '$' + Math.round(na.floor || a.floor).toLocaleString('en-US'), balance: '$' + Math.round(na.balance).toLocaleString('en-US'), time: new Date().toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) + ' ET', url: require('./auth').BASE() + '/app#account?acct=' + a.id }); await core.notify(c, a.user_id, `${a.id} breached`, e.msg + '. You can reset it from the account page.', 'account?acct=' + a.id); if (a.kind === 'funded') require('./integrations').alert('breach', `:red_circle: Funded account ${a.id} breached`); }
+    if (e.type === 'breach') { { const wu = await c.one('SELECT tid, email FROM users WHERE id=$1', [a.user_id]); require('./integrations').outHooks('breach', `${a.id} broke a rule`, { account: a.id, kind: a.kind, plan: a.plan, size: a.size, rule: String(e.msg || '').split(/[:.(]/)[0].trim() || 'Account rule', reason: String(e.msg || ''), balance: Number(na.balance), floor: Number(na.floor || a.floor), breachedAt: na.breached_at || new Date().toISOString(), user: wu ? { id: wu.tid, email: wu.email } : null }); }
+      require('./mail').t(a.kind === 'funded' ? 'fbreach' : 'breach', a.user_id, { account: a.id, size: core.kLabel(a.size), platform: a.platform, rule: String(e.msg || '').split(/[:.(]/)[0].trim() || 'Account rule', floor: '$' + Math.round(na.floor || a.floor).toLocaleString('en-US'), balance: '$' + Math.round(na.balance).toLocaleString('en-US'), time: new Date().toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) + ' ET', url: require('./auth').BASE() + '/app#account?acct=' + a.id }); await core.notify(c, a.user_id, `${a.id} breached`, e.msg + '. You can reset it from the account page.', 'account?acct=' + a.id); if (a.kind === 'funded') require('./integrations').alert('breach', `:red_circle: Funded account ${a.id} breached`); }
     if (e.type === 'dll') await core.notify(c, a.user_id, `Daily loss limit reached on ${a.id}`, e.msg, 'account?acct=' + a.id);
   }
   // Early warnings, at most once per account per day: 80% of the daily loss limit, and within 20% of the drawdown floor
@@ -62,12 +63,12 @@ async function closeAccountDay(c, a, dayIso) {
   await c.q(`UPDATE accounts SET days_traded=$2,best_day=$3,peak_eod=$4,floor=$5,cycle_win_days=$6,cycle_best=$7,phase=$8,passed_at=$9,steps=$10,today_pnl=0,halted_today=false WHERE id=$1`,
     [a.id, na.days_traded, na.best_day, na.peak_eod, na.floor, na.cycle_win_days || 0, na.cycle_best || 0, na.phase, na.passed_at || null, JSON.stringify(na.steps || {})]);
   for (const e of events) if (e.type === 'pass') {
-    const pd = core.sizeDef(cat, a.plan, a.size);
-    await core.notify(c, a.user_id, `You passed ${a.id}!`, pd && pd.activation ? `Sign the funded agreement and pay the $${pd.activation} activation fee to get your funded account.` : 'Sign the funded agreement to get your funded account.', 'account?acct=' + a.id);
+    const fee = core.feesOf(cat, a).activation;
+    await core.notify(c, a.user_id, `You passed ${a.id}!`, fee ? `Sign the funded agreement and pay the $${fee} activation fee to get your funded account.` : 'Sign the funded agreement to get your funded account.', 'account?acct=' + a.id);
     await core.points(c, a.user_id, 500, 'Passed ' + a.id);
     require('./mail').t('passed', a.user_id, { account: a.id, size: core.kLabel(a.size), platform: a.platform, url: require('./auth').BASE() + '/app#account?acct=' + a.id });
     { const u = await c.one('SELECT kyc_status FROM users WHERE id=$1', [a.user_id]); if (u && u.kyc_status === 'verified') await core.agreementReady(c, a); }
-    require('./integrations').alert('pass', `:tada: ${a.id} passed the evaluation`);
+    { const wu = await c.one('SELECT tid, email FROM users WHERE id=$1', [a.user_id]); require('./integrations').alert('pass', `:tada: ${a.id} passed the evaluation`, { account: a.id, plan: a.plan, size: a.size, platform: a.platform, balance: Number(na.balance != null ? na.balance : a.balance), daysTraded: na.days_traded, passedAt: na.passed_at || new Date().toISOString(), user: wu ? { id: wu.tid, email: wu.email } : null }); }
   }
   return { ...na, today_pnl: 0, halted_today: false };
 }
@@ -167,9 +168,10 @@ function start() {
   const run = () => tick().then((n) => db.q('INSERT INTO jobs_log(job,ok,detail) VALUES($1,true,$2)', ['feed.tick', n + ' trades'])).catch((e) => { console.error('sim tick', e.message); db.q('INSERT INTO jobs_log(job,ok,detail) VALUES($1,false,$2)', ['feed.tick', e.message]).catch(() => {}); });
   timer = setInterval(run, 60000);
   // Daily service status for the System Health uptime bars (worst status seen each day)
-  const healthDay = async () => { try { const I = require('./integrations'); const list = await I.list(); const d = new Date().toISOString().slice(0, 10); const row = await db.one("SELECT v FROM kv WHERE k='store.health.days'"); const v = (row && row.v) || {};
+  const healthDay = async () => { try { const I = require('./integrations'); const list = await I.list(); const d = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' }); const row = await db.one("SELECT v FROM kv WHERE k='store.health.days'"); const v = (row && row.v) || {};
     const lastTick = await db.one("SELECT created_at, ok FROM jobs_log WHERE job='feed.tick' ORDER BY id DESC LIMIT 1"); const day = v[d] = v[d] || {}; const worse = (k, st) => { const o = { ok: 0, w: 1, d: 2 }; if (day[k] === undefined || o[st] > o[day[k]]) day[k] = st; };
-    ['Website and Checkout', 'Trader Dashboard', 'Back Office', 'Public API'].forEach((k) => worse(k, 'ok')); worse('Simulated Trade Feed', lastTick && lastTick.ok && Date.now() - new Date(lastTick.created_at) < 5 * 60000 ? 'ok' : 'w');
+    ['Website and Checkout', 'Trader Dashboard', 'Back Office', 'Public API'].forEach((k) => worse(k, 'ok')); // the feed only ticks while the market is open, so a quiet feed when it is closed is normal
+    worse('Simulated Trade Feed', !marketOpen() || (lastTick && lastTick.ok && Date.now() - new Date(lastTick.created_at) < 5 * 60000) ? 'ok' : 'w');
     list.filter((x) => x.enabled).forEach((x) => worse(x.name, x.status === 'live' ? 'ok' : x.lastError ? 'w' : 'ok'));
     Object.keys(v).sort().slice(0, -90).forEach((k) => delete v[k]); await db.q("INSERT INTO kv(k,v) VALUES('store.health.days',$1) ON CONFLICT (k) DO UPDATE SET v=$1, updated_at=now()", [JSON.stringify(v)]); } catch (e) { console.error('health day', e.message); } };
   setInterval(healthDay, 5 * 60000); setTimeout(healthDay, 15000);

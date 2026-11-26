@@ -46,8 +46,8 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 <div class="fs-card" style="width: 100%; max-width: 440px; background: #18181A; border: 1px solid #26262A; border-radius: 12px; padding: 36px; box-sizing: border-box; display: flex; flex-direction: column; gap: 24px;">
 
 <div style="display: flex; flex-direction: column; gap: 8px;">
-<h1 class="fs-h1" style="margin: 0; font-size: 32px; line-height: 36px; font-weight: 600; letter-spacing: -0.03em;">Welcome Back.</h1>
-<p style="margin: 0; font-size: 15px; line-height: 22px; color: #D4CFCD;">Log in to your trader dashboard.</p>
+<h1 class="fs-h1" style="margin: 0; font-size: 32px; line-height: 36px; font-weight: 600; letter-spacing: -0.03em;">{{ title }}</h1>
+<p style="margin: 0; font-size: 15px; line-height: 22px; color: #D4CFCD;">{{ lead }}</p>
 </div>
 
 <sc-if value="{{ done }}" hint-placeholder-val="{{ false }}">
@@ -114,7 +114,7 @@ class Component extends DCLogic {
     try { const r = await DC.api('/api/auth/login', { email: st.email.trim(), password: st.pw, remember: st.remember }); if (r.mfa) { this.setState({ busy: false, mfa: true, ticket: r.ticket, code: '', codeErr: '' }); setTimeout(() => { const c = document.getElementById('code'); if (c) c.focus(); }, 50); return; } this.go(r); }
     catch (e) { this.setState({ busy: false, err: e.message }); }
   }
-  go(r) { this.setState({ done: true, mfa: false }); const n = DC.qs('next'); location.href = n && n.startsWith('/') && !n.startsWith('//') ? n : (r.role && r.role !== 'trader' && (DC.qs('admin') || r.mfa !== undefined || r.mfaSetup) ? '/admin' : '/app'); }
+  go(r) { this.setState({ done: true, mfa: false }); const n = DC.qs('next'); location.href = n && /^\/(?![\/\\])/.test(n) && !/[\u0000-\u001f\\]/.test(n) ? n : (r.role && r.role !== 'trader' && (DC.qs('admin') || r.mfa !== undefined || r.mfaSetup) ? '/admin' : '/app'); }
   async submitCode() {
     const st = this.state; const c = st.code.trim(); if (!c) { this.setState({ codeErr: 'Enter the code from your app.' }); return; }
     if (st.busy) return; this.setState({ busy: true, codeErr: '' });
@@ -127,6 +127,8 @@ class Component extends DCLogic {
     const emailOk = /.+@.+\..+/.test(st.email); const pwOk = st.pw.length > 0;
     const emailBad = st.submitted && !emailOk; const pwBad = (st.submitted && !pwOk) || !!st.err;
     return {
+      // Say why they are here: confirming an email from a link, opening the Back Office, or the staff code step
+      title: st.mfa ? 'Two-Step Login.' : 'Welcome Back.', lead: st.mfa ? 'One more step to open the Back Office.' : /^\/verify-email/.test(DC.qs('next') || '') ? 'Log in to confirm your email.' : /^\/admin/.test(DC.qs('next') || '') ? 'Log in to the Back Office.' : 'Log in to your trader dashboard.',
       social: false, email: st.email, pw: st.pw, remember: st.remember, done: st.done, notDone: !st.done && !st.mfa, mfaStep: st.mfa && !st.done,
       code: st.code, setCode: (e) => this.setState({ code: e.target.value, codeErr: '' }), codeBad: !!st.codeErr, codeBd: st.codeErr ? '#F2777F' : '', codeErr: st.codeErr,
       submitCode: () => this.submitCode(), backToPw: () => this.setState({ mfa: false, ticket: '', code: '', pw: '' }),
