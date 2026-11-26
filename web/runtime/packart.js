@@ -65,7 +65,7 @@
       label: `${p.name} Pack cover, 3 cards${p.badge ? ', ' + p.badge.toLowerCase() : ''}`,
       fs: { xs: '6px', sm: '9px', md: '12px', lg: '15px' }[size] || '15px',
       shadow: `drop-shadow(0 .8em 1.1em ${p.glow.replace(/[\d.]+\)$/, '.3)')}) drop-shadow(0 .2em .3em rgba(0,0,0,.5))`,
-      p: Object.assign({}, p, { takeoff: id === 'takeoff', climb: id === 'climb', jet: id === 'jet', strato: id === 'strato', orbit: id === 'orbit', isHolo: !!p.holo, hasBadge: !!p.badge && size !== 'xs', nameSize: Math.min(1.9, ({ xs: 6.8, sm: 12, md: 10.5, lg: 14 }[size] || 14) / (Math.max(...p.name.split(' ').map((w) => w.length)) * 0.78)).toFixed(2) + 'em' })
+      p: Object.assign({}, p, { takeoff: id === 'takeoff', climb: id === 'climb', jet: id === 'jet', strato: id === 'strato', orbit: id === 'orbit', isHolo: !!p.holo, hasBadge: !!p.badge && size !== 'xs', nameSize: Math.min(1.9, ({ xs: 6.8, sm: 10.8, md: 10.5, lg: 14 }[size] || 14) / (Math.max(...Object.values(P).map((q) => Math.max(...q.name.split(' ').map((w) => w.length)))) * 0.78)).toFixed(2) + 'em' })
     };
   }
   function cardVals(props) {

@@ -109,7 +109,7 @@
   function pkGot(cards, how) {
     const D = FS.PACKS; const cur = PKS.cur.slice(); const f = PKS.flipped.slice(); const fx = PKS.fx.slice(); const dl = PKS.dl.slice(); let k = 0; let edge = PKS.edge;
     const RANK = { Common: 1, Uncommon: 2, Rare: 3, Epic: 4, Legendary: 5, Mythic: 6 };
-    cards.forEach((c) => { const i = cur.findIndex((x) => x.uid === c.uid); if (i < 0 || !c.revealed || f[i]) return; cur[i] = c; f[i] = true; fx[i] = RANK[c.r] || 1; dl[i] = how === 'all' ? k++ * 160 : 0; if (fx[i] === 6) edge = '#FF8A92';
+    cards.forEach((c) => { const i = cur.findIndex((x) => x.uid === c.uid); if (i < 0 || !c.revealed || f[i]) return; cur[i] = c; f[i] = true; fx[i] = RANK[c.r] || 1; dl[i] = 0; if (fx[i] === 6) edge = '#FF8A92';
       if (D && !D.own.some((o) => o.uid === c.uid)) { D.own.unshift(Object.assign({}, c, { st: 'ready', usedOn: '' })); if (D.ownN) D.ownN.ready = (D.ownN.ready || 0) + 1; } });
     if (D) { const w = D.waiting.find((x) => x.uid === PKS.packUid); if (w) { w.cards = cur; w.left = f.filter((x) => !x).length; if (!w.left) D.waiting = D.waiting.filter((x) => x !== w); } }
     Object.assign(PKS, { cur, flipped: f, fx, dl, edge });
@@ -175,7 +175,7 @@
     // a pack torn open earlier with cards still face down comes first
     const pend = w0 && w0.pending ? w0 : null; const pendLeft = pend ? (pend.left != null ? pend.left : (pend.cards || []).filter((c) => !c.revealed).length) : 0;
     const histRows = D.hist.map((h, i) => ({ d: h.d, what: h.what.split(': ')[0], det: h.what.includes(': ') ? h.what.split(': ').slice(1).join(': ') : (h.kind === 'earned' ? 'Earned with a purchase' : ''), amt: h.delta ? (h.delta > 0 ? '+' : '−') + fmt(Math.abs(h.delta)) : '—', color: h.delta > 0 ? 'var(--ok)' : 'var(--t2)', top: i ? '1px solid var(--ln)' : '0' }));
-    const pickDrops = () => { const out = []; ['Rare', 'Epic', 'Legendary', 'Mythic', 'Uncommon', 'Common'].forEach((r) => { const c = CARDS.find((x) => x.r === r && !out.includes(x)); if (c && out.length < 3) out.push(c); }); return out; };
+    const pickDrops = () => { const out = []; const k = Math.max(0, PACKS.indexOf(sel)); const all = RN.filter((r, i) => (sel.odds || [])[i] > 0); const can = all.slice(Math.min(k, Math.max(0, all.length - 3)), Math.min(k, Math.max(0, all.length - 3)) + 3).reverse(); /* cheaper packs show what they mostly drop, dearer packs their best cards */ can.forEach((r) => { const pool = CARDS.filter((x) => x.r === r); if (pool.length && out.length < 3) out.push(pool[k % pool.length]); }); can.forEach((r) => CARDS.forEach((x) => { if (x.r === r && out.length < 3 && !out.includes(x)) out.push(x); })); return out; };
     const drops = pickDrops();
     const V = {
       themeCls: light ? 'light' : '', desk: !mob, mob,
