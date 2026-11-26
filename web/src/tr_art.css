@@ -1,0 +1,33 @@
+/* competition cups, tier badges and reward art (Rewards and Competitions pages) */
+.fsbo .cmph{display:flex;align-items:center;gap:28px}
+.fsbo .cmpcup{flex:none;width:150px;height:160px;display:grid;place-items:center;border-radius:20px;background:radial-gradient(70% 70% at 50% 45%,rgba(245,192,78,.22),transparent 70%)}
+.fsbo .cmpcup.cup-obsidian{background:radial-gradient(70% 70% at 50% 45%,rgba(154,160,180,.22),transparent 70%)}
+.fsbo .cmpcup.cup-ice{background:radial-gradient(70% 70% at 50% 45%,rgba(159,211,255,.24),transparent 70%)}
+.fsbo .cmpc{padding:0;overflow:hidden}
+.fsbo .cmpc>*:not(.cmpa){margin-left:20px;margin-right:20px}
+.fsbo .cmpc>.f{margin-bottom:20px}
+.fsbo .cmpa{position:relative;height:150px;display:grid;place-items:center;border-bottom:1px solid var(--ln);background:radial-gradient(60% 80% at 50% 50%,rgba(245,192,78,.22),transparent 70%),var(--p3)}
+.fsbo .cmpa.cup-obsidian{background:radial-gradient(60% 80% at 50% 50%,rgba(154,160,180,.25),transparent 70%),linear-gradient(160deg,#1b1c24,#0b0b10)}
+.fsbo .cmpa.cup-ice{background:radial-gradient(60% 80% at 50% 50%,rgba(159,211,255,.3),transparent 70%),linear-gradient(160deg,#0f2236,#08121e)}
+.fsbo .cmpa .tag{position:absolute;top:12px;left:12px}
+.fsbo .tierc{display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+.fsbo .prz{display:flex;flex-direction:column;border:1px solid var(--ln);border-radius:12px;overflow:hidden}
+.fsbo .przr{display:flex;align-items:center;gap:14px;padding:12px 16px;border-top:1px solid var(--ln)}
+.fsbo .przr:first-child{border-top:0;background:rgba(245,192,78,.07)}
+.fsbo .przr span:last-child{display:flex;flex-direction:column}
+.fsbo .przr b{font-size:14px;font-weight:600}
+.fsbo .przr small{font-size:12.5px;color:var(--mu)}
+.fsbo .pzn{width:26px;text-align:center;font-weight:700;color:var(--mu)}
+.fsbo .rwg{grid-template-columns:repeat(auto-fill,minmax(250px,1fr))}
+.fsbo .rwx{display:flex;flex-direction:column;border:1px solid var(--ln);border-radius:14px;overflow:hidden;background:var(--p2);transition:transform .15s,border-color .15s}
+.fsbo .rwx:hover{transform:translateY(-2px);border-color:#3A3A42}
+.fsbo .rwx:not(.ok) .rwa svg{filter:saturate(.55) brightness(.8)}
+.fsbo .rwa{position:relative;aspect-ratio:320/140;border-bottom:1px solid var(--ln)}
+.fsbo .rwt{position:absolute;top:10px;left:10px;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:4px 8px;border-radius:999px;background:rgba(8,8,10,.6);color:#fff;backdrop-filter:blur(6px)}
+.fsbo .rwb{display:flex;flex-direction:column;gap:8px;padding:16px 18px 18px;flex:1}
+.fsbo .rwb b{font-size:15px;font-weight:600}
+.fsbo .rwb p{margin:0;font-size:13px;color:var(--mu)}
+.fsbo .rwb .f{display:flex;align-items:center;gap:10px;padding-top:6px}
+.fsbo .rwc{display:inline-flex;align-items:center;gap:6px}
+.fsbo .rwc b{font-family:'Geist Mono',ui-monospace,monospace;font-weight:500;font-size:14px}
+@media (max-width:860px){.fsbo .cmph{flex-direction:column;align-items:flex-start;gap:12px}.fsbo .cmpcup{width:110px;height:118px}.fsbo .cmpcup svg{width:96px;height:auto}.fsbo .rwg{grid-template-columns:minmax(0,1fr)}}

@@ -180,3 +180,19 @@ body{margin:0;background:#08080A}
 .fl .sxf{box-sizing:border-box;height:44px;padding:0 12px;border:1px solid var(--ln);border-radius:4px;background:var(--p1);display:flex;flex-direction:column;justify-content:center}.fl .sxf>*{width:100%}.fl .sxf.StripeElement--focus{border-color:var(--sk,#7CC4FF)}.fl .sxf.StripeElement--invalid{border-color:#F2777F}
 
 @media (max-width:760px){.pm button:last-child:nth-child(odd){grid-column:span 2}}
+
+/* done screen: same layout as the evaluation thank-you page */
+.rs .cf{max-width:760px;margin:0 auto;padding:64px 32px;display:flex;flex-direction:column;gap:36px}
+.rs .cf-ic{width:48px;height:48px;border-radius:24px;background:var(--skyt);color:var(--sky);display:flex;align-items:center;justify-content:center}
+.rs .cf-eb{margin:0;font-stretch:125%;font-size:11px;line-height:16px;letter-spacing:.16em;text-transform:uppercase;color:var(--mu);font-weight:500}
+.rs .cf h1{margin:0;font-size:56px;line-height:58px;font-weight:600;letter-spacing:-.035em}
+.rs .cf-lead{margin:0;font-size:17px;line-height:26px;color:var(--t2)}
+.rs .cf-steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;border:1px solid var(--ln);border-radius:8px;background:var(--p2)}
+.rs .cf-steps li{display:flex;gap:16px;align-items:flex-start;padding:20px 22px;border-bottom:1px solid var(--ln)}.rs .cf-steps li:last-child{border-bottom:0}
+.rs .cf-steps .n{font-family:'Geist Mono',ui-monospace,monospace;font-size:13px;line-height:20px;color:var(--mu)}.rs .cf-steps li:first-child .n{color:var(--sky)}
+.rs .cf-steps .t{flex:1;display:flex;flex-direction:column;gap:3px}.rs .cf-steps .t b{font-size:16px;line-height:20px;font-weight:600}.rs .cf-steps .t span{font-size:14px;line-height:20px;color:var(--mu)}
+.rs .cf-btns{display:flex;flex-wrap:wrap;gap:12px}
+.rs .cf-btns a{border-radius:4px;padding:14px 22px;font-size:15px;font-weight:600;font-stretch:112%}
+.rs .cf-btns a.pri{background:var(--tx);color:var(--bg)}.rs .cf-btns a.sec2{border:1px solid var(--ln);color:var(--tx);font-weight:500}
+.rs .cf-foot{margin:0;font-size:13px;line-height:18px;color:var(--mu)}
+@media (max-width:760px){.rs .cf{padding:32px 20px 40px;gap:28px}.rs .cf h1{font-size:32px;line-height:36px}.rs .cf-lead{font-size:15px;line-height:22px}.rs .cf-steps li{padding:16px}.rs .cf-btns{flex-direction:column}.rs .cf-btns a{text-align:center}}

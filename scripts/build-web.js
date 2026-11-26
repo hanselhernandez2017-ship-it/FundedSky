@@ -15,8 +15,8 @@ const out = (f, s) => { fs.writeFileSync(path.join(DIST, f), s); console.log('bu
 
 // ---------- trader app (one page, routes by path) ----------
 {
-  const css = ['tr.css', 'viz.css', 'tr_panel.css', 'tr_shell.css', 'tr_fix.css', 'tr_light.css', 'tr_packs.css'].map(rd).join('\n') + (fs.existsSync(path.join(SRC, 'tr_live.css')) ? rd('tr_live.css') : '');
-  const js = ['viz.js', 'tr_data.js', 'tr_app.js', 'tr_viz.js', 'tr_pages1.js', 'tr_pages2.js', 'tr_pages4.js', 'tr_pages5.js', 'tr_pages6.js', 'tr_pages3.js'].map(rd).join('\n');
+  const css = ['tr.css', 'viz.css', 'tr_panel.css', 'tr_shell.css', 'tr_fix.css', 'tr_light.css', 'tr_packs.css', 'tr_art.css'].map(rd).join('\n') + (fs.existsSync(path.join(SRC, 'tr_live.css')) ? rd('tr_live.css') : '');
+  const js = ['viz.js', 'tr_data.js', 'tr_app.js', 'tr_art.js', 'tr_viz.js', 'tr_pages1.js', 'tr_pages2.js', 'tr_pages4.js', 'tr_pages5.js', 'tr_pages6.js', 'tr_pages3.js'].map(rd).join('\n');
   const html = `${HEAD('Funded Sky', `<style>html,body{margin:0;background:#08080A}html[data-theme=light],html[data-theme=light] body{background:#F6F5F3}${css}
 .fsload{position:fixed;inset:0;display:grid;place-items:center;font:500 14px 'Mona Sans',system-ui;color:#9C9693}</style>`)}
 <body><div class="fsbo" id="fsbo"></div><div class="fsload" id="fsload">Loading your dashboard…</div>
