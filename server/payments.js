@@ -37,7 +37,7 @@ async function checkLimits(user, items) {
   const list = (v) => String(v || '').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean);
   const ctry = String(user.country || '').toLowerCase();
   if (ctry && list(L.blocked).includes(ctry)) bad(`Funded Sky accounts are not available in ${user.country}.`, 403);
-  const mine = await db.all("SELECT plan, size, kind FROM accounts WHERE user_id=$1 AND phase IN ('active','passed','review')", [user.id]);
+  const mine = await db.all("SELECT plan, size, kind FROM accounts WHERE user_id=$1 AND phase IN ('active','passed','review') AND comp IS NULL", [user.id]);
   const isF = (pid) => { const p = core.planDef(cat, pid); return pid === 'instant' || (p && p.kind === 'funded'); };
   const newEval = items.filter((i) => !isF(i.plan)).reduce((n, i) => n + i.qty, 0); const newF = items.filter((i) => isF(i.plan));
   const nEval = mine.filter((a) => a.kind === 'evaluation').length; const fund = mine.filter((a) => a.kind === 'funded');
@@ -72,6 +72,7 @@ async function createResetOrder(user, body) {
   const a = await db.one('SELECT * FROM accounts WHERE id=$1 AND user_id=$2', [id, user.id]);
   if (!a) bad('Account not found', 404);
   if (a.kind !== 'evaluation' || !['active', 'breached'].includes(a.phase)) bad('This account cannot be reset');
+  if (a.comp) bad('Competition accounts cannot be reset');
   const cat = await core.catalog(); const s = core.sizeDef(cat, a.plan, a.size);
   const addons = (body.addons || []).filter((x) => ['reset', 'daily'].includes(x));
   const lines = []; let subtotal = 0; let discount = 0;

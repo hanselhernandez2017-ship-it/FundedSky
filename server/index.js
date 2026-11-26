@@ -173,7 +173,7 @@ T.post('/rewards/:id/redeem', needFlag('rewards', 'Rewards are switched off righ
     return { code };
   });
 }));
-T.post('/competitions/:id/join', h(async (req) => { const fl = ((await db.one("SELECT v FROM kv WHERE k='settings.flags'")) || {}).v || {}; if (fl.competitions === false) bad('Competitions are not open right now', 403); const comp = ((await content.all()).competitions || []).find((x) => x.id === req.params.id); if (!comp) bad('Competition not found', 404); if (comp.st === 'ended') bad('This competition has ended'); await db.q("UPDATE users SET settings = jsonb_set(settings, '{comps}', COALESCE(settings->'comps','{}'::jsonb) || jsonb_build_object($2::text, true)) WHERE id=$1", [req.user.id, clean(req.params.id, 20)]); }));
+T.post('/competitions/:id/join', h(async (req) => { const fl = ((await db.one("SELECT v FROM kv WHERE k='settings.flags'")) || {}).v || {}; if (fl.competitions === false) bad('Competitions are not open right now', 403); const comp = ((await content.all()).competitions || []).find((x) => x.id === req.params.id); if (!comp) bad('Competition not found', 404); if (comp.st === 'ended') bad('This competition has ended'); await db.q("UPDATE users SET settings = jsonb_set(settings, '{comps}', COALESCE(settings->'comps','{}'::jsonb) || jsonb_build_object($2::text, true)) WHERE id=$1", [req.user.id, clean(req.params.id, 20)]); const acct = await require('./comps').joined(comp.id, req.user.id); return { account: acct }; }));
 // Certificates: find one by its public ID
 async function findCert(id) {
   const tr = require('./trader'); id = clean(id, 20);

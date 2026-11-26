@@ -174,7 +174,7 @@ function closeDay(cat, a, dayIso, nTrades) {
       if (pnl >= r.winDayMin) a.cycle_win_days = (a.cycle_win_days || 0) + 1;
       if (pnl > Number(a.cycle_best)) a.cycle_best = pnl;
     }
-    if (a.kind === 'evaluation') {
+    if (a.kind === 'evaluation' && !a.comp) { // competition accounts never pass: they are ranked on a leaderboard
       const profit = Number(a.balance) - Number(a.start_bal);
       const consOk = r.consOff || (profit > 0 && Number(a.best_day) <= (r.consistency / 100) * profit);
       const scalpOk = !r.scalp || Number(a.scalp_profit || 0) <= (r.scalp.pct / 100) * r.target;

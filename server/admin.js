@@ -59,6 +59,7 @@ function router(h) {
   // Everything the back office boards read, in one call. Cheap enough at early-stage volumes.
   r.get('/boot', h(async (req) => {
     const cat = await core.catalog();
+    await require('./comps').sync().catch((e) => console.error('comps sync', e.message));
     const [users, accounts, orders, payouts, tickets, msgs, outbox, auditRows, methods, daily, notes] = await Promise.all([
       db.all('SELECT id,tid,email,first,last,country,phone,role,verified,status,kyc_status,kyc,tax_status,rise_status,points,ref_code,referred_by,settings,agreements,created_at,last_login FROM users ORDER BY created_at DESC LIMIT 2000'),
       db.all('SELECT a.*, u.email, u.first, u.last, u.tid FROM accounts a JOIN users u ON u.id=a.user_id ORDER BY a.created_at DESC LIMIT 5000'),
@@ -74,7 +75,7 @@ function router(h) {
     ]);
     const acctOut = accounts.map((a) => {
       const q = a.kind === 'funded' ? R.payoutQuote(cat, a) : null; const rr = R.rulesFor(cat, a);
-      return { id: a.id, user: a.user_id, tid: a.tid, name: `${a.first} ${a.last}`, email: a.email, plan: a.plan, size: a.size, platform: a.platform, kind: a.kind, phase: a.phase, start: Number(a.start_bal), bal: Number(a.balance), floor: Number(a.floor), peak: Number(a.peak_eod), today: a.today_date === tradeDate() ? Number(a.today_pnl) : 0, halted: a.halted_today, days: a.days_traded, best: Number(a.best_day), payouts: a.payout_count, paid: Number(a.paid_total), resets: a.reset_count, freeResets: a.free_resets, addons: a.addons, breach: a.breach_reason, created: a.created_at, passed: a.passed_at, funded: a.funded_at, breached: a.breached_at, closed: a.closed_at, parent: a.parent_id, maxLoss: rr.maxLoss, dll: rr.dll, target: rr.target || rr.goal || 0, avail: q ? q.max : 0, ready: q ? q.ok : false, winDays: a.cycle_win_days, sim: a.sim, steps: a.steps || {}, demo: /@demo\.fundedsky\.test$/.test(a.email) };
+      return { id: a.id, comp: a.comp || null, user: a.user_id, tid: a.tid, name: `${a.first} ${a.last}`, email: a.email, plan: a.plan, size: a.size, platform: a.platform, kind: a.kind, phase: a.phase, start: Number(a.start_bal), bal: Number(a.balance), floor: Number(a.floor), peak: Number(a.peak_eod), today: a.today_date === tradeDate() ? Number(a.today_pnl) : 0, halted: a.halted_today, days: a.days_traded, best: Number(a.best_day), payouts: a.payout_count, paid: Number(a.paid_total), resets: a.reset_count, freeResets: a.free_resets, addons: a.addons, breach: a.breach_reason, created: a.created_at, passed: a.passed_at, funded: a.funded_at, breached: a.breached_at, closed: a.closed_at, parent: a.parent_id, maxLoss: rr.maxLoss, dll: rr.dll, target: rr.target || rr.goal || 0, avail: q ? q.max : 0, ready: q ? q.ok : false, winDays: a.cycle_win_days, sim: a.sim, steps: a.steps || {}, demo: /@demo\.fundedsky\.test$/.test(a.email) };
     });
     const kvs = await db.all("SELECT k, v FROM kv WHERE k LIKE 'settings.%' OR k LIKE 'dispute.%' OR k LIKE 'list.%' OR k LIKE 'store.%' OR k LIKE 'refclicks.%'");
     const settings = {}; const disputes = [];
@@ -268,7 +269,7 @@ function router(h) {
   r.post('/catalog/changes/:id/approve', h(async (req) => { need(req.user); const d = ((await db.one("SELECT v FROM kv WHERE k='store.catalog.draft'")) || {}).v; const c = ((d && d.s && d.s.changes) || []).find((x) => x.id === req.params.id); if (!c) bad('Change not found', 404);
     const staffN = (await db.one("SELECT count(*)::int n FROM users WHERE role<>'trader' AND status='active'")).n; if (c.whoId === req.user.id && staffN > 1) bad('Someone else must approve your own change');
     const ok = ((await db.one("SELECT v FROM kv WHERE k='catalog.approvals'")) || {}).v || {}; ok[c.id] = { by: req.user.id, name: req.user.first, at: new Date().toISOString() }; await db.q("INSERT INTO kv(k,v) VALUES('catalog.approvals',$1) ON CONFLICT (k) DO UPDATE SET v=$1, updated_at=now()", [JSON.stringify(ok)]); await core.audit(req.user.id, 'catalog.approve', c.id, { text: c.text }); return { ok: true }; }));
-  r.put('/content/:key', h(async (req) => { need(req.user, 'support'); await content.set(req.params.key, req.body.value); await core.audit(req.user.id, 'content.update', req.params.key, {}); }));
+  r.put('/content/:key', h(async (req) => { need(req.user, 'support'); await content.set(req.params.key, req.body.value); await core.audit(req.user.id, 'content.update', req.params.key, {}); if (req.params.key === 'competitions') await require('./comps').sync(); }));
   r.post('/sim/tick', h(async (req) => { need(req.user); return { trades: await sim.tick() }; }));
   r.post('/automations/run', h(async (req) => { need(req.user); return require('./automations').run(); }));
   r.post('/demo/purge', h(async (req) => {

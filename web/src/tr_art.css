@@ -31,3 +31,14 @@
 .fsbo .rwc{display:inline-flex;align-items:center;gap:6px}
 .fsbo .rwc b{font-family:'Geist Mono',ui-monospace,monospace;font-weight:500;font-size:14px}
 @media (max-width:860px){.fsbo .cmph{flex-direction:column;align-items:flex-start;gap:12px}.fsbo .cmpcup{width:110px;height:118px}.fsbo .cmpcup svg{width:96px;height:auto}.fsbo .rwg{grid-template-columns:minmax(0,1fr)}}
+.fsbo .lbme{display:flex;align-items:center;gap:20px;padding:18px 20px;border:1px solid rgba(124,196,255,.35);background:var(--skyt);border-radius:12px;margin-bottom:20px}
+.fsbo .podium2{display:grid;grid-template-columns:1fr 1fr 1fr;align-items:end;gap:12px;margin-bottom:20px}
+.fsbo .podium2 .pd{display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;font-size:13px}
+.fsbo .podium2 .av{width:44px;height:44px;border-radius:50%;background:var(--skyt);color:var(--sky);display:grid;place-items:center;font-weight:700;font-size:13px;margin-bottom:4px}
+.fsbo .podium2 em{font-style:normal;font-weight:600;color:var(--ok)}
+.fsbo .podium2 .blk{width:100%;margin-top:8px;border-radius:10px 10px 0 0;background:var(--p2);border:1px solid var(--ln);border-bottom:0;display:grid;place-items:center;font-size:22px;font-weight:700;color:var(--mu)}
+.fsbo .podium2 .p1 .blk{height:96px;color:var(--sky);background:var(--skyt);border-color:rgba(124,196,255,.35)}
+.fsbo .podium2 .p2 .blk{height:70px}
+.fsbo .podium2 .p3 .blk{height:52px}
+.fsbo .lbme>svg{filter:drop-shadow(0 4px 10px rgba(0,0,0,.3))}
+@media (max-width:860px){.fsbo .lbme{flex-wrap:wrap;gap:12px}}

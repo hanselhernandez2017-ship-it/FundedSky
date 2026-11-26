@@ -9,6 +9,7 @@ const BASE = () => require('./auth').BASE();
 async function once(key) { const r = await db.one('INSERT INTO auto_sent(key) VALUES($1) ON CONFLICT DO NOTHING RETURNING key', [key]); return !!r; }
 const K = (s) => '$' + Number(s) / 1000 + 'K';
 async function run() {
+  await require('./comps').sync().catch((e) => console.error('comps sync', e.message));
   const cat = await core.catalog(); const out = {}; const mrules = (await mail.cfg()).rules;
   const hit = (k) => { out[k] = (out[k] || 0) + 1; };
   try { const n = await require('./support').autoClose(); if (n) out.ticketsClosed = n; } catch (e) { console.error('autoClose', e.message); }

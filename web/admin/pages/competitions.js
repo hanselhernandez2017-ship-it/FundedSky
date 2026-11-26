@@ -119,8 +119,8 @@ function startBoard(root) {
   const CPR = ((BO.content || {}).cprizes) || BO.contentDefault.cprizes;
   const run = COMP.find((x) => x.st === 'running');
   const DQ = F.st('competitions.dq', {});
-  const lbFor = (c) => { if (!c) return []; return regs(c.id).map((u) => { const ac = BO.accounts.filter((a) => a.user === u.id && ['active', 'review', 'passed'].includes(a.phase)); const best = ac.sort((a, x) => (x.bal - x.start) - (a.bal - a.start))[0]; const pnl = best ? best.bal - best.start : 0; const dd = best ? Math.max(0, (best.peak - Math.min(best.bal, best.peak)) / best.start * 100) : 0;
-    const ips = new Set(); return { n: F.short(u), uid: u.id, ctry: u.country || '—', pnl, trades: best ? best.days : 0, dd: dd.toFixed(1), flag: BO.users.some((y) => y.id !== u.id && y.kyc && u.kyc && y.kyc.name === u.kyc.name && y.kyc.dob === u.kyc.dob) ? 'Same identity as another entrant' : '', mv: 0, dq: !!(DQ[c.id] || []).includes(u.id) }; }).sort((a, x) => x.pnl - a.pnl); };
+  const lbFor = (c) => { if (!c) return []; return regs(c.id).map((u) => { const ac = BO.accounts.filter((a) => a.user === u.id && a.comp === c.id); const best = ac[0]; const out = !best || best.phase === 'breached'; const pnl = best ? best.bal - best.start : 0; const dd = best ? Math.max(0, (best.peak - Math.min(best.bal, best.peak)) / best.start * 100) : 0;
+    const ips = new Set(); return { n: F.short(u), uid: u.id, ctry: u.country || '—', pnl, trades: best ? best.days : 0, dd: dd.toFixed(1), flag: BO.users.some((y) => y.id !== u.id && y.kyc && u.kyc && y.kyc.name === u.kyc.name && y.kyc.dob === u.kyc.dob) ? 'Same identity as another entrant' : '', mv: 0, out, acct: best ? best.id : '', dq: !!(DQ[c.id] || []).includes(u.id) || out }; }).sort((a, x) => (a.dq - x.dq) || (x.pnl - a.pnl)); };
   const LB = lbFor(run);
   const PRIZES = [].concat(...Object.entries(WIN).map(([cid, ws]) => ws.map((w, i) => { const u = F.user(w.uid); return [w.place, w.prize, F.short(u), cid, w.status, w.uid, i]; })));
   Object.assign(S.set, { pubLb: true, showCtry: true, hideName: true, kycWin: true }, F.st('competitions.settings', {}));

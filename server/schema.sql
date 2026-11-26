@@ -329,3 +329,7 @@ CREATE TABLE IF NOT EXISTS user_cards (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS user_cards_user ON user_cards(user_id);
+
+-- Competitions: each registered trader gets a practice account for a live competition
+ALTER TABLE accounts ADD COLUMN IF NOT EXISTS comp TEXT;
+CREATE INDEX IF NOT EXISTS accounts_comp ON accounts(comp) WHERE comp IS NOT NULL;
