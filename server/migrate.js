@@ -7,6 +7,11 @@ async function migrate() {
   if (!c) await db.q('INSERT INTO catalog(id,data) VALUES(1,$1)', [DEFAULT_CATALOG]);
   const seed = require('./seed');
   await seed.run();
+  // One-time: every plan counts toward free packs at checkout (Instant was left out at first)
+  if (!(await db.one("SELECT 1 FROM kv WHERE k='mig.packs.instant'"))) {
+    await db.q("UPDATE kv SET v = jsonb_set(v, '{ladder,plans,instant}', 'true'::jsonb, true) WHERE k='packs.config' AND v ? 'ladder'");
+    await db.q("INSERT INTO kv(k,v) VALUES('mig.packs.instant','true'::jsonb) ON CONFLICT (k) DO NOTHING");
+  }
 }
 module.exports = { migrate };
 if (require.main === module) migrate().then(() => { console.log('migrated'); process.exit(0); }).catch((e) => { console.error(e); process.exit(1); });

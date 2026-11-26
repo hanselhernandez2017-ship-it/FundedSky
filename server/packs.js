@@ -46,7 +46,7 @@ const DEF = {
     { usd: 250, cr: 28750, bonus: 15, badge: 'Best Value', on: true }
   ],
   // Free packs with a checkout order: counts every account in the order
-  ladder: { on: true, plans: { essential: true, prime: true, instant: false }, tiers: [
+  ladder: { on: true, plans: { essential: true, prime: true, instant: true }, tiers: [
     { n: 2, packs: ['takeoff'], credits: 0 }, { n: 3, packs: ['takeoff', 'takeoff'], credits: 0 },
     { n: 4, packs: ['climb', 'takeoff'], credits: 0 }, { n: 5, packs: ['takeoff', 'climb', 'jet', 'strato', 'orbit'], credits: 0, full: true }] },
   rules: { perDollar: 100, cryptoBonus: 5, dailyCap: 50000, custom: { on: true, min: 10, max: 2000 } }
