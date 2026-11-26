@@ -18,7 +18,7 @@
   const PAGES = [
     { g: 'Main', items: [['accounts', 'Accounts', () => (ACC.filter((a) => a.kind !== 'breached').length ? String(ACC.filter((a) => a.kind !== 'breached').length) : null)], ['journal', 'Journal'], ['payouts', 'Payouts', () => { const n = ACC.filter((a) => a.quote && a.quote.ok).length; return n ? n + ' Ready' : null; }], ['billing', 'Billing']] },
     { g: 'Learn', items: [['education', 'Education', () => String(COURSES.filter((c) => c.done < c.l).length)], ['affiliates', 'Affiliates'], ['resources', 'Resources']] },
-    { g: 'You', items: [['packs', 'Packs', () => (FS.PACKS && FS.PACKS.waiting.length ? FS.PACKS.waiting.length + ' New' : null), 'n'], ['rewards', 'Rewards'], ['competitions', 'Competitions', () => (COMPS.some((c) => c.st === 'running') ? 'Live' : null), 'n'], ['support', 'Support', () => (TICKETS.some((t) => t.st === 'open') ? '1' : null)], ['settings', 'Settings']] }
+    { g: 'You', items: [['packs', 'Packs', () => (FS.PACKS && FS.PACKS.waiting.length ? FS.PACKS.waiting.length + ' New' : null), 'n'], ['rewards', 'Rewards'], ['competitions', 'Competitions', () => (COMPS.some((c) => c.st === 'running' || c.st === 'live') ? 'Live' : null), 'n'], ['support', 'Support', () => (TICKETS.some((t) => t.st === 'open') ? '1' : null)], ['settings', 'Settings']] }
   ];
   const TITLES = { packs: 'Packs', empty: 'Accounts', accounts: 'Accounts', journal: 'Journal', payouts: 'Payouts', billing: 'Billing', education: 'Education', affiliates: 'Affiliates', resources: 'Resources', rewards: 'Rewards', competitions: 'Competitions', support: 'Support', settings: 'Settings', account: 'Account' };
   const LIGHT = () => S.theme === 'light';

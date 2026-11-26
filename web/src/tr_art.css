@@ -42,3 +42,7 @@
 .fsbo .podium2 .p3 .blk{height:52px}
 .fsbo .lbme>svg{filter:drop-shadow(0 4px 10px rgba(0,0,0,.3))}
 @media (max-width:860px){.fsbo .lbme{flex-wrap:wrap;gap:12px}}
+/* tables: room on both ends so the row hover never touches the text */
+.fsbo table.t :is(th,td):first-child{padding-left:14px}
+.fsbo table.t :is(th,td):last-child{padding-right:14px}
+.fsbo table.t tr.sub td{padding-left:0;padding-right:0}
