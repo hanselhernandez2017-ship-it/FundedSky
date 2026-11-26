@@ -116,3 +116,10 @@
 .fsbo .swh i:first-child{width:18px;background:var(--sky)}
 .fsbo .scrim{display:none}
 @media (max-width:860px){.fsbo .scrim{display:block;position:fixed;inset:0;z-index:70;background:rgba(8,8,10,.55)}.fsbo.light .scrim{background:rgba(16,18,22,.3)}}
+
+/* phone bar: a raised Buy button in the middle, the way to a new account from any page */
+.fsbo .bnav .bbuy{position:relative;color:var(--tx);font-weight:600}
+.fsbo .bnav .bbuy i{display:grid;place-items:center;width:52px;height:52px;margin-top:-26px;border-radius:50%;background:var(--sky);color:#08080A;box-shadow:0 0 0 5px var(--bg),0 8px 20px rgba(76,155,232,.45);transition:transform .15s}
+.fsbo .bnav .bbuy:active i{transform:scale(.94)}
+.fsbo .bnav .bbuy svg{width:24px;height:24px;stroke:#08080A}
+.fsbo.light .bnav .bbuy i{color:#fff}.fsbo.light .bnav .bbuy svg{stroke:#fff}
