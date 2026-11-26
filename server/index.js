@@ -108,6 +108,8 @@ T.get('/packs', h(async (req) => { const d = await PK.traderData(req.user.id); i
 T.get('/packs/history', h((req) => PK.history(req.user.id, req.query.before)));
 T.post('/packs/buy', limit(30, 60000), h((req) => PK.buy(req.user, clean(req.body.pack, 30))));
 T.post('/packs/open', limit(30, 60000), h((req) => PK.openOwned(req.user, req.body.id)));
+T.post('/packs/:id/reveal', limit(60, 60000), h((req) => PK.reveal(req.user, { pack: req.params.id })));
+T.post('/cards/:id/reveal', limit(120, 60000), h((req) => PK.reveal(req.user, { card: req.params.id })));
 T.post('/cards/:id/use', limit(20, 60000), h((req) => PK.useCard(req.user, req.params.id, req.body || {})));
 T.post('/orders/credits', h(async (req) => { const m = await maintOn(); if (m) bad(m, 503); if (await auth.blockedReq(req, req.user.email)) bad('This purchase could not be completed. Contact support.', 403); return PK.createCreditsOrder(req.user, req.body || {}); }));
 T.post('/orders', h(async (req) => { const m = await maintOn(); if (m) bad(m, 503); if (await auth.blockedReq(req, req.user.email)) bad('This purchase could not be completed. Contact support.', 403); { const sw = ((await db.one("SELECT v FROM kv WHERE k='store.risk.switches'")) || {}).v || {}; if (sw.sales) bad('New purchases are paused for a short time. Try again soon.', 503); } return pay.createOrder(req.user, req.body); }));

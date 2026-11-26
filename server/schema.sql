@@ -341,6 +341,10 @@ CREATE TABLE IF NOT EXISTS user_cards (
 );
 CREATE INDEX IF NOT EXISTS user_cards_user ON user_cards(user_id);
 ALTER TABLE user_cards ADD COLUMN IF NOT EXISTS coupon TEXT;                      -- the discount code of a card saved for checkout
+-- Cards are drawn when a pack is opened but join the collection only when the trader flips them over: NULL = drawn, not revealed yet.
+-- A pack draw stores NULL; anything else (a card granted by staff) is revealed from the start, and so is every card that existed before this column.
+ALTER TABLE user_cards ADD COLUMN IF NOT EXISTS revealed_at TIMESTAMPTZ DEFAULT now();
+CREATE INDEX IF NOT EXISTS user_cards_pack ON user_cards(pack_id);
 
 -- Competitions: each registered trader gets a practice account for a live competition
 ALTER TABLE accounts ADD COLUMN IF NOT EXISTS comp TEXT;

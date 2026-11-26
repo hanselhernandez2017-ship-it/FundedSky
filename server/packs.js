@@ -201,13 +201,17 @@ async function openPack(c, userId, packRow, cfg) {
   const cards = [];
   for (let i = 0; i < 3; i++) {
     const cd = drawOne(cfg, packRow.odds && packRow.odds.length === 6 ? packRow.odds : (cfg.packs.find((p) => p.id === packRow.pack) || {}).odds);
-    const row = await c.one('INSERT INTO user_cards(user_id,card,rarity,data,pack_id) VALUES($1,$2,$3,$4,$5) RETURNING id', [userId, cd.id, cd.r, JSON.stringify(cd), packRow.id]);
-    cards.push(Object.assign({ uid: row.id }, cd));
+    // drawn now and never again, but not revealed: the card joins the collection when the trader flips it over
+    const row = await c.one('INSERT INTO user_cards(user_id,card,rarity,data,pack_id,revealed_at) VALUES($1,$2,$3,$4,$5,NULL) RETURNING id', [userId, cd.id, cd.r, JSON.stringify(cd), packRow.id]);
+    cards.push({ uid: row.id, revealed: false });
   }
   await c.q("UPDATE user_packs SET status='opened', opened_at=now() WHERE id=$1", [packRow.id]);
   return cards;
 }
 const pub = (cd) => ({ uid: cd.uid, id: cd.id, r: cd.r, kind: cd.kind, big: cd.big, name: cd.name, desc: cd.desc, uses: cd.uses, on: cd.on });
+// A card row as its owner may see it: what the card is only once it is revealed, before that just its id
+const seen = (x) => (x.revealed_at ? Object.assign(pub(Object.assign({ uid: x.id }, x.data || {}, { id: x.card, r: x.rarity })), { revealed: true }) : { uid: x.id, revealed: false });
+const hidden = (x) => x.status === 'ready' && !x.revealed_at;
 
 // Buy a pack with credits and open it
 async function buy(user, packId) {
@@ -220,8 +224,7 @@ async function buy(user, packId) {
     const row = await c.one("INSERT INTO user_packs(user_id,pack,name,odds,source,price) VALUES($1,$2,$3,$4,'bought',$5) RETURNING *", [user.id, p.id, p.name, JSON.stringify(p.odds), p.price]);
     const cards = await openPack(c, user.id, row, cfg);
     const bal = (await c.one('SELECT points FROM users WHERE id=$1', [user.id])).points;
-    await c.q("UPDATE points_log SET label=$3 WHERE id=(SELECT max(id) FROM points_log WHERE user_id=$1 AND ref=$2)", [user.id, p.id, 'Opened ' + p.name + ': ' + cards.map((x) => x.name).join(' · ')]);
-    return { pack: row.id, cards: cards.map(pub), balance: bal };
+    return { pack: row.id, cards, left: cards.length, balance: bal };
   });
 }
 // Open a pack the trader already owns (from checkout or a grant)
@@ -230,10 +233,41 @@ async function openOwned(user, id) {
   return db.tx(async (c) => {
     if (id != null && rowId(id) == null) bad('Pack not found', 404);
     const row = id != null ? await c.one("SELECT * FROM user_packs WHERE id=$1 AND user_id=$2 FOR UPDATE", [rowId(id), user.id]) : await c.one("SELECT * FROM user_packs WHERE user_id=$1 AND status='unopened' ORDER BY id LIMIT 1 FOR UPDATE", [user.id]);
-    if (!row) bad('Pack not found', 404); if (row.status === 'revoked') bad('This pack was removed' + (row.note ? ': ' + row.note.charAt(0).toLowerCase() + row.note.slice(1) : '')); if (row.status !== 'unopened') bad('This pack has already been opened');
+    if (!row) bad('Pack not found', 404); if (row.status === 'revoked') bad('This pack was removed' + (row.note ? ': ' + row.note.charAt(0).toLowerCase() + row.note.slice(1) : ''));
+    if (row.status !== 'unopened') {
+      // opened before but not every card was flipped: carry on with the same cards, never a new draw
+      const mine = (await c.all('SELECT * FROM user_cards WHERE pack_id=$1 AND user_id=$2 ORDER BY id', [row.id, user.id])).filter((x) => x.status !== 'revoked');
+      if (!mine.some(hidden)) bad('This pack has already been opened');
+      return { pack: row.id, cards: mine.map(seen), left: mine.filter(hidden).length, resumed: true };
+    }
     const cards = await openPack(c, user.id, row, cfg);
-    await c.q('INSERT INTO points_log(user_id,label,delta,kind,ref) VALUES($1,$2,0,$3,$4)', [user.id, 'Opened ' + row.name + ': ' + cards.map((x) => x.name).join(' · '), 'spent', row.pack]);
-    return { pack: row.id, cards: cards.map(pub) };
+    await c.q('INSERT INTO points_log(user_id,label,delta,kind,ref) VALUES($1,$2,0,$3,$4)', [user.id, 'Opened ' + row.name, 'spent', row.pack]);
+    return { pack: row.id, cards, left: cards.length };
+  });
+}
+// Flip cards over: one card, or every card still face down in a pack. This is the moment a card becomes the trader's.
+// Asking again for a card already revealed returns the same card and changes nothing.
+async function reveal(user, by) {
+  await need(); const cardId = by.card != null ? rowId(by.card) : null; const packId = by.pack != null ? rowId(by.pack) : null;
+  if (by.card != null && cardId == null) bad('Card not found', 404); if (by.card == null && packId == null) bad('Pack not found', 404);
+  return db.tx(async (c) => {
+    let pid = packId;
+    if (cardId != null) { const x = await c.one('SELECT * FROM user_cards WHERE id=$1 AND user_id=$2', [cardId, user.id]); if (!x) bad('Card not found', 404); if (x.status === 'revoked') bad('This card was removed');
+      if (x.pack_id == null) return { card: seen(x), cards: [seen(x)], left: 0 }; pid = x.pack_id; }
+    // the pack row is the lock: two flips at once wait for each other
+    const p = await c.one('SELECT * FROM user_packs WHERE id=$1 AND user_id=$2 FOR UPDATE', [pid, user.id]); if (!p) bad('Pack not found', 404);
+    const rows = await c.all('SELECT * FROM user_cards WHERE pack_id=$1 AND user_id=$2 ORDER BY id FOR UPDATE', [p.id, user.id]);
+    const one = cardId != null ? rows.find((x) => x.id === cardId) : null; if (cardId != null && (!one || one.status === 'revoked')) bad('This card was removed');
+    const live = rows.filter((x) => x.status !== 'revoked'); if (!live.length) bad(p.status === 'unopened' ? 'Open this pack first' : 'This pack was removed');
+    const fresh = (one ? [one] : live).filter(hidden);
+    if (fresh.length) {
+      const at = (await c.one('UPDATE user_cards SET revealed_at=now() WHERE id = ANY($1) RETURNING revealed_at', [fresh.map((x) => x.id)])).revealed_at; fresh.forEach((x) => { x.revealed_at = at; });
+      // one history line for the pack, listing its cards as they are revealed
+      const label = `Revealed ${p.name}: ` + live.filter((x) => x.revealed_at).map((x) => (x.data || {}).name || x.card).join(' · '); const ref = 'reveal:' + p.id;
+      const l = await c.one("SELECT id FROM points_log WHERE user_id=$1 AND kind='card' AND ref=$2 ORDER BY id LIMIT 1", [user.id, ref]);
+      if (l) await c.q('UPDATE points_log SET label=$2 WHERE id=$1', [l.id, clean(label, 160)]); else await c.q('INSERT INTO points_log(user_id,label,delta,kind,ref) VALUES($1,$2,0,$3,$4)', [user.id, clean(label, 160), 'card', ref]);
+    }
+    return Object.assign({ pack: p.id, cards: live.map(seen), left: live.filter(hidden).length, fresh: fresh.length }, one ? { card: seen(one) } : {});
   });
 }
 
@@ -253,6 +287,7 @@ async function useCard(user, cardUid, body) {
   return db.tx(async (c) => {
     const uc = await c.one('SELECT * FROM user_cards WHERE id=$1 AND user_id=$2 FOR UPDATE', [rowId(cardUid), user.id]);
     if (!uc) bad('Card not found', 404); if (uc.status === 'revoked') bad('This card was removed from your collection'); if (uc.status !== 'ready') bad('This card has already been used');
+    if (!uc.revealed_at) bad('Flip this card over first. Its pack is waiting on the Packs page.');
     const cd = uc.data || {}; const fx = cd.fx || {}; const cat = await core.catalog();
     let usedOn = ''; let done = ''; let extra = {}; let coupon = null;
     if (cd.on === 'checkout') {
@@ -407,7 +442,7 @@ async function refundInfo(o, c) {
   let block = '';
   if (spent && cover < spent) block = `${plural(spent - cover, 'credit', 'credits')} from this order went on something other than packs, so a full refund is not possible. Refund the unspent share instead.`;
   else if (usedCards.length) block = `${plural(usedCards.length, 'card', 'cards')} bought with these credits ${usedCards.length === 1 ? 'was' : 'were'} already used (${[...new Set(usedCards.map((x) => (x.data || {}).name || x.card))].join(', ')}), so a full refund is not possible. Refund the unspent share instead.`;
-  return { order: o.code, total, credits, spent, unspent, refundable, balance: bal, packs: packs.map((p) => ({ id: p.id, name: p.name, price: p.price })), cards: cards.filter((x) => x.status !== 'revoked').map((x) => ({ id: x.id, name: (x.data || {}).name || x.card, status: x.status === 'ready' ? 'unused' : takeable(x) ? 'saved for checkout' : 'used' })), cover,
+  return { order: o.code, total, credits, spent, unspent, refundable, balance: bal, packs: packs.map((p) => ({ id: p.id, name: p.name, price: p.price })), cards: cards.filter((x) => x.status !== 'revoked').map((x) => ({ id: x.id, name: (x.data || {}).name || x.card, status: x.status === 'ready' ? (x.revealed_at ? 'unused' : 'not revealed') : takeable(x) ? 'saved for checkout' : 'used' })), cover,
     canTakeBack: !!spent && !block, block,
     msg: spent ? `${fmt(spent)} of ${fmt(credits)} credits already spent; refundable $${refundable.toFixed(2)}` : '' };
 }
@@ -450,6 +485,8 @@ async function onRefund(o, opt = {}) {
         const r1 = await c.all("UPDATE user_packs SET status='revoked', note='Order refunded' WHERE id = ANY($1) AND status='unopened' RETURNING id", [ids]); out.packs = (out.packs || 0) + r1.length;
         // unused cards from these packs, and cards saved for checkout whose discount was not used yet
         out.cards = (out.cards || 0) + await removeCards(c, await cardsOf(c, ids), why);
+        // a pack that was torn open but had no card flipped yet goes back whole, like an unopened one
+        const r2 = await c.all("UPDATE user_packs p SET status='revoked', note='Order refunded' WHERE p.id = ANY($1) AND p.status='opened' AND NOT EXISTS (SELECT 1 FROM user_cards x WHERE x.pack_id=p.id AND x.revealed_at IS NOT NULL) RETURNING p.id", [ids]); out.packs += r2.length;
       }
       if (g.credits) out.rewardCredits = await clawback(c, o.user_id, g.credits, `Refund ${o.code}: reward credits taken back`, o.code);
     }
@@ -467,13 +504,17 @@ async function traderData(userId) {
   const cfg = await config();
   const [u, packs, cards, log, accts] = await Promise.all([
     db.one('SELECT points FROM users WHERE id=$1', [userId]),
-    db.all("SELECT id, pack, name, source, order_id, created_at FROM user_packs WHERE user_id=$1 AND status='unopened' ORDER BY id", [userId]),
+    // packs waiting: first the ones torn open with cards still face down, then the sealed ones
+    db.all("SELECT p.id, p.pack, p.name, p.status FROM user_packs p WHERE p.user_id=$1 AND (p.status='unopened' OR (p.status='opened' AND EXISTS (SELECT 1 FROM user_cards x WHERE x.pack_id=p.id AND x.status='ready' AND x.revealed_at IS NULL))) ORDER BY (p.status='unopened'), p.opened_at, p.id", [userId]),
     // the collection: every card ready to use (newest 600) and the 200 used most recently; the counts cover all of them
-    db.all("(SELECT id, card, rarity, data, status, used_on, used_at, created_at FROM user_cards WHERE user_id=$1 AND status='ready' ORDER BY id DESC LIMIT 600) UNION ALL (SELECT id, card, rarity, data, status, used_on, used_at, created_at FROM user_cards WHERE user_id=$1 AND status='used' ORDER BY used_at DESC NULLS LAST, id DESC LIMIT 200) ORDER BY id DESC", [userId]),
+    db.all("(SELECT id, card, rarity, data, status, used_on, used_at, created_at FROM user_cards WHERE user_id=$1 AND status='ready' AND revealed_at IS NOT NULL ORDER BY id DESC LIMIT 600) UNION ALL (SELECT id, card, rarity, data, status, used_on, used_at, created_at FROM user_cards WHERE user_id=$1 AND status='used' ORDER BY used_at DESC NULLS LAST, id DESC LIMIT 200) ORDER BY id DESC", [userId]),
     db.all("SELECT id, label, delta, kind, created_at FROM points_log WHERE user_id=$1 ORDER BY id DESC LIMIT $2", [userId, HIST_PAGE + 1]),
     db.all("SELECT id, plan, size, kind, phase, balance, perks FROM accounts WHERE user_id=$1 AND phase NOT IN ('closed') ORDER BY created_at DESC", [userId])
   ]);
-  const cnt = await db.one("SELECT count(*) FILTER (WHERE status='ready')::int ready, count(*) FILTER (WHERE status='used')::int used FROM user_cards WHERE user_id=$1", [userId]);
+  const cnt = await db.one("SELECT count(*) FILTER (WHERE status='ready' AND revealed_at IS NOT NULL)::int ready, count(*) FILTER (WHERE status='used')::int used FROM user_cards WHERE user_id=$1", [userId]);
+  // cards of the packs torn open but not fully revealed: face-down ones go out as an id only
+  const part = packs.filter((p) => p.status === 'opened').map((p) => p.id);
+  const inPart = part.length ? await db.all("SELECT id, pack_id, card, rarity, data, status, revealed_at FROM user_cards WHERE user_id=$1 AND pack_id = ANY($2) AND status<>'revoked' ORDER BY id", [userId, part]) : [];
   const left = await capLeft(cfg, userId);
   return {
     bal: u ? u.points : 0, perDollar: cfg.rules.perDollar, cryptoBonus: cfg.rules.cryptoBonus,
@@ -482,7 +523,7 @@ async function traderData(userId) {
     packs: cfg.packs.filter((p) => p.on).map((p) => ({ id: p.id, name: p.name, short: p.short, price: p.price, tag: p.tag, odds: p.odds, g: p.g })),
     cards: cfg.cards.filter((c) => c.active).map((c) => ({ id: c.id, r: c.r, kind: c.kind, big: c.big, name: c.name, desc: c.desc, uses: c.uses, on: c.on })),
     bundles: cfg.bundles.filter((b) => b.on).map((b) => ({ usd: b.usd, cr: b.cr, bonus: b.bonus, badge: b.badge })),
-    waiting: packs.map((p) => ({ uid: p.id, id: p.pack, name: p.name })),
+    waiting: packs.map((p) => { if (p.status !== 'opened') return { uid: p.id, id: p.pack, name: p.name }; const cs = inPart.filter((x) => x.pack_id === p.id); return { uid: p.id, id: p.pack, name: p.name, pending: true, left: cs.filter(hidden).length, cards: cs.map(seen) }; }),
     own: cards.map((c) => Object.assign(pub(Object.assign({ uid: c.id }, c.data || {}, { id: c.card, r: c.rarity })), { st: c.status, usedOn: c.used_on || '', usedAt: c.used_at })),
     hist: log.slice(0, HIST_PAGE).map(histRow), histMore: log.length > HIST_PAGE,
     accts: accts.map((a) => ({ id: a.id, det: `${ACC_LABEL(a)} · ${a.phase === 'breached' ? 'failed' : a.phase === 'active' ? '$' + fmt(Math.round(a.balance)) : a.phase}`, t: ['eval', 'failed', 'funded', 'any'].filter((on) => eligible(on, a)) }))
@@ -549,10 +590,12 @@ async function traderAdmin(uid) {
   const u = await db.one('SELECT id, tid, first, last, email, points FROM users WHERE id=$1', [rowId(uid)]); if (!u) bad('Trader not found', 404);
   const [packs, cards, spent] = await Promise.all([
     db.all('SELECT id, pack, name, source, status, note, created_at, opened_at FROM user_packs WHERE user_id=$1 ORDER BY id DESC LIMIT 100', [u.id]),
-    db.all('SELECT id, card, rarity, data, status, used_on, created_at FROM user_cards WHERE user_id=$1 ORDER BY id DESC LIMIT 200', [u.id]),
+    db.all('SELECT id, card, rarity, data, status, used_on, created_at, pack_id, revealed_at FROM user_cards WHERE user_id=$1 ORDER BY id DESC LIMIT 200', [u.id]),
     db.one("SELECT COALESCE(-sum(delta),0)::int n FROM points_log WHERE user_id=$1 AND kind='spent'", [u.id])
   ]);
-  return { u, packs, cards: cards.map((c) => ({ id: c.id, card: c.card, name: (c.data || {}).name || c.card, r: c.rarity, status: c.status, usedOn: c.used_on, at: c.created_at })), spent: spent.n };
+  // a pack that is opened but still has face-down cards says how many
+  const down = {}; (await db.all("SELECT pack_id, count(*)::int n FROM user_cards WHERE user_id=$1 AND status='ready' AND revealed_at IS NULL AND pack_id IS NOT NULL GROUP BY pack_id", [u.id])).forEach((r) => { down[r.pack_id] = r.n; });
+  return { u, packs: packs.map((p) => Object.assign({}, p, { hidden: down[p.id] || 0 })), cards: cards.map((c) => ({ id: c.id, card: c.card, name: (c.data || {}).name || c.card, r: c.rarity, status: c.status, usedOn: c.used_on, at: c.created_at, pack: c.pack_id, revealed: !!c.revealed_at })), spent: spent.n };
 }
 // What a grant is worth in credits: a pack at its price, a card at what it gives (the account's price, the cash it adds, or its cost)
 const GRANT_CAP = 100000;
@@ -605,21 +648,32 @@ async function grant(actor, uid, body) {
 }
 async function revokeCard(actor, cardId, reason) {
   if (rowId(cardId) == null) bad('Card not found', 404);
-  const r = await db.one("UPDATE user_cards SET status='revoked', used_on=$2 WHERE id=$1 AND status='ready' RETURNING user_id, data", [rowId(cardId), 'Removed: ' + (clean(reason, 120) || 'by support')]);
+  const r = await db.one("UPDATE user_cards SET status='revoked', used_on=$2 WHERE id=$1 AND status='ready' RETURNING user_id, data, revealed_at", [rowId(cardId), 'Removed: ' + (clean(reason, 120) || 'by support')]);
   if (!r) { if (!(await db.one('SELECT 1 FROM user_cards WHERE id=$1', [rowId(cardId)]))) bad('Card not found', 404); bad('Only unused cards can be removed'); }
-  await db.q('INSERT INTO points_log(user_id,label,delta,kind,actor_id) VALUES($1,$2,0,$3,$4)', [r.user_id, `Card removed: ${(r.data || {}).name || ''}`, 'grant', actor.id]);
+  // the trader's history never names a card they have not flipped over
+  await db.q('INSERT INTO points_log(user_id,label,delta,kind,actor_id) VALUES($1,$2,0,$3,$4)', [r.user_id, r.revealed_at ? `Card removed: ${(r.data || {}).name || ''}` : 'Card removed: a card that was not revealed yet', 'grant', actor.id]);
   await core.audit(actor.id, 'packs.revoke', String(cardId), { card: (r.data || {}).id, user: r.user_id, reason: clean(reason, 120) }); return { ok: true };
 }
-// Take back a pack staff granted, while it is still unopened
+// Take back a pack staff granted: while it is unopened, or opened with cards the trader has not flipped over yet (those cards go with it)
 async function revokePack(actor, packId, reason) {
-  if (rowId(packId) == null) bad('Pack not found', 404);
-  const p = await db.one('SELECT id, source, status FROM user_packs WHERE id=$1', [rowId(packId)]); if (!p) bad('Pack not found', 404);
-  if (p.source !== 'grant') bad(p.source === 'checkout' ? 'This pack came with an order. Refund the order to take it back.' : 'Only packs granted by staff can be taken back');
-  const r = await db.one("UPDATE user_packs SET status='revoked', note=$2 WHERE id=$1 AND status='unopened' RETURNING user_id, name", [p.id, 'Taken back: ' + (clean(reason, 120) || 'by support')]);
-  if (!r) bad(p.status === 'opened' ? 'This pack was already opened. Remove its unused cards instead.' : 'This pack was already taken back');
-  await db.q('INSERT INTO points_log(user_id,label,delta,kind,actor_id) VALUES($1,$2,0,$3,$4)', [r.user_id, `Pack taken back: ${r.name}`, 'grant', actor.id]);
-  await core.audit(actor.id, 'packs.revokePack', String(p.id), { user: r.user_id, pack: r.name, reason: clean(reason, 120) }); return { ok: true };
+  if (rowId(packId) == null) bad('Pack not found', 404); const why = 'Taken back: ' + (clean(reason, 120) || 'by support');
+  return db.tx(async (c) => {
+    const p = await c.one('SELECT id, user_id, name, source, status FROM user_packs WHERE id=$1 FOR UPDATE', [rowId(packId)]); if (!p) bad('Pack not found', 404);
+    if (p.source !== 'grant') bad(p.source === 'checkout' ? 'This pack came with an order. Refund the order to take it back.' : 'Only packs granted by staff can be taken back');
+    if (p.status === 'revoked') bad('This pack was already taken back');
+    let cards = 0; let kept = 0;
+    if (p.status === 'opened') {
+      const mine = await c.all("SELECT id, status, revealed_at FROM user_cards WHERE pack_id=$1 AND status<>'revoked' FOR UPDATE", [p.id]); const down = mine.filter(hidden); kept = mine.length - down.length;
+      if (!down.length) bad('This pack was already opened. Remove its unused cards instead.');
+      await c.q("UPDATE user_cards SET status='revoked', used_on=$2 WHERE id = ANY($1)", [down.map((x) => x.id), why]); cards = down.length;
+    }
+    // with a card already revealed the pack stays opened: only what was still face down is taken back
+    if (!kept) await c.q("UPDATE user_packs SET status='revoked', note=$2 WHERE id=$1", [p.id, why]);
+    await c.q('INSERT INTO points_log(user_id,label,delta,kind,actor_id) VALUES($1,$2,0,$3,$4)', [p.user_id, kept ? `Pack taken back: ${p.name} (${plural(cards, 'card', 'cards')} not revealed yet)` : `Pack taken back: ${p.name}`, 'grant', actor.id]);
+    await c.q('INSERT INTO audit(actor_id,action,target,meta) VALUES($1,$2,$3,$4)', [actor.id, 'packs.revokePack', String(p.id), { user: p.user_id, pack: p.name, reason: clean(reason, 120), cards, kept }]);
+    return Object.assign({ ok: true, cards }, kept ? { kept, note: `${plural(cards, 'card', 'cards')} not revealed yet ${cards === 1 ? 'was' : 'were'} taken back. ${plural(kept, 'revealed card stays', 'revealed cards stay')}: remove ${kept === 1 ? 'it' : 'them'} one by one if needed.` } : {});
+  });
 }
 
 module.exports = { RN, DEF, config, saveConfig, normalize, enabled, setEnabled, credit, buy, openOwned, useCard, ladderFor, ladderLine, grantForOrder, createCreditsOrder, fulfilCredits, onRefund, traderData, publicLadder, publicCredits, adminData, findTrader, traderAdmin, grant, revokeCard, eligible, drawOne };
-Object.assign(module.exports, { revokePack, refundInfo, refundPlan, payGuard, history, customMax, capLeft, gText });
+Object.assign(module.exports, { reveal, revokePack, refundInfo, refundPlan, payGuard, history, customMax, capLeft, gText });
