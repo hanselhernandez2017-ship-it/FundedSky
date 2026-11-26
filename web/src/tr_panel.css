@@ -186,3 +186,6 @@
 .fsbo .ftl.six{grid-template-columns:repeat(6,minmax(0,1fr))}
 .fsbo .content>.sec.first:has(.ftl.six)+.sec{border-top:0!important;padding-top:8px!important}
 @media (max-width:860px){.fsbo .ftl.six{grid-template-columns:1fr 1fr}.fsbo .ftl.open>*{border-left:0;padding-left:0}}
+/* the "You" badge on a milestone track points at its place on the bar: a short stem, then a dot on the bar itself */
+.fsbo .trk .me2:before{content:'';position:absolute;left:50%;top:calc(100% + 5px);width:2px;height:9px;margin-left:-1px;border-radius:1px;background:var(--sky);opacity:.9}
+.fsbo .trk .me2:after{content:'';position:absolute;left:50%;top:36px;width:10px;height:10px;margin:-1px 0 0 -5px;border-radius:50%;background:var(--sky);box-shadow:0 0 0 3px var(--bg),0 0 0 4px var(--sky)}
