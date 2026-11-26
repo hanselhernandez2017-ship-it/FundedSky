@@ -79,8 +79,9 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 <li style="display: flex; align-items: center; gap: 8px;"><span style="width: 22px; height: 22px; border-radius: 11px; border: 1px solid #3A3A40; font-size: 12px; display: flex; align-items: center; justify-content: center;">3</span>Start Trading</li>
 </ol>
 <div style="display: flex; align-items: center; gap: 20px;">
+<sc-if value="{{ meIn }}"><a href="/app" aria-label="Your dashboard" style="display: flex; align-items: center; gap: 8px; min-height: 44px; font-size: 13px; color: #D4CFCD; text-decoration: none;"><span style="width: 32px; height: 32px; border-radius: 16px; background: #26262A; color: #F4F2F1; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center;">{{ ini }}</span><span class="fs-secure">{{ firstName }}</span></a></sc-if>
 <span class="fs-secure" style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: #9C9693;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg>Secure Checkout</span>
-<a href="{{ loginHref }}" style="min-height: 44px; display: flex; align-items: center; font-size: 14px; font-weight: 500;">{{ loginText }}</a>
+<sc-if value="{{ meOut }}"><a href="{{ loginHref }}" style="min-height: 44px; display: flex; align-items: center; font-size: 14px; font-weight: 500;">{{ loginText }}</a></sc-if>
 </div>
 </div>
 </header>
@@ -288,7 +289,7 @@ class Component extends DCLogic {
     const st = this.state; const cat = st.cat; const M = FSX.money;
     const on = { bg: '#13202E', bd: '#7CC4FF', sub: '#D4CFCD', fg: '#F4F2F1', ring: '6px solid #7CC4FF' };
     const off = { bg: '#111113', bd: '#26262A', sub: '#9C9693', fg: '#D4CFCD', ring: '1.5px solid #3A3A40' };
-    const empty = { plans: [], sizes: [], platforms: [], addons: [], bundles: [], cart: [], lines: [], rules: {}, total: '…', accountsLabel: 'Loading', activeLabel: '', activeQty: 1, atMin: true, feeTerms: '', loginHref: '/login?next=/checkout', nextHref: '#', rulesHref: '#', rulesNote: '', loginText: 'Log In' };
+    const empty = { plans: [], sizes: [], platforms: [], addons: [], bundles: [], cart: [], lines: [], rules: {}, total: '…', accountsLabel: 'Loading', activeLabel: '', activeQty: 1, atMin: true, feeTerms: '', loginHref: '/login?next=/checkout', nextHref: '#', rulesHref: '#', rulesNote: '', loginText: 'Log In', meOut: !st.me, meIn: !!st.me, ini: st.me ? ((st.me.first || '')[0] || '') + ((st.me.last || '')[0] || '') : '', firstName: st.me ? st.me.first : '' };
     if (!cat) return empty;
     const cur = st.cart.find((c) => c.id === st.active) || st.cart[0];
     const P = (id) => cat.plans.find((p) => p.id === id);
@@ -364,7 +365,8 @@ class Component extends DCLogic {
       setPromo: (e) => this.setState({ promoInput: e.target.value }),
       applyPromo: () => { const v = (st.promoInput || '').trim(); this.setState({ promo: v, promoOk: false, promoMsg: '' }); this.reprice(); },
       rulesHref: st.me ? '/app/resources?tab=rules' : '#order', rulesNote: isI ? 'Instant: funded from day one' : 'Same Rules on Every Evaluation Plan',
-      nextHref: next, loginHref: st.me ? '/app' : '/login?next=/checkout', loginText: st.me ? 'Dashboard' : 'Log In'
+      nextHref: next, loginHref: st.me ? '/app' : '/login?next=/checkout', loginText: st.me ? 'Dashboard' : 'Log In',
+      meIn: !!st.me, meOut: !st.me, ini: st.me ? ((st.me.first || '')[0] || '') + ((st.me.last || '')[0] || '') : '', firstName: st.me ? st.me.first : ''
     };
   }
 }

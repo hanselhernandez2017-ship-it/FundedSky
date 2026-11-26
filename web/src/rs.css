@@ -196,3 +196,11 @@ body{margin:0;background:#08080A}
 .rs .cf-btns a.pri{background:var(--tx);color:var(--bg)}.rs .cf-btns a.sec2{border:1px solid var(--ln);color:var(--tx);font-weight:500}
 .rs .cf-foot{margin:0;font-size:13px;line-height:18px;color:var(--mu)}
 @media (max-width:760px){.rs .cf{padding:32px 20px 40px;gap:28px}.rs .cf h1{font-size:32px;line-height:36px}.rs .cf-lead{font-size:15px;line-height:22px}.rs .cf-steps li{padding:16px}.rs .cf-btns{flex-direction:column}.rs .cf-btns a{text-align:center}}
+
+/* signed-in trader in the header, like the other checkout pages */
+.rs .hdr .hr{display:flex;align-items:center;gap:20px}
+.rs .hme{display:flex;align-items:center;gap:8px;min-height:44px;font-size:13px;color:var(--t2);text-decoration:none}
+.rs .hme span{width:32px;height:32px;border-radius:16px;background:var(--ln);color:var(--tx);font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.rs .hme b{font-weight:400}
+@media (max-width:760px){.rs .hme b{display:none}}
+.rs .mprog{white-space:nowrap}

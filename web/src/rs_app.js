@@ -22,7 +22,7 @@
   function paint(html) { if (!window.morphdom || !root.firstChild) { root.innerHTML = html; return; } const n = document.createElement('div'); n.innerHTML = html; window.morphdom(root, n, { childrenOnly: true, onBeforeElUpdated: (f) => !f.hasAttribute('data-keep') }); }
   function render() {
     const a = list.find((x) => x.id === R.acct); const p = price(a);
-    const hdr = `<header><div class="hdr"><a class="logo" href="${home()}"><b>fundedsky</b><i>futures</i></a>${steps(R.done ? 1 : 0)}<span class="sec">${LOCK}Secure Checkout</span><span class="mprog">Step ${R.done ? 2 : 1} of 2 <i><b style="width:${R.done ? 100 : 50}%"></b></i></span></div></header>`;
+    const hdr = `<header><div class="hdr"><a class="logo" href="${home()}"><b>fundedsky</b><i>futures</i></a>${steps(R.done ? 1 : 0)}<span class="hr"><a class="hme" href="${home()}" aria-label="Your dashboard"><span>${esc(((ME.first || '')[0] || '') + ((ME.lastFull || ME.last || '')[0] || ''))}</span><b>${esc(ME.first || '')}</b></a><span class="sec">${LOCK}Secure Checkout</span></span><span class="mprog">Step ${R.done ? 2 : 1} of 2 <i><b style="width:${R.done ? 100 : 50}%"></b></i></span></div></header>`;
     if (R.done) {
       const pmName = !p.total ? 'No charge' : R.pm === 'apple' ? 'Apple Pay' : R.pm === 'crypto' ? 'crypto' : R.pm === 'code' ? 'a reward code' : 'your card';
       const adds = Object.keys(R.ad).filter((k) => R.ad[k]).map((k) => ADDONS[k][0]);
