@@ -116,6 +116,22 @@
 .fsbo .swh i{width:6px;height:6px;border-radius:3px;background:var(--ln)}
 .fsbo .swh i{transition:width .2s,background .2s}
 .fsbo .swh i.on{width:18px;background:var(--sky)}
+.fsbo .bset .wb{display:none}
+@media (max-width:860px){
+  .fsbo .ftl.bset{grid-template-columns:minmax(0,1fr)!important;gap:0!important}
+  .fsbo .ftl.bset>*{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:14px;row-gap:4px;align-items:center;padding:14px 0!important;border:0!important;border-top:1px solid var(--ln2)!important}
+  .fsbo .ftl.bset>*:first-child{border-top:0!important;padding-top:2px!important}
+  .fsbo .ftl.bset>*:last-child{padding-bottom:2px!important}
+  .fsbo .ftl.bset>*>div:first-child{grid-column:1;grid-row:1;min-width:0}
+  .fsbo .ftl.bset>*>div:first-child>b{font-size:15.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .fsbo .ftl.bset .dn{display:none!important}
+  .fsbo .ftl.bset .kpi{grid-column:2;grid-row:1 / span 2;text-align:right}
+  .fsbo .ftl.bset .kpi b{font-size:18px!important}
+  .fsbo .ftl.bset .kpi b.pos{color:var(--ok)}.fsbo .ftl.bset .kpi b.neg{color:var(--no)}
+  .fsbo .ftl.bset>*>span{grid-column:1;grid-row:2}
+  .fsbo .ftl.bset .wb{display:block;grid-column:1 / -1;grid-row:3;height:4px;border-radius:2px;background:var(--ln);overflow:hidden;margin-top:6px}
+  .fsbo .ftl.bset .wb i{display:block;height:100%;border-radius:2px}
+}
 .fsbo select.acsel{display:block;width:auto;min-width:300px;max-width:100%;height:44px;margin:8px 0 22px;padding:0 44px 0 14px;font-weight:600;font-size:14.5px;border-radius:8px;cursor:pointer;text-overflow:ellipsis}
 @media (max-width:860px){.fsbo select.acsel{width:100%;min-width:0;font-size:16px;letter-spacing:-.01em}}
 .fsbo .scrim{display:none}

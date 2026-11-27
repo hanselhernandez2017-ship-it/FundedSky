@@ -240,7 +240,7 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 </sc-for>
 <div class="fs-total" style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 6px;"><span style="font-size: 16px; font-weight: 600;">Total Today</span><span style="font-family: 'Geist Mono', monospace; font-size: 26px; font-weight: 500;">{{ total }}</span></div>
 </div>
-<sc-if value="{{ blockMsg }}"><p role="status" style="margin: 0; font-size: 13px; line-height: 19px; color: #F2C46D;">{{ blockMsg }}</p></sc-if>
+<sc-if value="{{ blockMsg }}"><p class="fs-cta" role="status" style="margin: 0; font-size: 13px; line-height: 19px; color: #F2C46D;">{{ blockMsg }}</p></sc-if>
 <a href="{{ nextHref }}" class="fs-cta" aria-disabled="{{ ctaOff }}" style="opacity: {{ ctaOp }}; display: block; text-align: center; background: #FFFFFF; color: #111113; border-radius: 4px; padding: 14px; font-size: 15px; font-weight: 600; font-stretch: 112%; text-decoration: none;">Continue to Payment</a>
 <p style="margin: 0; font-size: 12px; line-height: 18px; color: #9C9693; text-align: center;">{{ feeTerms }}</p>
 </aside>
