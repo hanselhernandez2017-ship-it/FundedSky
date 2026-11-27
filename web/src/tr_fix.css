@@ -207,3 +207,7 @@
 .fsbo .logo i{font-size:15px;padding:2px 6px 3px}
 @media (max-width:374px){.fsbo .mtop .logo b{font-size:19px}.fsbo .mtop .logo i{font-size:14px;padding:2px 5px 3px}}
 @media (max-width:349px){.fsbo .mtop .logo i{display:none}}
+/* clock hover box must not touch the credits pill */
+@media (min-width:861px){.fsbo .top .clk{margin-right:12px}}
+@media (max-width:1060px) and (min-width:861px){.fsbo .top .tcb{display:none}.fsbo .top .clk .et{border-left:0;padding-left:0}}
+@media (max-width:940px) and (min-width:861px){.fsbo .top .srch{display:none}.fsbo .top .clk .et small{display:none}}
