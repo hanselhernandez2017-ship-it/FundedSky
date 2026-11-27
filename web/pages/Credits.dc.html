@@ -43,6 +43,10 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 .fs-total{display:none!important}
 .fs-bar{display:flex!important}
 .fs-in{font-size:16px!important}
+.fs-main{flex-direction:column!important;flex-wrap:nowrap!important;align-items:stretch!important}
+.fs-col{display:contents!important}
+.fs-aside{flex:none!important;order:1}
+.fs-agree{order:2}
 }
 .fs-bgrid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
 .fs-tile{box-sizing:border-box;aspect-ratio:1/1;display:flex;flex-direction:column;gap:10px;border-radius:8px;padding:14px;cursor:pointer;min-width:0}
@@ -126,7 +130,7 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 </sc-if>
 </fieldset>
 
-<label style="display: flex; gap: 12px; align-items: flex-start; font-size: 14px; line-height: 20px; color: #D4CFCD; cursor: pointer;"><input type="checkbox" class="fs-check" checked="{{ agreed }}" onChange="{{ toggleAgree }}"><span>I've read the <a href="/checkout#order">Trading Rules</a> and agree to the <a href="/terms" target="_blank">Terms</a> and <a href="/refund-policy" target="_blank">Refund Policy</a>.</span></label>
+<label class="fs-agree" style="display: flex; gap: 12px; align-items: flex-start; font-size: 14px; line-height: 20px; color: #D4CFCD; cursor: pointer;"><input type="checkbox" class="fs-check" checked="{{ agreed }}" onChange="{{ toggleAgree }}"><span>I've read the <a href="/checkout#order">Trading Rules</a> and agree to the <a href="/terms" target="_blank">Terms</a> and <a href="/refund-policy" target="_blank">Refund Policy</a>.</span></label>
 </form>
 
 <aside class="fs-aside" style="flex: 1 1 340px; min-width: 0; position: sticky; top: 24px; background: #18181A; border: 1px solid #26262A; border-radius: 8px; padding: 24px; box-sizing: border-box; display: flex; flex-direction: column; gap: 18px;">
