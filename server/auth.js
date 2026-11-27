@@ -48,7 +48,7 @@ async function loadUser(req, res, next) {
   next();
 }
 const STAFF = ['admin', 'support', 'risk', 'finance'];
-const needUser = (req, res, next) => (req.user ? next() : res.status(401).json({ error: 'Please log in' }));
+const needUser = (req, res, next) => (req.user ? next() : res.status(401).json({ error: 'Please log in.' }));
 const staffOk = (u) => !!(u && STAFF.includes(u.role) && u.status !== 'suspended' && u.status !== 'banned' && u.mfa_on && u.sess_mfa && !u.netBlocked);
 // Team > Security: allowed networks and the inactivity timeout for staff. Entries are one IPv4 or IPv6 address, or a range like 10.0.0.0/24 or 2001:db8::/48.
 const net = require('net');
@@ -56,7 +56,7 @@ const normIp = (ip) => String(ip || '').trim().replace(/^::ffff:(\d+\.\d+\.\d+\.
 const netRule = (rule) => { const m = /^([^/\s]+)(?:\/(\d{1,3}))?$/.exec(String(rule || '').trim()); if (!m) return null; const base = normIp(m[1]); const v = net.isIP(base); if (!v) return null; const bits = m[2] === undefined ? null : +m[2]; if (bits !== null && bits > (v === 4 ? 32 : 128)) return null; return { base, bits, fam: v === 4 ? 'ipv4' : 'ipv6' }; };
 const ipIn = (ip, rule) => { ip = normIp(ip); const v = net.isIP(ip); const r = netRule(rule); if (!v || !r) return false; const bl = new net.BlockList(); if (r.bits === null) bl.addAddress(r.base, r.fam); else bl.addSubnet(r.base, r.bits, r.fam); return bl.check(ip, v === 4 ? 'ipv4' : 'ipv6'); };
 async function staffPolicy(req) { const sec = ((await db.one("SELECT v FROM kv WHERE k='store.team.security'")) || {}).v || {}; const nets = ((await db.one("SELECT v FROM kv WHERE k='store.team.networks'")) || {}).v || []; return { sec, nets }; }
-const needStaff = (req, res, next) => (staffOk(req.user) ? next() : !req.user ? res.status(401).json({ error: 'Please log in' }) : req.user && req.user.netBlocked ? res.status(403).json({ error: 'The back office only opens from your company network. Ask an admin to add this network in Team.' }) : req.user && STAFF.includes(req.user.role) ? res.status(403).json({ error: 'Set up two-step login first', mfa: 'setup' }) : res.status(403).json({ error: 'Staff only' }));
+const needStaff = (req, res, next) => (staffOk(req.user) ? next() : !req.user ? res.status(401).json({ error: 'Please log in.' }) : req.user && req.user.netBlocked ? res.status(403).json({ error: 'The back office only opens from your company network. Ask an admin to add this network in Team.' }) : req.user && STAFF.includes(req.user.role) ? res.status(403).json({ error: 'Set up two-step login first.', mfa: 'setup' }) : res.status(403).json({ error: 'Staff only' }));
 const needAdmin = (req, res, next) => (req.user && req.user.role === 'admin' ? next() : res.status(403).json({ error: 'Admins only' }));
 
 async function makeToken(userId, kind, hours) {
@@ -69,17 +69,17 @@ async function blockedReq(req, email) {
   return bl.some((x) => x && x.type !== 'watch' && x.value && ((x.type === 'ip' && String(x.value).replace(/^::ffff:/, '') === ip) || (x.type === 'email' && (em === String(x.value).toLowerCase() || (String(x.value).startsWith('@') && em.endsWith(String(x.value).toLowerCase()))))));
 }
 // Same rule the sign-up and reset pages show: 8+ characters, a number and an uppercase letter
-const pwRule = (p) => { if (p.replace(/\s/g, '').length < 8 || !/\d/.test(p) || !/[A-Z]/.test(p)) bad('Use at least 8 characters, with a number and an uppercase letter'); };
+const pwRule = (p) => { if (p.replace(/\s/g, '').length < 8 || !/\d/.test(p) || !/[A-Z]/.test(p)) bad('Use at least 8 characters, with a number and an uppercase letter.'); };
 async function signup(req, res) {
-  const b = req.body || {}; if (['email', 'password', 'first', 'last', 'country', 'ref', 'phone', 'phoneIso'].some((k) => b[k] != null && typeof b[k] !== 'string')) bad('Check your details and try again');
+  const b = req.body || {}; if (['email', 'password', 'first', 'last', 'country', 'ref', 'phone', 'phoneIso'].some((k) => b[k] != null && typeof b[k] !== 'string')) bad('Check your details and try again.');
   const email = clean(b.email, 200).toLowerCase(); const pass = String(b.password || '');
   const first = clean(b.first, 60), last = clean(b.last, 60);
   // Country must be one from the sign-up list (the same list as the phone codes), stored with its usual spelling
   const cRow = require('./phone').DIAL.find((r) => r[0].toLowerCase() === clean(b.country, 60).toLowerCase()); const country = cRow ? cRow[0] : '';
-  if (!emailOk(email)) bad('Enter a valid email address');
+  if (!emailOk(email)) bad('Enter a valid email address.');
   pwRule(pass);
-  if (!first || !last) bad('Enter your first and last name');
-  if (!country) bad('Choose your country of residence from the list');
+  if (!first || !last) bad('Enter your first and last name.');
+  if (!country) bad('Choose your country of residence from the list.');
   const ph = require('./phone').parse(req.body.phoneIso, req.body.phone); if (ph.err) bad(ph.err);
   const rc = await db.one("SELECT v FROM kv WHERE k='list.countries'"); if (rc && (rc.v || []).some((c) => c.blocked && String(c.name || '').trim().toLowerCase() === country.toLowerCase())) bad('Funded Sky is not available in ' + country + ' yet.');
   if (await blockedReq(req, email)) bad('We could not create an account. Contact support if you think this is a mistake.');
@@ -103,7 +103,7 @@ async function login(req, res) {
   const M = require('./mfa'); const fails = loginFails.get(email) || 0;
   if (fails >= 10) bad('Too many wrong tries. Wait 15 minutes or reset your password.', 429);
   const okPw = await bcrypt.compare(String(req.body.password || ''), u ? u.pass_hash : DUMMY_HASH);
-  if (!u || !okPw) { loginFails.set(email, fails + 1); setTimeout(() => { const v = loginFails.get(email); if (v) loginFails.set(email, v - 1); }, 15 * 60000).unref(); bad('That email and password do not match', 401); }
+  if (!u || !okPw) { loginFails.set(email, fails + 1); setTimeout(() => { const v = loginFails.get(email); if (v) loginFails.set(email, v - 1); }, 15 * 60000).unref(); bad('That email and password do not match.', 401); }
   loginFails.delete(email);
   if (u.status === 'banned') bad('This account is closed. Contact support.', 403);
   if (STAFF.includes(u.role) && u.status === 'suspended') bad('Your back office access is suspended. Ask an admin to turn it back on.', 403);
@@ -156,7 +156,7 @@ async function staffRoleFor(email) {
   return inv.role;
 }
 async function verifyEmail(req) {
-  if (!req.user) bad('Log in first, then enter your code', 401);
+  if (!req.user) bad('Log in first, then enter your code.', 401);
   const code = clean(req.body.code, 10).replace(/\D/g, '');
   const t = await db.one("SELECT * FROM tokens WHERE token=$1 AND kind='verify' AND used=false AND expires_at > now()", ['V' + req.user.id + ':' + code]);
   if (!t) { if (require('./mfa').bump('v' + req.user.id) >= 6) await db.q("UPDATE tokens SET used=true WHERE user_id=$1 AND kind='verify'", [req.user.id]); bad('That code is wrong or has expired. Send a new one.'); }
@@ -175,8 +175,8 @@ async function resendVerify(req) {
 // Fixes a typo in the sign-up email before it is confirmed (keeps the same account instead of making a second one)
 async function changeEmail(req) {
   const u = await db.one('SELECT * FROM users WHERE id=$1', [req.user.id]); if (u.verified) bad('Your email is already confirmed. Contact support to change it.');
-  if (req.body.email != null && typeof req.body.email !== 'string') bad('Enter a valid email address');
-  const email = clean(req.body.email, 200).toLowerCase(); if (!emailOk(email)) bad('Enter a valid email address');
+  if (req.body.email != null && typeof req.body.email !== 'string') bad('Enter a valid email address.');
+  const email = clean(req.body.email, 200).toLowerCase(); if (!emailOk(email)) bad('Enter a valid email address.');
   if (email === u.email) return resendVerify(req);
   if (await blockedReq(req, email)) bad('We could not use that email. Contact support if you think this is a mistake.');
   if (await db.one('SELECT 1 FROM users WHERE email=$1', [email])) bad('An account with this email already exists. Log in instead.');
@@ -185,9 +185,9 @@ async function changeEmail(req) {
 }
 async function changePassword(req) {
   const u = await db.one('SELECT * FROM users WHERE id=$1', [req.user.id]);
-  if (!(await bcrypt.compare(String(req.body.current || ''), u.pass_hash))) bad('Your current password is not right');
+  if (!(await bcrypt.compare(String(req.body.current || ''), u.pass_hash))) bad('Your current password is not right.');
   const pass = String(req.body.password || ''); pwRule(pass);
-  if (await bcrypt.compare(pass, u.pass_hash)) bad('Your new password must be different from your current one');
+  if (await bcrypt.compare(pass, u.pass_hash)) bad('Your new password must be different from your current one.');
   await db.q('UPDATE users SET pass_hash=$2 WHERE id=$1', [u.id, await bcrypt.hash(pass, 10)]);
   await db.q('DELETE FROM sessions WHERE user_id=$1 AND token<>$2', [u.id, req.sess]);
   await db.q("UPDATE tokens SET used=true WHERE user_id=$1 AND kind='reset'", [u.id]);

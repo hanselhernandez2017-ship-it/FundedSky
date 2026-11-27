@@ -144,11 +144,11 @@ async function checkRefundRate(uid, core) {
 // ---- Staff save the affiliates list: the server checks codes and keeps the fields it owns ----
 async function saveList(next, core) {
   if (!Array.isArray(next)) bad('Bad list'); const prev = ((await kv('list.affiliates')) || []).filter((x) => x && x.user); const now = new Date().toISOString(); const out = []; const fresh = []; const declined = [];
-  for (const raw of next) { if (!raw || !raw.user) continue; const uid = Number(raw.user); if (out.some((y) => y.user === uid)) bad('The same trader is on the list twice'); const old = prev.find((y) => y.user === uid);
+  for (const raw of next) { if (!raw || !raw.user) continue; const uid = Number(raw.user); if (out.some((y) => y.user === uid)) bad('The same trader is on the list twice.'); const old = prev.find((y) => y.user === uid);
     if (raw.status === 'declined') { const d = { user: uid, status: 'declined', at: (old && old.status === 'declined' && old.at) || now, reason: clean(raw.reason, 300) }; if (old && old.status !== 'declined') bad('This trader is already an affiliate. Pause them instead.'); if (!old && raw.at && Date.now() - new Date(raw.at) > 600000) continue; if (!old) declined.push(d); out.push(d); continue; }
     const was = old && old.status !== 'declined' ? old : null;
     if (!was && !(await db.one("SELECT 1 FROM users WHERE id=$1 AND role='trader'", [uid]))) bad('That trader account was not found');
-    const x = Object.assign({}, raw, { user: uid, code: up(raw.code), status: raw.status === 'paused' ? 'paused' : 'active' }); if (x.code.length < 3) bad('Give the affiliate a code of at least 3 letters or numbers');
+    const x = Object.assign({}, raw, { user: uid, code: up(raw.code), status: raw.status === 'paused' ? 'paused' : 'active' }); if (x.code.length < 3) bad('Give the affiliate a code of at least 3 letters or numbers.');
     // the pause history belongs to the server
     x.pauses = was ? (was.pauses || []).slice() : []; delete x.pausedWhy; if (was && was.pausedWhy && x.status === 'paused') x.pausedWhy = was.pausedWhy;
     if (x.status === 'paused' && !(was && was.status === 'paused')) x.pauses.push({ from: now });
@@ -182,11 +182,11 @@ async function tellDeclined(d, core) {
 // ---- Trader applies: a channel link and a short description are required; a declined trader waits 30 days ----
 async function apply(user, b, core) {
   const s = user.settings || {}; const all = ((await kv('list.affiliates')) || []).filter((x) => x && x.user); const mine = all.find((x) => x.user === user.id);
-  if (mine && mine.status !== 'declined') bad('You are already an affiliate');
+  if (mine && mine.status !== 'declined') bad('You are already an affiliate.');
   if (s.affApplied) bad('Your application is already with our team. We reply within 3 business days.');
-  const decl = (mine && mine.at) || s.affDeclined; if (decl) { const again = new Date(decl).getTime() + REAPPLY_DAYS * 86400000; if (again > Date.now()) bad(`You can apply again from ${dateOf(again)}`); }
+  const decl = (mine && mine.at) || s.affDeclined; if (decl) { const again = new Date(decl).getTime() + REAPPLY_DAYS * 86400000; if (again > Date.now()) bad(`You can apply again from ${dateOf(again)}.`); }
   const where = clean(b.where, 200); const aud = clean(b.audience, 500);
-  if (where.length < 4) bad('Add a link to your channel, page or community'); if (aud.length < 20) bad('Tell us about your audience in a sentence or two (at least 20 characters)');
+  if (where.length < 4) bad('Add a link to your channel, page or community.'); if (aud.length < 20) bad('Tell us about your audience in a sentence or two (at least 20 characters).');
   await db.q('UPDATE users SET settings = (settings - \'affDeclined\') || $2 WHERE id=$1', [user.id, JSON.stringify({ affApplied: true, affAt: new Date().toISOString(), affWhere: where, affAudience: aud })]);
   let next = all.filter((x) => x.user !== user.id);
   if (mine) await putKv('list.affiliates', next); // an earlier decline leaves the list so the new application reaches staff

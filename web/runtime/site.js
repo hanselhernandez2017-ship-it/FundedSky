@@ -2,7 +2,9 @@
 (function () {
   const KEY = 'fs_cart';
   const FS = {
-    cart: { get() { try { return JSON.parse(localStorage.getItem(KEY)) || null; } catch (e) { return null; } }, set(v) { try { localStorage.setItem(KEY, JSON.stringify(v)); } catch (e) { /* private mode */ } }, clear() { try { localStorage.removeItem(KEY); } catch (e) { /* ignore */ } } },
+    cart: { get() { try { return JSON.parse(localStorage.getItem(KEY)) || null; } catch (e) { return null; } }, set(v) { try { localStorage.setItem(KEY, JSON.stringify(v)); } catch (e) { /* private mode */ } }, clear() { try { localStorage.removeItem(KEY); localStorage.removeItem(KEY + '_n'); } catch (e) { /* ignore */ } },
+      // one key per cart and contents, shared by every tab: the server makes one order per key, so two tabs paying the same cart pay once
+      key(items, promo) { let n = ''; try { n = localStorage.getItem(KEY + '_n') || ''; if (!n) { n = Math.random().toString(36).slice(2, 12); localStorage.setItem(KEY + '_n', n); } } catch (e) { return ''; } let h = 5381; const t = JSON.stringify([items, promo || '']); for (let i = 0; i < t.length; i++) h = ((h * 33) ^ t.charCodeAt(i)) >>> 0; return n + '-' + h.toString(36); } },
     money: (v) => '$' + (Math.round(Number(v) * 100) / 100).toLocaleString('en-US', { minimumFractionDigits: Number(v) % 1 ? 2 : 0, maximumFractionDigits: 2 }),
     catalog: null,
     async loadCatalog() { if (!FS.catalog) FS.catalog = await DC.api('/api/catalog'); return FS.catalog; },
@@ -23,19 +25,19 @@
       if (member && code) {
         // a reward code in the link (the checkout reminder email) goes on this order before it is shown
         const rc = DC.qs('code'); let warn = '';
-        if (rc) { try { const r = await DC.api('/api/orders/' + encodeURIComponent(code) + '/code', { code: rc }); if (r.paid) { location.replace('/checkout/confirmed?order=' + code); return new Promise(() => {}); } } catch (e) { if (e.status !== 404) warn = `Code ${String(rc).toUpperCase().slice(0, 40)} was not applied: ${e.message}.`; } }
+        if (rc) { try { const r = await DC.api('/api/orders/' + encodeURIComponent(code) + '/code', { code: rc }); if (r.paid) { location.replace('/checkout/confirmed?order=' + code); return new Promise(() => {}); } } catch (e) { if (e.status !== 404) warn = `Code ${String(rc).toUpperCase().slice(0, 40)} was not applied: ${e.message}`; } }
         const sum = FSX.checkout.fromOrder(await DC.api('/api/orders/' + encodeURIComponent(code)), cat); if (warn) sum.note = warn; return sum;
       }
       const saved = FSX.cart.get();
       if (!saved || !saved.cart || !saved.cart.length) return { empty: true, cat };
       const items = saved.cart.map((c) => ({ plan: c.plan, size: c.size, platform: c.platform, addons: Object.keys(c.addons || {}).filter((k) => c.addons[k]), qty: c.qty }));
-      let priced; let note = ''; try { priced = await DC.api('/api/cart/price', { items, promo: saved.promo || undefined }); } catch (e) { if (!saved.promo) throw e; note = `Code ${String(saved.promo).toUpperCase()} was taken off: ${e.message}.`; priced = await DC.api('/api/cart/price', { items }); FSX.cart.set(Object.assign({}, saved, { promo: '' })); }
+      let priced; let note = ''; try { priced = await DC.api('/api/cart/price', { items, promo: saved.promo || undefined }); } catch (e) { if (!saved.promo) throw e; note = `Code ${String(saved.promo).toUpperCase()} was taken off: ${e.message}`; priced = await DC.api('/api/cart/price', { items }); FSX.cart.set(Object.assign({}, saved, { promo: '' })); }
       const lines = priced.lines.map(lineOut);
       // the free packs line comes from the server with the priced cart (kind 'packs')
       const P = (id) => cat.plans.find((p) => p.id === id);
       const n = items.reduce((s, i) => s + i.qty, 0);
       const first = items[0]; const p0 = P(first.plan);
-      return { cat, source: 'cart', items, note, promo: priced.promo || (priced.autoCard ? null : priced.coupon), lines, total: priced.total,
+      return { cat, source: 'cart', items, note, cartKey: FSX.cart.key(items, note ? '' : saved.promo), promo: priced.promo || (priced.autoCard ? null : priced.coupon), lines, total: priced.total,
         title: n > 1 ? n + ' Accounts' : `${p0.short} · $${first.size / 1000}K`, sub: n > 1 ? items.map((i) => `${P(i.plan).short} $${i.size / 1000}K${i.qty > 1 ? ' × ' + i.qty : ''}`).join(', ') : [first.platform].concat(first.addons.map((k) => cat.addons[k].name)).join(' · ') };
     },
     fromOrder(o, cat) {
@@ -43,8 +45,11 @@
         title: o.kind === 'activation' ? 'Activation Fee' : o.kind === 'reset' ? 'Account Reset' : o.kind === 'credits' ? ((o.lines[0] || {}).label || 'Credits').replace(/ \(.*\)$/, '') : 'Order ' + o.code, sub: o.kind === 'activation' ? 'For ' + (o.account || '') : o.lines.filter((l) => l.kind === 'plan').map((l) => l.label).join(', ') };
     },
     async pay(sum, st) {
+      // the cart was changed in another tab after this page loaded: show the new cart and total and charge nothing until Pay is pressed again
+      const again = async (msg) => { const f = await FSX.checkout.load(false); if (f.empty) return; Object.assign(sum, f, { code: undefined }); const e = new Error(msg || `Your cart was changed in another tab. Your order is now ${M(f.total)}. Check it and press Pay to confirm.`); e.status = 409; e.repriced = true; throw e; };
+      if (sum.cartKey) { const s = FSX.cart.get(); const it = s && s.cart && s.cart.length ? s.cart.map((c) => ({ plan: c.plan, size: c.size, platform: c.platform, addons: Object.keys(c.addons || {}).filter((k) => c.addons[k]), qty: c.qty })) : null; if (it && FSX.cart.key(it, s.promo) !== sum.cartKey) await again(); }
       if (sum.source === 'cart') {
-        const o = await DC.api('/api/orders', { items: sum.items, promo: sum.promo || undefined });
+        let o; try { o = await DC.api('/api/orders', { items: sum.items, promo: sum.promo || undefined, cartKey: sum.cartKey || undefined, total: sum.total }); } catch (e) { if (e.status === 409 && e.repriced) await again(e.message); throw e; }
         sum.code = o.code; sum.source = 'order'; if (o.paid) { FSX.cart.clear(); return '/checkout/confirmed?order=' + o.code; }
         if (o.total != null) sum.total = o.total; // the order is what is charged
       }

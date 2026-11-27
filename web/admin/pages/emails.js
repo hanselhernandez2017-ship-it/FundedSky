@@ -144,8 +144,8 @@ function startEmails(root) {
         ${paras.map((p) => `<p>${fe(p)}</p>`).join('')}
         ${e.c ? `<div class="em-code">${fe(e.c)}</div>` : ''}
         ${pg}
-        ${e.r ? `<div class="em-rows">${e.r.map(([k, v]) => `<div><span>${fe(k)}</span><b>${fe(v)}</b></div>`).join('')}</div>` : ''}
-        ${e.st ? `<div class="em-steps">${e.st.map(([t, d], i) => `<div class="em-s"><span class="em-n">${i + 1}</span><div><b>${fe(t)}</b><p>${fe(d)}</p></div></div>`).join('')}</div>` : ''}
+        ${e.r ? `<div class="em-rows">${e.r.filter(([, v]) => fe(v).trim()).map(([k, v]) => `<div><span>${fe(k)}</span><b>${fe(v)}</b></div>`).join('')}</div>` : ''}
+        ${e.st ? `<div class="em-steps">${e.st.filter(([t]) => fe(t).trim()).map(([t, d], i) => `<div class="em-s"><span class="em-n">${i + 1}</span><div><b>${fe(t)}</b><p>${fe(d)}</p></div></div>`).join('')}</div>` : ''}
         ${e.cta ? `<div class="em-ctaw"><span class="em-cta">${fe(e.cta)}</span></div>` : ''}
         ${e.n2 ? `<div class="em-n2">${fe(e.n2)}</div>` : ''}
       </div>
@@ -357,7 +357,7 @@ function startEmails(root) {
       case 'closePanel': S.panel = false; break;
       case 'tab': S.tab = k; break;
       case 'emOn': { const x = E[id]; x.on = !x.on; if (x.draft && x.on) x.draft = false; saveState(); toast(`${x.n} ${x.on ? 'turned on' : 'turned off'}`); return; }
-      case 'flowOn': { const f = FLOWS.find((x) => x.id === id); f.paused = !f.paused; saveState(); toast(f.paused ? `${f.name} paused. Always-on emails still send.` : `${f.name} is on`); return; }
+      case 'flowOn': { const f = FLOWS.find((x) => x.id === id); f.paused = !f.paused; saveState(); toast(f.paused ? `${f.name} paused. Always-on emails still send.` : `${f.name} is on.`); return; }
       case 'dev': S.dev = k; break;
       case 'test': { const d = S.edit && S.edit.id === e.id ? S.edit.f : null; F.api('/emails/test', { key: e.id, draft: d ? Object.fromEntries(EDITF.map((k2) => [k2, d[k2]])) : null }).then((r2) => toast(`Test of "${e.n}" sent to ${r2.to}`)).catch((x) => toast(x.message)); return; }
       case 'full': S.full = true; break;
@@ -384,7 +384,7 @@ function startEmails(root) {
       case 'copy': try { navigator.clipboard.writeText(k); } catch (x) { /* clipboard blocked */ } toast('Copied'); return;
       case 'rule': S.rules[k] = !S.rules[k]; break;
       case 'suppDel': { const x = S.supp.splice(i, 1)[0]; saveSupp(); toast(`${x.a} removed`); return; }
-      case 'suppAdd': { const inp = root.querySelector('#suppadd'); const v = (inp.value || '').trim(); if (!/^\S+@\S+\.\S+$/.test(v)) { toast('Enter a full email address'); return; } S.supp.unshift({ a: v, k: 'Unsubscribed', why: 'Added by ' + ME, d: F.md(new Date()), at: new Date().toISOString() }); saveSupp(); toast(`${v} added`); return; }
+      case 'suppAdd': { const inp = root.querySelector('#suppadd'); const v = (inp.value || '').trim(); if (!/^\S+@\S+\.\S+$/.test(v)) { toast('Enter a full email address.'); return; } S.supp.unshift({ a: v, k: 'Unsubscribed', why: 'Added by ' + ME, d: F.md(new Date()), at: new Date().toISOString() }); saveSupp(); toast(`${v} added`); return; }
       default: return;
     }
     render();

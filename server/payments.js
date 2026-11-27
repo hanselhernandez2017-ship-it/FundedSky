@@ -80,25 +80,42 @@ async function holdCoupon(user, o, code) {
     }
     await db.q('UPDATE coupons SET order_id=NULL WHERE code=$1 AND order_id=$2 AND used=false', [code, c.order_id]);
   }
-  bad('That code has already been used');
+  bad('That code has already been used.');
 }
 // Hold the order's code; if that fails the new order is cancelled. A card that was added automatically is left out instead (returns false).
 async function holdOrCancel(user, o, code, auto) {
   try { await holdCoupon(user, o, code); return true; } catch (e) { await db.q("UPDATE orders SET status='canceled' WHERE id=$1 AND status='pending'", [o.id]); if (auto) return false; throw e; }
 }
-async function createOrder(user, body, noCard) {
+// The same cart sent twice (two tabs, a second Pay press before the page moved on) carries the same cartKey from the checkout page:
+// it gets the order that cart already made instead of a second one, so it can never be charged twice. A new cart gets a new key.
+const offTotal = (body, t) => body && body.total != null && body.total !== '' && Number.isFinite(Number(body.total)) && Math.abs(Number(body.total) - Number(t)) >= 0.005;
+function createOrder(user, body, noCard) {
+  const key = clean((body || {}).cartKey, 64);
+  if (!key) return createOrderNow(user, body, noCard);
+  return serial('cart:' + user.id, async () => {
+    const prev = await db.one("SELECT id, code, status, total, provider_ref FROM orders WHERE user_id=$1 AND meta->>'cartKey'=$2 AND status IN ('pending','paid') AND created_at > now() - interval '1 day' ORDER BY id DESC LIMIT 1", [user.id, key]);
+    if (prev && prev.status === 'paid') return { code: prev.code, total: Number(prev.total), paid: true };
+    // the page sends the total it showed: an unpaid order for this cart at another total is not charged; it is cancelled and the cart is priced again (a payment already started on it is left alone)
+    if (prev && offTotal(body, prev.total)) { if (prev.provider_ref) bad('This cart is already being paid in another tab. Finish or cancel that payment first.', 409); await cancelOrder(prev, 'Priced again: the page showed another total'); }
+    else if (prev) return { code: prev.code, total: Number(prev.total), mode: mode() };
+    return createOrderNow(user, body, noCard);
+  });
+}
+async function createOrderNow(user, body, noCard) {
   await maintGuard();
   body = body || {};
   const priced = await core.priceCart(body.items, { promo: body.promo, coupon: body.coupon, userId: user.id, noCard });
+  // the cart was changed (another tab) or priced differently since the page showed it: nothing is made or charged, the page shows the new total and asks again
+  if (offTotal(body, priced.total)) { const e = new HttpError(409, `Your order is now ${money2(priced.total)}, not the ${money2(body.total)} shown. Check the total and press Pay to confirm.`); e.repriced = true; e.total = priced.total; throw e; }
   // one use per trader for promo codes marked "once"
   if (priced.promo) {
     const cat = await core.catalog(); const p = cat.promos.find((x) => x.code === priced.promo);
-    if (p && p.once && (await db.one("SELECT 1 FROM orders WHERE user_id=$1 AND promo=$2 AND status='paid'", [user.id, p.code]))) bad('You have already used this code');
+    if (p && p.once && (await db.one("SELECT 1 FROM orders WHERE user_id=$1 AND promo=$2 AND status='paid'", [user.id, p.code]))) bad('You have already used this code.');
   }
   await checkLimits(user, priced.items);
   const kind = priced.items.every((i) => i.plan === 'instant') ? 'instant' : priced.items.some((i) => i.plan === 'instant') ? 'mixed' : 'evaluation';
-  const o = await insertOrder(user, kind, priced, { coupon: priced.coupon || undefined, affiliate: priced.affiliate || undefined });
-  if (priced.coupon && !(await holdOrCancel(user, o, priced.coupon, priced.autoCard))) return createOrder(user, body, true);
+  const o = await insertOrder(user, kind, priced, { coupon: priced.coupon || undefined, affiliate: priced.affiliate || undefined, cartKey: clean(body.cartKey, 64) || undefined });
+  if (priced.coupon && !(await holdOrCancel(user, o, priced.coupon, priced.autoCard))) return createOrderNow(user, body, true);
   // The affiliate whose code was used is kept on the order; the buyer is tied to them only when the order is paid (core.fulfilOrder)
   if (Number(o.total) === 0) return finishFree(o);
   return { code: o.code, total: Number(o.total), mode: mode() };
@@ -108,8 +125,8 @@ async function createOrder(user, body, noCard) {
 async function resetTarget(user, id) {
   const a = await db.one('SELECT * FROM accounts WHERE id=$1 AND user_id=$2', [clean(id, 40), user.id]);
   if (!a) bad('Account not found', 404);
-  if (a.kind !== 'evaluation' || !['active', 'breached'].includes(a.phase)) bad('This account cannot be reset');
-  if (a.comp) bad('Competition accounts cannot be reset');
+  if (a.kind !== 'evaluation' || !['active', 'breached'].includes(a.phase)) bad('This account cannot be reset.');
+  if (a.comp) bad('Competition accounts cannot be reset.');
   return a;
 }
 // Price a reset on the server: the fee the account was sold with, the Free Reset add-on, reset promotions, add-ons and a reward code.
@@ -121,7 +138,7 @@ async function priceReset(user, a, body) {
   const lines = []; let subtotal = 0; let discount = 0;
   // Reset price: the one the account was sold with (Back Office › Resets and Fees at the time of sale)
   const base = fz.reset; const pn = (core.planDef(cat, a.plan) || {}).short || a.plan;
-  lines.push({ label: `Reset · ${core.kLabel(a.size)} ${pn}`, amount: base, kind: 'plan' }); subtotal += base;
+  lines.push({ label: `${core.kLabel(a.size)} ${pn} · Reset`, amount: base, kind: 'plan' }); subtotal += base;
   if (a.free_resets > 0) { lines.push({ label: 'Free Reset (your add-on)', amount: -base, kind: 'discount' }); discount += base; }
   // automatic promotions set to apply to resets (Back Office › Promotions › Applies To: Resets), unless resets of this size can't be discounted
   else if ((((((cat.x || {}).fees || {})[a.plan] || {})[a.size] || {}).resetDiscountable) !== false) { const today = new Date().toISOString().slice(0, 10); const cap = Number(cat.maxPromoPct || 30);
@@ -134,12 +151,12 @@ async function priceReset(user, a, body) {
   if (!code && !body.noAuto && (await require('./packs').enabled())) { const cc = await db.one("SELECT code FROM coupons WHERE user_id=$1 AND used=false AND source='card' AND kind='reset_discount' AND (expires_at IS NULL OR expires_at > now()) ORDER BY pct DESC LIMIT 1", [user.id]); if (cc && subtotal - discount > 0) { code = cc.code; auto = true; } }
   if (code) {
     const c = await db.one('SELECT * FROM coupons WHERE upper(code)=upper($1) AND user_id=$2 AND used=false', [code, user.id]);
-    if (!c) bad('That reward code is not valid');
-    if (c.expires_at ? new Date(c.expires_at) < new Date() : new Date(c.created_at) < new Date(Date.now() - 90 * 86400000)) bad('That code has expired');
+    if (!c) bad('That reward code is not valid.');
+    if (c.expires_at ? new Date(c.expires_at) < new Date() : new Date(c.created_at) < new Date(Date.now() - 90 * 86400000)) bad('That code has expired.');
     // a discount code is for evaluations: it works on a reset only when it is a card, or its reward says it also covers resets
     const onResets = c.kind === 'reset_discount' || (c.kind === 'discount' && (c.source === 'card' || (c.meta || {}).resets));
     const d = c.kind === 'free_reset' ? Math.max(0, base - (a.free_resets > 0 ? base : 0)) : onResets ? round2((subtotal - discount) * Number(c.pct) / 100) : 0;
-    if (!d) bad(c.kind === 'free_reset' ? 'Your Free Reset add-on already covers this reset. Keep the code for next time.' : c.kind === 'discount' || c.kind === 'free_eval' ? 'That code is for a new evaluation, not a reset' : 'That code does not apply to resets');
+    if (!d) bad(c.kind === 'free_reset' ? 'Your Free Reset add-on already covers this reset. Keep the code for next time.' : c.kind === 'discount' || c.kind === 'free_eval' ? 'That code is for a new evaluation, not a reset.' : 'That code does not apply to resets.');
     lines.push({ label: c.label, amount: -d, kind: 'coupon' }); discount += d; code = c.code;
   }
   const priced = { lines, subtotal: round2(subtotal), discount: round2(discount), total: Math.max(0, round2(subtotal - discount)), items: [{ plan: a.plan, size: a.size, addons, qty: 1 }] };
@@ -173,15 +190,15 @@ async function createActivationOrder(user, body) {
   await maintGuard();
   const id = clean(body.account, 40);
   const a = await db.one('SELECT * FROM accounts WHERE id=$1 AND user_id=$2', [id, user.id]);
-  if (!a || a.phase !== 'passed') bad('This account is not waiting for activation');
-  if (!(a.steps || {}).agreement) bad('Sign the funded agreement first');
+  if (!a || a.phase !== 'passed') bad('This account is not waiting for activation.');
+  if (!(a.steps || {}).agreement) bad('Sign the funded agreement first.');
   const cat = await core.catalog(); const ord = a.order_id ? await db.one('SELECT items FROM orders WHERE id=$1', [a.order_id]) : null; const fee = core.feesOf(cat, a, ord).activation;
   if (!fee) bad('This account has no activation fee. Sign the agreement to get your funded account.');
   // reuse a pending activation order only while it still charges the account's fee
   const existing = await db.one("SELECT * FROM orders WHERE user_id=$1 AND kind='activation' AND status='pending' AND meta->>'account'=$2 ORDER BY id DESC LIMIT 1", [user.id, a.id]);
   if (existing && Number(existing.total) === fee) return { code: existing.code, total: Number(existing.total), mode: mode() };
   if (existing) await db.q("UPDATE orders SET status='canceled' WHERE user_id=$1 AND kind='activation' AND status='pending' AND meta->>'account'=$2", [user.id, a.id]);
-  const priced = { lines: [{ label: `Activation fee · ${core.kLabel(a.size)} ${(core.planDef(cat, a.plan) || {}).short || a.plan}`, amount: fee, kind: 'plan' }], subtotal: fee, discount: 0, total: fee, items: [] };
+  const priced = { lines: [{ label: `${core.kLabel(a.size)} ${(core.planDef(cat, a.plan) || {}).short || a.plan} · Activation Fee`, amount: fee, kind: 'plan' }], subtotal: fee, discount: 0, total: fee, items: [] };
   const o = await insertOrder(user, 'activation', priced, { account: a.id });
   return { code: o.code, total: Number(o.total), mode: mode() };
 }
@@ -208,10 +225,10 @@ async function markPaid(o, provider, ref, method, fp) {
   if (o.kind === 'reset' && o.meta.useFree) await db.q('UPDATE accounts SET free_resets=GREATEST(0,free_resets-1) WHERE id=$1', [o.meta.account]);
   if (o.kind === 'reset') await closeOtherResets(o);
   const u = await db.one('SELECT email, first FROM users WHERE id=$1', [o.user_id]);
-  { const cat = await core.catalog(); const it = (o.items || [])[0] || {}; const pl = it.plan ? ((core.planDef(cat, it.plan) || {}).name || it.plan) : (o.kind === 'reset' ? 'Reset' : o.kind === 'credits' ? (o.lines[0] || {}).label || 'Credits' : o.kind); const adds = o.lines.filter((l) => l.kind === 'addon').map((l) => l.label);
+  { const cat = await core.catalog(); const it = (o.items || [])[0] || {}; const multi = (o.items || []).length > 1 || Number(it.qty) > 1 || o.kind === 'reset' || o.kind === 'activation'; const nm = o.kind === 'credits' ? '' : o.lines.filter((l) => l.kind === 'plan' || !l.kind).map((l) => l.label).join(', '); /* the order's name, as Billing shows it: "$25K Essential · Evaluation" */ const pl = nm || (it.plan || multi ? (multi ? o.lines.filter((l) => l.kind === 'plan' || !l.kind).map((l) => l.label).join(', ') || (o.lines[0] || {}).label || (o.kind === 'reset' ? 'Reset' : 'Activation Fee') : ((core.planDef(cat, it.plan) || {}).name || it.plan)) : (o.kind === 'reset' ? 'Reset' : o.kind === 'credits' ? (o.lines[0] || {}).label || 'Credits' : o.kind === 'activation' ? 'Activation Fee' : o.kind)); const adds = o.lines.filter((l) => l.kind === 'addon').map((l) => l.label);
     // Finance > Invoices and Receipts: the receipt email can be switched off
     const rcp = ((await db.one("SELECT v FROM kv WHERE k='store.finance.settings'")) || {}).v || {};
-    if (rcp.receipts !== false) await require('./mail').sendT('order', u.email, { first_name: u.first, order: o.code, plan: pl, size: it.size ? core.kLabel(it.size) : '', platform: it.platform || '', addons: adds.join(', '), discount: Number(o.discount) > 0 ? `${o.promo ? o.promo + ' · ' : ''}−${money2(o.discount)}` : '', total: money2(o.total), paid_with: method || provider, url: `${BASE()}/app#billing` }, { uid: o.user_id }); }
+    if (rcp.receipts !== false) await require('./mail').sendT('order', u.email, { first_name: u.first, order: o.code, plan: pl, size: it.size && !multi && !nm ? core.kLabel(it.size) : '', platform: multi ? '' : it.platform || '', addons: adds.join(', '), discount: Number(o.discount) > 0 ? `${o.promo ? o.promo + ' · ' : ''}−${money2(o.discount)}` : '', total: money2(o.total), paid_with: method || provider, next: o.kind === 'credits' ? 'Your credits are in your balance now.' : o.kind === 'reset' ? 'Your account is back to its starting balance and ready to trade.' : o.kind === 'activation' ? 'Your funded account is being created now.' : (o.items || []).length > 1 || Number(it.qty) > 1 ? 'Your accounts are being created now. Login details arrive in separate emails, usually within a minute.' : o.kind === 'evaluation' ? 'Your evaluation account is being created now. Login details arrive in a separate email, usually within a minute.' : 'Your account is being created now. Login details arrive in a separate email, usually within a minute.', url: `${BASE()}/app#billing` }, { uid: o.user_id }); }
 }
 
 function stripeMethod(pi) {
@@ -269,7 +286,7 @@ async function freshen(user, o, strict) {
   if (['evaluation', 'instant', 'mixed'].includes(o.kind)) {
     let r;
     try { r = await repriceCart(user, o); }
-    catch (e) { if (!(e instanceof HttpError) || e.status !== 400) throw e; if (!strict) return o; await cancelOrder(o, e.message); gone(`This order can no longer be paid (${e.message}). You have not been charged. Start a new checkout.`); }
+    catch (e) { if (!(e instanceof HttpError) || e.status !== 400) throw e; if (!strict) return o; await cancelOrder(o, e.message); gone(`This order can no longer be paid (${String(e.message).replace(/\.$/, '')}). You have not been charged. Start a new checkout.`); }
     if (strict) { try { await checkLimits(user, r.p.items); } catch (e) { if (e instanceof HttpError) e.message += ' You have not been charged.'; throw e; } }
     if (same(r.p) && !r.why) return o;
     const n = await saveRepriced(o, r.p, r.meta); if (!n) return o;
@@ -286,7 +303,7 @@ async function freshen(user, o, strict) {
     }
     let r; let why = '';
     try { r = await priceReset(user, a, { addons: o.meta.addons, coupon: o.meta.coupon, noAuto: true }); }
-    catch (e) { if (!(e instanceof HttpError) || e.status !== 400 || !o.meta.coupon) throw e; why = e.message === 'That reward code is not valid' ? 'Your reward code was already used' : e.message; r = await priceReset(user, a, { addons: o.meta.addons, noAuto: true }); }
+    catch (e) { if (!(e instanceof HttpError) || e.status !== 400 || !o.meta.coupon) throw e; why = e.message === 'That reward code is not valid.' ? 'Your reward code was already used.' : e.message; r = await priceReset(user, a, { addons: o.meta.addons, noAuto: true }); }
     if (same(r.priced) && !why) return o;
     const n = await saveRepriced(o, r.priced, r.meta); if (!n) return o;
     if (strict) throw changedErr(n, why, isStale(o));
@@ -310,9 +327,9 @@ async function applyCode(user, code, body) {
   return serial(user.id, async () => {
     const o = await db.one('SELECT * FROM orders WHERE code=$1 AND user_id=$2', [clean(code, 30), user.id]);
     if (!o) bad('Order not found', 404);
-    if (o.status !== 'pending' || !['evaluation', 'instant', 'mixed'].includes(o.kind)) bad('A code can only be added to an unpaid account order');
+    if (o.status !== 'pending' || !['evaluation', 'instant', 'mixed'].includes(o.kind)) bad('A code can only be added to an unpaid account order.');
     const cp = await db.one('SELECT code FROM coupons WHERE upper(code)=upper($1) AND user_id=$2', [clean((body || {}).code, 40), user.id]);
-    if (!cp) bad('That reward code is not valid');
+    if (!cp) bad('That reward code is not valid.');
     if (o.meta && o.meta.coupon === cp.code) return { code: o.code, total: Number(o.total), applied: true };
     const items = (o.items || []).map((i) => ({ plan: i.plan, size: i.size, platform: i.platform, addons: i.addons, qty: i.qty }));
     let p; try { p = await core.priceCart(items, { promo: o.promo || undefined, coupon: cp.code, userId: user.id }); } catch (e) { if (!(e instanceof HttpError) || !o.promo || /reward|expired/i.test(e.message)) throw e; p = await core.priceCart(items, { coupon: cp.code, userId: user.id }); }
@@ -325,14 +342,20 @@ async function applyCode(user, code, body) {
   });
 }
 
-function payOrder(user, code, body) { return serial(user.id, () => payOrderNow(user, code, body || {})); }
+// One payment at a time per trader. An order with a promo code that has a total-use limit also waits its turn behind every other
+// order paying with that code, so the limit is checked against orders that have finished paying (two traders paying in the same
+// moment could otherwise both get the last use).
+function payOrder(user, code, body) { return serial(user.id, async () => {
+  const o = await db.one("SELECT promo FROM orders WHERE code=$1 AND user_id=$2 AND status='pending'", [clean(code, 30), user.id]); const pc = o && o.promo ? String(o.promo).toUpperCase() : '';
+  const capped = pc && ((await core.catalog()).promos || []).some((p) => String(p.code || '').toUpperCase() === pc && Number(p.total) > 0);
+  return capped ? serial('promo:' + pc, () => payOrderNow(user, code, body || {})) : payOrderNow(user, code, body || {}); }); }
 async function payOrderNow(user, code, body) {
   await maintGuard();
   await refreshMode();
   let o = await db.one('SELECT * FROM orders WHERE code=$1 AND user_id=$2', [clean(code, 30), user.id]);
   if (!o) bad('Order not found', 404);
   if (o.status === 'paid') return { paid: true, code: o.code };
-  if (o.status !== 'pending') bad(o.status === 'canceled' ? `This order was cancelled${o.meta && o.meta.canceledWhy ? ' (' + String(o.meta.canceledWhy).toLowerCase() + ')' : ''}. You have not been charged.` : 'This order can no longer be paid', 409);
+  if (o.status !== 'pending') bad(o.status === 'canceled' ? `This order was cancelled${o.meta && o.meta.canceledWhy ? ' (' + String(o.meta.canceledWhy).toLowerCase() + ')' : ''}. You have not been charged.` : 'This order can no longer be paid.', 409);
   await require('./packs').payGuard(o); // Packs switched off: a credits order is cancelled instead of charged
   const method = body.method || 'card';
   // Stripe step 2 (the bank already approved the payment) only records it; every other step is checked before anything is charged
@@ -362,7 +385,7 @@ async function payOrderNow(user, code, body) {
   if (stripe && MODE.card === 'stripe' && method === 'card') {
     if (body.paymentIntent) {
       const pi = await stripe.paymentIntents.retrieve(clean(body.paymentIntent, 80), { expand: ['latest_charge'] });
-      if (!pi.metadata || pi.metadata.order !== o.code) bad('This payment does not match the order');
+      if (!pi.metadata || pi.metadata.order !== o.code) bad('This payment does not match the order.');
       if (pi.status === 'succeeded') { await markPaid(o, 'stripe', pi.id, stripeMethod(pi), stripeFp(pi)); return { paid: true, code: o.code }; }
       if (pi.status === 'processing') return { pending: true, code: o.code };
       bad('The payment was not completed. Try again or use another card.', 402);
@@ -393,11 +416,12 @@ async function payOrderNow(user, code, body) {
   if (MODE.live) bad('Card payments are not available right now. Try crypto, or contact support.');
   // Built-in test mode: only while no payment provider is connected
   const num = String(body.card || '').replace(/\D/g, '');
-  if (num === '4000000000000002') { await declined(o, 'Declined by the bank (test card)'); const e = new Error('Your card was declined: try another card'); e.status = 402; throw e; }
-  if (num !== '4242424242424242') bad('Test mode: use the test card 4242 4242 4242 4242 with any future date and any CVC, or 4000 0000 0000 0002 to see a decline');
-  const ex = /^(\d{2})\s*\/\s*(\d{2})$/.exec(String(body.exp || '').trim()); if (!ex || +ex[1] < 1 || +ex[1] > 12) bad('Enter the expiry as MM / YY');
+  if (num === '4000000000000002') { await declined(o, 'Declined by the bank (test card)'); const e = new Error('Your card was declined: try another card.'); e.status = 402; throw e; }
+  if (num !== '4242424242424242') bad('Test mode: use the test card 4242 4242 4242 4242 with any future date and a 3 or 4 digit CVC.');
+  const ex = /^(\d{2})\s*\/\s*(\d{2})$/.exec(String(body.exp || '').trim()); if (!ex || +ex[1] < 1 || +ex[1] > 12) bad('Enter the expiry as MM / YY.');
   { const now = new Date(); if (2000 + +ex[2] < now.getFullYear() || (2000 + +ex[2] === now.getFullYear() && +ex[1] < now.getMonth() + 1)) bad('That card has expired. Use a future expiry date.'); }
-  await markPaid(o, 'test', 'test_' + Date.now(), 'Test card •••• 4242');
+  if (!/^\d{3,4}$/.test(String(body.cvc || '').trim())) bad('Enter the 3 or 4 digit CVC from the back of the card.'); // a card processor refuses a short CVC, so test mode does too
+  await markPaid(o, 'test', 'test_' + Date.now(), 'Test Card •••• 4242');
   return { paid: true, code: o.code };
 }
 
@@ -510,18 +534,18 @@ async function refund(actorId, code, note, opt = {}) {
   // From here on o.total is the amount being refunded; o.fullTotal is set when that is less than the order total.
   if (o.status === 'paid' && o.kind === 'credits' && Number(o.total) > 0) { const cr = await require('./packs').refundPlan(o, opt); o = Object.assign({}, o, { refundPlan: cr }, cr.amount < Number(o.total) ? { total: cr.amount, fullTotal: Number(o.total) } : {}); }
   if (opt.external) { /* already refunded at the processor */ } else if (o.provider === 'stripe' && o.provider_ref) {
-    const stripe = await stripeClient(); if (!stripe) bad('Stripe is not connected, so this refund cannot be sent');
+    const stripe = await stripeClient(); if (!stripe) bad('Stripe is not connected, so this refund cannot be sent.');
     const pi = o.provider_ref.startsWith('cs_') ? (await stripe.checkout.sessions.retrieve(o.provider_ref)).payment_intent : o.provider_ref;
     await stripe.refunds.create(Object.assign({ payment_intent: pi }, o.fullTotal ? { amount: Math.round(Number(o.total) * 100) } : {}));
   } else if (o.provider === 'tailoredpay' && o.provider_ref) {
-    const c = await I.cfg('tailoredpay'); if (!c) bad('TailoredPay is not connected, so this refund cannot be sent');
+    const c = await I.cfg('tailoredpay'); if (!c) bad('TailoredPay is not connected, so this refund cannot be sent.');
     const r = await I.nmi(c, { type: 'refund', transactionid: o.provider_ref, amount: Number(o.total).toFixed(2) });
     if (r.response !== '1' && o.fullTotal) bad('The gateway refused the part refund: ' + (r.responsetext || 'try again after the payment settles'));
     if (r.response !== '1') { const v = await I.nmi(c, { type: 'void', transactionid: o.provider_ref }); if (v.response !== '1') bad('The gateway refused the refund: ' + (r.responsetext || v.responsetext)); }
   }
   const reason = note || ''; const staffOnly = o.provider === 'confirmo' && !opt.external ? 'Crypto refund: send it manually from Confirmo' : '';
   const done = await db.one("UPDATE orders SET status='refunded', refunded_at=now(), meta = meta || $2 WHERE id=$1 AND status='paid' RETURNING id", [o.id, JSON.stringify({ refundReason: reason, refundNote: [reason, staffOnly].filter(Boolean).join(' · ') })]);
-  if (!done) bad('Only paid orders can be refunded');
+  if (!done) bad('Only paid orders can be refunded.');
   // Take back the credits this order earned, and the referrer's bonus if this was a referred trader's first purchase
   let took = 0;
   const earned = o.kind === 'credits' ? 0 : Math.floor(Number(o.total)); if (earned > 0) { const u0 = await db.one('SELECT points FROM users WHERE id=$1', [o.user_id]); const take = Math.min(earned, Math.max(0, u0 ? u0.points : 0)); if (take > 0) { await core.points(null, o.user_id, -take, 'Refund ' + o.code, 'refund'); took += take; } }
@@ -559,7 +583,7 @@ async function receipt(user, code) {
   const pos = o.lines.filter((l) => !(Number(l.amount) < 0)), neg = o.lines.filter((l) => Number(l.amount) < 0); const row = (l) => `<tr><td>${e(l.label)}</td><td>${m(l.amount)}</td></tr>`;
   const stat = o.status === 'paid' ? 'Paid' : o.status === 'refunded' ? `Refunded on ${longDate(o.refunded_at)}` : 'Not paid';
   const took = o.status === 'refunded' && o.meta && o.meta.refundTook ? `<p>With this refund: ${e(o.meta.refundTook)}.</p>` : '';
-  return `<!doctype html><meta charset="utf-8"><title>${doc} ${e(o.code)}</title><style>body{font:15px/1.5 system-ui;max-width:560px;margin:48px auto;color:#111;padding:0 20px}h1{font-size:22px}table{width:100%;border-collapse:collapse;margin:20px 0}td{padding:8px 0;border-bottom:1px solid #eee}td:last-child{text-align:right}.t td{font-weight:700;border:0}.co{color:#555;font-size:13px;margin:0 0 18px}</style>
+  return `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${doc} ${e(o.code)}</title><style>body{font:15px/1.5 system-ui;max-width:560px;margin:48px auto;color:#111;padding:0 20px}h1{font-size:22px}table{width:100%;border-collapse:collapse;margin:20px 0}td{padding:8px 0;border-bottom:1px solid #eee}td:last-child{text-align:right}.t td{font-weight:700;border:0}.co{color:#555;font-size:13px;margin:0 0 18px}</style>
   <h1>${e(co.brand)} ${doc}</h1><p class="co">${[co.legal, co.address, co.taxId ? 'Tax number ' + co.taxId : '', co.support].filter(Boolean).map(e).join('<br>')}</p><p>${e(o.code)} · ${paid ? 'Paid ' + longDate(o.paid_at || o.created_at) : 'Created ' + longDate(o.created_at)}<br>${e(u.first)} ${e(u.last)} · ${e(u.email)}</p>
   <table>${pos.map(row).join('')}${neg.length ? `<tr><td>Subtotal</td><td>${m(pos.reduce((s2, l) => s2 + Number(l.amount), 0))}</td></tr>` : ''}${neg.map(row).join('')}<tr class="t"><td>${paid ? 'Total Paid' : 'Total Due'}</td><td>${m(o.total)}</td></tr>${o.status === 'refunded' ? `<tr><td>Refunded ${longDate(o.refunded_at)}</td><td>${m(-Number(o.total))}</td></tr>` : ''}</table>
   <p>Status: ${e(stat)}${o.pay_method ? ' · ' + e(o.pay_method) : ''}</p>${took}${paid ? '' : '<p>This order has not been paid. No money was taken.</p>'}<p style="color:#666;font-size:13px">Evaluations and funded accounts are simulated trading accounts. Fees are not deposits and are not traded.</p><script>window.print&&setTimeout(()=>window.print(),300)</script>`;

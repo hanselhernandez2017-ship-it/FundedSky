@@ -28,7 +28,7 @@ async function verify(user, code) {
 // Second step of sign-in
 async function challenge(ticket, code) {
   const t = await db.one("SELECT * FROM tokens WHERE token=$1 AND kind='mfa' AND used=false AND expires_at > now()", [clean(ticket, 100)]);
-  if (!t) bad('Your sign-in timed out. Enter your password again.', 401);
+  if (!t) bad('Your login timed out. Enter your password again.', 401);
   const u = await db.one('SELECT * FROM users WHERE id=$1', [t.user_id]);
   const ok = await verify(u, code);
   if (!ok) { if (bump('t' + t.token) >= 5 || bump('u' + u.id) >= 10) await db.q('UPDATE tokens SET used=true WHERE token=$1', [t.token]); bad('That code is not right. Check the time on your phone and try again.', 401); }
@@ -36,7 +36,7 @@ async function challenge(ticket, code) {
   return { user: u, backup: ok === 'backup', left: (u.mfa_backup || []).length };
 }
 async function setup(user) {
-  const u = await db.one('SELECT mfa_on, mfa_secret FROM users WHERE id=$1', [user.id]); if (u.mfa_on) bad('Two-step login is already on');
+  const u = await db.one('SELECT mfa_on, mfa_secret FROM users WHERE id=$1', [user.id]); if (u.mfa_on) bad('Two-step login is already on.');
   // Reopening setup (a reload or a second tab) shows the same key, so a QR code already scanned keeps working
   let secret = u.mfa_secret; if (!secret) { secret = b32enc(crypto.randomBytes(20)); const w = await db.one('UPDATE users SET mfa_secret=$2 WHERE id=$1 AND mfa_secret IS NULL AND mfa_on=false RETURNING mfa_secret', [user.id, secret]); if (!w) secret = (await db.one('SELECT mfa_secret FROM users WHERE id=$1', [user.id])).mfa_secret; }
   const uri = `otpauth://totp/${encodeURIComponent('Funded Sky:' + user.email)}?secret=${secret}&issuer=${encodeURIComponent('Funded Sky')}&digits=6&period=30`;
@@ -44,7 +44,7 @@ async function setup(user) {
   return { secret: secret.replace(/(.{4})/g, '$1 ').trim(), uri, qr };
 }
 async function enable(user, sess, code) {
-  const u = await db.one('SELECT * FROM users WHERE id=$1', [user.id]); if (u.mfa_on) bad('Two-step login is already on');
+  const u = await db.one('SELECT * FROM users WHERE id=$1', [user.id]); if (u.mfa_on) bad('Two-step login is already on.');
   const step = checkCode(u.mfa_secret, code); if (step === false || !(await useStep(u.id, step))) { bump('u' + u.id); bad(step === false ? 'That code is not right. Check the time on your phone and try again.' : 'That code was just used. Wait for the next one.'); }
   const AB = 'abcdefghjkmnpqrstuvwxyz23456789'; const codes = Array.from({ length: 8 }, () => Array.from({ length: 10 }, () => AB[crypto.randomInt(AB.length)]).join('')); // no 0/o, 1/l/i to mix up
   await db.q('UPDATE users SET mfa_on=true, mfa_backup=$2 WHERE id=$1', [u.id, JSON.stringify(await Promise.all(codes.map((c) => bcrypt.hash(c, 8))))]);

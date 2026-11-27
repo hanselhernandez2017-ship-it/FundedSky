@@ -292,9 +292,9 @@ class Component extends DCLogic {
     const whole = (v) => /^-?\d+$/.test(String(v).trim()) ? Number(v) : NaN;
     const body = { type: st.grant, reason: g.reason, credits: whole(g.credits), pack: g.pack || cfg.packs[0].id, qty: whole(g.qty), card: g.card || cfg.cards[0].id };
     // the same checks the server makes, so nothing is quietly changed on the way
-    if (!String(g.reason || '').trim()) return this.setState({ trErr: 'Add a reason', trMsg: '' });
-    if (st.grant === 'credits' && !(Number.isInteger(body.credits) && body.credits !== 0)) return this.setState({ trErr: 'Enter a whole number of credits, like 500 or -200', trMsg: '' });
-    if (st.grant === 'pack' && !(Number.isInteger(body.qty) && body.qty >= 1 && body.qty <= 10)) return this.setState({ trErr: 'Enter how many packs, from 1 to 10', trMsg: '' });
+    if (!String(g.reason || '').trim()) return this.setState({ trErr: 'Add a reason.', trMsg: '' });
+    if (st.grant === 'credits' && !(Number.isInteger(body.credits) && body.credits !== 0)) return this.setState({ trErr: 'Enter a whole number of credits, like 500 or -200.', trMsg: '' });
+    if (st.grant === 'pack' && !(Number.isInteger(body.qty) && body.qty >= 1 && body.qty <= 10)) return this.setState({ trErr: 'Enter how many packs, from 1 to 10.', trMsg: '' });
     if (st.grant !== 'credits') delete body.credits; if (st.grant !== 'pack') { delete body.pack; delete body.qty; } if (st.grant !== 'card') delete body.card;
     this.setState({ busy: true, trErr: '', trMsg: '' });
     try { await DC.api('/api/admin/packs/traders/' + st.tr.u.id + '/grant', body); const what = st.grant === 'credits' ? `${Math.abs(body.credits).toLocaleString('en-US')} credits` : st.grant === 'pack' ? `${body.qty} × ${(cfg.packs.find((p) => p.id === body.pack) || {}).name}` : (cfg.cards.find((c) => c.id === body.card) || {}).name;

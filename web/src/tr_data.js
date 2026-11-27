@@ -49,7 +49,7 @@
   async function API(path, body, method) {
     const r = await fetch(path, { method: method || (body ? 'POST' : 'GET'), headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined, credentials: 'same-origin' });
     let j = {}; try { j = await r.json(); } catch (e) { /* no body */ }
-    if (r.status === 401) { location.href = '/login?next=' + encodeURIComponent(location.pathname + location.search); throw new Error('Please log in'); }
+    if (r.status === 401) { location.href = '/login?next=' + encodeURIComponent(location.pathname + location.search); throw new Error('Please log in.'); }
     if (!r.ok) throw new Error(j.error || 'Something went wrong. Try again.');
     return j;
   }

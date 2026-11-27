@@ -16,7 +16,7 @@ const tLabel = (ts) => new Date(ts).toLocaleTimeString('en-US', { hour: 'numeric
 // A trader's reward and card codes. co: works at checkout, rs: works on a reset. Expired codes are left out.
 async function myCodes(uid, rewardsOn = true) {
   const rows = await db.all("SELECT * FROM coupons WHERE user_id=$1 AND COALESCE(expires_at, created_at + interval '90 days') > now() ORDER BY created_at DESC", [uid]);
-  return rows.filter((c) => rewardsOn || c.source === 'card').map((c) => ({ code: c.code, label: c.label, used: c.used, kind: c.kind, pct: Number(c.pct), exp: longDate(c.expires_at || new Date(new Date(c.created_at).getTime() + 90 * 86400000)), co: ['discount', 'free_eval'].includes(c.kind), rs: c.kind === 'free_reset' || c.kind === 'reset_discount' || (c.kind === 'discount' && (c.source === 'card' || !!(c.meta || {}).resets)) }));
+  return rows.filter((c) => rewardsOn || c.source === 'card').map((c) => ({ code: c.code, label: c.label, used: c.used, kind: c.kind, pct: Number(c.pct), exp: longDate(c.expires_at || new Date(new Date(c.created_at).getTime() + 90 * 86400000)), co: ['discount', 'free_eval'].includes(c.kind), rs: c.kind === 'free_reset' || c.kind === 'reset_discount' || (c.kind === 'discount' && (c.source === 'card' || !!(c.meta || {}).resets)), size: Number(c.size || (c.meta || {}).size) || 0 }));
 }
 // Credits History: 25 lines a page, newest first, with the number of lines in all
 const PTS_PAGE = 25;
@@ -116,7 +116,7 @@ async function boot(user, sessToken, host) {
       status, st, bought: shortDate(a.created_at), order: o ? o.code : '', peak: Number(a.peak_eod), addons: a.addons || [],
       cycle: (a.payout_count || 0) + 1, paid: Number(a.paid_total), payouts: a.payout_count || 0, funded: a.funded_at ? shortDate(a.funded_at) : '', steps,
       closed: a.breached_at ? shortDate(a.breached_at) : a.closed_at ? shortDate(a.closed_at) : '', breach: a.breach_reason || '',
-      plan: p.name, planShort: p.short, rv: 1, dll: r.dllOff ? 0 : r.dll, dllOff: !!r.dllOff || !r.dll, dllMode: r.dllMode, ddAmt: r.maxLoss, ddLabel: { eod: 'Max Loss (Trailing, End of Day)', intraday: 'Max Loss (Trailing, Intraday)', static: 'Max Loss (Static)' }[r.ddType] || 'Max Loss (Trailing, End of Day)', ct: R.allowedContracts(r, a), ctMax: r.fullContracts || r.contracts, scaling: !!r.scaling, minDays: r.minDays || 0, consOff: !!r.consOff, newsTxt: r.news ? `No new orders ${r.news.win} min before and after` : 'Allowed', holdTxt: r.overnight === false ? `Flat by ${r.closeAt} ET each day` : r.weekend === false ? `Flat by ${r.closeAt} ET Friday` : 'Allowed', scalpTxt: r.scalp ? `Trades under ${r.scalp.hold}s: max ${r.scalp.pct}% of profit` : 'Allowed', idleDays: r.inactivity || 0,
+      plan: p.name, planShort: p.short, rv: 1, dll: r.dllOff ? 0 : r.dll, dllOff: !!r.dllOff || !r.dll, dllMode: r.dllMode, ddAmt: r.maxLoss, ddLabel: { eod: 'Max Loss (Trailing, End of Day)', intraday: 'Max Loss (Trailing, Intraday)', static: 'Max Loss (Static)' }[r.ddType] || 'Max Loss (Trailing, End of Day)', ct: R.allowedContracts(r, a), ctMax: r.fullContracts || r.contracts, scaling: !!r.scaling, minDays: r.minDays || 0, consOff: !!r.consOff, newsTxt: r.news ? `No new orders ${r.news.win} min before and after` : 'Allowed', holdTxt: r.overnight === false ? `Flat by ${require('./ruletable').t12(r.closeAt)} ET each day` : r.weekend === false ? `Flat by ${require('./ruletable').t12(r.closeAt)} ET Friday` : 'Allowed', scalpTxt: r.scalp ? `Trades under ${r.scalp.hold}s: max ${r.scalp.pct}% of profit` : 'Allowed', idleDays: r.inactivity || 0,
       cons: r.consistency, split: r.split || cat.fundedCommon.split, buffer: r.kind === 'funded' ? (r.buffer != null ? r.buffer : r.cushion) || 0 : 0,
       floor: Number(a.floor), price: s.price, activation: s.activation || 0, payoutMin: r.payoutMin, winDayMin: r.winDayMin, freeResets: a.free_resets, resets: a.reset_count,
       halted: a.halted_today, comp: a.comp || null, curve, created: a.created_at, parent: a.parent_id,
@@ -128,6 +128,7 @@ async function boot(user, sessToken, host) {
       const profit = bal - start; x.consNow = profit > 0 ? Math.round((x.best / profit) * 100) : 0;
       x.checks = R.evalChecks(cat, a);
       x.resetPrice = s.reset;
+      if (a.phase === 'passed') { const fr = R.rulesFor(cat, Object.assign({}, a, { kind: 'funded', payout_count: 0 })); x.fLock = fr.lockAt; x.fReview = fr.reviewAfter || null; } // the funded rules the agreement quotes
     } else {
       x.target = start + (r.instant && !(a.payout_count > 0) ? r.goal : Math.ceil(r.payoutMin / (r.split / 100)) + r.cushion);
       x.goal = r.goal || 0;
@@ -155,11 +156,11 @@ async function boot(user, sessToken, host) {
 
   const PAYOUTS = pays.map((p) => ({ id: p.code, acct: p.account_id, amt: Number(p.amount), gross: Number(p.gross), method: p.method, rail: p.rail, req: shortDate(p.requested_at), appr: p.approved_at ? shortDate(p.approved_at) : '', paid: p.paid_at ? shortDate(p.paid_at) : '', paidIso: p.paid_at, batch: p.batch || '', st: p.status === 'paid' ? 'paid' : p.status === 'denied' ? 'denied' : p.status === 'failed' ? 'failed' : 'pending', stage: p.status, cycle: p.number, note: p.note, tx: p.tx_hash || '' }));
   const kindName = { evaluation: 'Evaluation', instant: 'Instant', reset: 'Reset', activation: 'Activation', mixed: 'Evaluation and Instant', credits: 'Credits' };
-  const ORDERS = orders.map((o) => ({ id: o.code, d: shortDate(o.paid_at || o.created_at), what: o.lines.filter((l) => l.kind === 'plan' || !l.kind).map((l) => l.label).join(', ') || kindName[o.kind], kind: kindName[o.kind] || o.kind, lines: o.lines.map((l) => [l.label, Number(l.amount)]), amt: Number(o.total), pay: o.pay_method || (o.provider === 'test' ? 'Test card' : ''), st: o.status === 'paid' ? 'Paid' : o.status === 'refunded' ? 'Refunded' : o.status === 'pending' ? 'Pending' : 'Failed', note: o.refunded_at ? 'Refunded ' + shortDate(o.refunded_at) + (o.meta && o.meta.refundTook ? ' · ' + o.meta.refundTook : '') : '', accounts: (o.meta && o.meta.accounts) || [] }));
+  const ORDERS = orders.map((o) => ({ id: o.code, d: shortDate(o.paid_at || o.created_at), what: o.lines.filter((l) => l.kind === 'plan' || !l.kind).map((l) => l.label).join(', ') || kindName[o.kind], kind: kindName[o.kind] || o.kind, lines: o.lines.map((l) => [l.label, Number(l.amount)]), amt: Number(o.total), pay: o.pay_method || (o.provider === 'test' ? 'Test Card •••• 4242' : ''), st: o.status === 'paid' ? 'Paid' : o.status === 'refunded' ? 'Refunded' : o.status === 'pending' ? 'Pending' : 'Failed', note: o.refunded_at ? 'Refunded ' + shortDate(o.refunded_at) + (o.meta && o.meta.refundTook ? ' · ' + o.meta.refundTook : '') : '', accounts: (o.meta && o.meta.accounts) || [] }));
   const pkOn = await require('./packs').enabled(); // with Packs switched off, notices that only point at the hidden Packs page are left out
   const NOTES = ((user.settings || {}).nPush === false ? [] : notes).filter((n) => pkOn || n.go !== 'packs').map((n) => ({ id: 'n' + n.id, nid: n.id, t: n.title, s: n.body, ago: ago(n.created_at), go: n.go, read: n.read }));
   const TICKETS = tickets.map((t) => ({ id: t.id, s: t.subject, cat: t.category, ch: t.channel, st: t.status, rating: t.rating, upd: ago(t.updated_at), msgs: msgs.filter((m) => m.ticket_id === t.id).map((m) => [m.staff ? 'them' : 'me', m.body, new Date(m.created_at).toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }) + (m.staff ? ' · ' + (m.afirst || 'Support') : '')]) }));
-  const SESS = sess.map((s) => [uaLabel(s.ua), s.ip ? 'IP ' + s.ip.replace(/^::ffff:/, '') : '', s.token === sessToken ? 'Active now' : 'Active ' + ago(s.seen_at).toLowerCase(), s.token === sessToken, sessId(s.token)]);
+  const SESS = sess.map((s) => [uaLabel(s.ua), s.ip ? 'IP ' + s.ip.replace(/^::ffff:/, '') : '', s.token === sessToken ? 'Active now' : /^just now$/i.test(ago(s.seen_at)) ? 'Active now' : 'Active ' + ago(s.seen_at).toLowerCase(), s.token === sessToken, sessId(s.token)]);
   const ag = user.agreements || {};
   const LEGAL = require('./legal'); const VERS = await LEGAL.versions(); const REACCEPT = await LEGAL.pending(user);
   const AGREE = VERS.filter((d) => ag[d.key]).map((d) => [d.name, 'v' + d.v, (REACCEPT.some((x) => x.key === d.key) ? 'New version to accept · last accepted ' : 'Accepted ') + longDate(ag[d.key]), d.url]);
@@ -205,4 +206,19 @@ async function boot(user, sessToken, host) {
     caps: { funded: cat.fundedCaps, instant: cat.instantCaps, instantRules: cat.instantRules, instantCommon: cat.instantCommon, fundedCommon: cat.fundedCommon }
   };
 }
-module.exports = { certId, certIdOld, boot, certOff, LIFE, lifeCerts, myCodes, pointsPage };
+// One-time: orders saved before order names read size, plan, then what was bought ("Prime $50K" -> "$50K Prime · Evaluation",
+// "Reset · $25K Essential" -> "$25K Essential · Reset", "Activation Fee · $25K Essential" -> "$25K Essential · Activation Fee")
+async function migrateOrderNames() {
+  if (await db.one("SELECT 1 FROM kv WHERE k='mig.orders.names'")) return;
+  const cat = await core.catalog(); const kindOf = {}; cat.plans.forEach((p) => { kindOf[p.short] = p.kind; });
+  const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); const shorts = Object.keys(kindOf).map(esc).join('|');
+  const name = (l) => { const s = String(l || ''); let m;
+    if (shorts && (m = s.match(new RegExp('^(' + shorts + ') (\\$\\d+(?:\\.\\d+)?K)( × \\d+)?$')))) return `${m[2]} ${m[1]} · ${kindOf[m[1]] === 'funded' ? 'Funded Account' : 'Evaluation'}${m[3] || ''}`;
+    if ((m = s.match(/^(Reset|Activation Fee) · (\$\d+(?:\.\d+)?K) (.+)$/))) return `${m[2]} ${m[3]} · ${m[1]}`;
+    return s; };
+  const rows = await db.all("SELECT id, lines FROM orders WHERE kind IN ('evaluation','instant','mixed','reset','activation')");
+  for (const o of rows) { let ch = false; const L = (o.lines || []).map((l) => { if (l && (l.kind === 'plan' || !l.kind)) { const n = name(l.label); if (n !== l.label) { ch = true; return Object.assign({}, l, { label: n }); } } return l; });
+    if (ch) await db.q('UPDATE orders SET lines=$2 WHERE id=$1', [o.id, JSON.stringify(L)]); }
+  await db.q("INSERT INTO kv(k,v) VALUES('mig.orders.names','true'::jsonb) ON CONFLICT (k) DO NOTHING");
+}
+module.exports = { migrateOrderNames, certId, certIdOld, boot, certOff, LIFE, lifeCerts, myCodes, pointsPage };

@@ -211,3 +211,157 @@
 @media (min-width:861px){.fsbo .top .clk{margin-right:12px}}
 @media (max-width:1060px) and (min-width:861px){.fsbo .top .tcb{display:none}.fsbo .top .clk .et{border-left:0;padding-left:0}}
 @media (max-width:940px) and (min-width:861px){.fsbo .top .srch{display:none}.fsbo .top .clk .et small{display:none}}
+/* qc3:deskA */
+/* journal By Setup: five setups sit in one row on a wide screen, three per row below that; no stray divider or indent on a wrapped row */
+@media (min-width:1280px){.fsbo .ftl.open.bset{grid-template-columns:repeat(5,minmax(0,1fr))}}
+@media (min-width:861px) and (max-width:1279px){.fsbo .ftl.open.bset{grid-template-columns:repeat(3,minmax(0,1fr));row-gap:24px}.fsbo .ftl.open.bset>*:nth-child(3n+1){border-left:0;padding-left:0}}
+/* payouts history: ids, dates and amounts stay on one line; the reason for a refused payout wraps under its badge instead of squeezing every other column */
+@media (min-width:861px){.fsbo .t.pohist td.mono,.fsbo .t.pohist td.mu,.fsbo .t.pohist td.num,.fsbo .t.pohist th{white-space:nowrap}.fsbo .t.pohist td.r>div.fa{max-width:250px;margin-left:auto}.fsbo .t.pohist td+td.num{padding-left:14px}}
+/* narrow desktop (861 to 1279px wide, e.g. a 1024px laptop or a split window): two-column sections do not fit next to the sidebar, so they stack; numbers and ids never break mid-value */
+@media (min-width:861px) and (max-width:1279px){
+  .fsbo .homeg{grid-template-columns:minmax(0,1fr);gap:28px}.fsbo .hside{position:static;border-left:0;padding-left:0}.fsbo .hside>section:first-child{border-top:1px solid var(--ln2);padding-top:26px}
+  .fsbo .hgrid{grid-template-columns:minmax(0,1fr)!important;row-gap:26px}.fsbo .hgrid>.hviz{align-self:start;justify-self:start}
+  .fsbo :is(.grid2,.g21).sec{grid-template-columns:minmax(0,1fr)}.fsbo :is(.grid2,.g21).sec>*+*{border-top:1px solid var(--ln2)!important;padding-top:32px!important}
+  .fsbo .stats{row-gap:20px}.fsbo .stats>.stat{flex:1 1 30%}.fsbo .stats>.stat:nth-child(3n+1){border-left:0;padding-left:0}
+  .fsbo .sumrow{flex-wrap:wrap;row-gap:20px}.fsbo .sumrow>.sum{flex:1 1 30%}.fsbo .sumrow>.sum:nth-child(3n+1){border-left:0;padding-left:0}
+  .fsbo .hin .r{flex-wrap:wrap}
+  .fsbo .stat b,.fsbo .sum b,.fsbo .cal .d b,.fsbo .cal .d>span,.fsbo .mono{white-space:nowrap}
+}
+/* journal calendar: a day's P&L never breaks after the minus sign; on a 1280px screen the cells are narrower, so the figure is set a touch smaller */
+@media (min-width:861px){.fsbo .cal .d b,.fsbo .cal .d small{white-space:nowrap}}
+@media (min-width:1280px) and (max-width:1439px){.fsbo .g21 .cal .d{padding:8px 6px}.fsbo .g21 .cal .d b{font-size:12.5px;letter-spacing:-.02em}}
+/* journal Day Review: the note box shows three lines, so a saved note is not cut mid-line when you edit it */
+.fsbo .rvw textarea{min-height:88px}
+/* qc3:deskB */
+/* Support article and ticket rows share the class name of the back-office news ticker (viz.css .tkr): undo its box, fade mask and clipping */
+.fsbo .row.tkr{overflow:visible;border:0;border-bottom:1px solid var(--ln2);border-radius:0;background:none;margin-bottom:0;-webkit-mask-image:none;mask-image:none}
+/* narrow desktop (sidebar still shown): the hero ring and its legend no longer fit side by side, so stack them; tighten the rewards track labels */
+@media (min-width:861px) and (max-width:1180px){.fsbo .hgrid>.hviz{flex-direction:column;align-items:stretch;gap:18px}.fsbo .hgrid>.hviz>:is(.dn,.vzg,.vzr){align-self:center}.fsbo .trk .mk{width:64px}.fsbo .trk .mk span{font-size:10.5px}}
+/* a long name in the Settings header wraps inside its column instead of running under the setup gauge */
+.fsbo .prof>div{min-width:0}.fsbo .prof .hero{overflow-wrap:anywhere}
+
+/* qc3:mobA */
+.fsbo .pin kbd{cursor:pointer}
+@media (max-width:860px){
+  /* fields at 16px so iOS does not zoom the page when one is focused */
+  .fsbo input[type=text],.fsbo input[type=email],.fsbo input[type=number],.fsbo input[type=password],.fsbo input[type=search],.fsbo input[type=tel],.fsbo input[type=url],.fsbo input[type=date],.fsbo select,.fsbo textarea{font-size:16px}
+  /* tap targets of at least 40px without changing how the controls look */
+  .fsbo .mtop .avbtn,.fsbo .mtrow .crd,.fsbo .btn.sm,.fsbo .lk,.fsbo .vzchips button,.fsbo .seg button{position:relative}
+  .fsbo .mtop .ib::after,.fsbo .mtop .avbtn::after{content:'';position:absolute;inset:-3px}
+  .fsbo .mtrow .crd::after{content:'';position:absolute;inset:-2px 0}
+  .fsbo .mtop .logo{position:relative}.fsbo .mtop .logo::after{content:'';position:absolute;inset:-11px 0}
+  .fsbo .btn.sm::after,.fsbo .jpg .ib::after{content:'';position:absolute;inset:-4px}
+  .fsbo .ib.x::after{content:'';position:absolute;inset:-3px}
+  .fsbo .lk::after{content:'';position:absolute;inset:-12px}
+  .fsbo .vzchips button::after{content:'';position:absolute;inset:-5px 0}
+  .fsbo .sh .vzchips,.fsbo .vzchips.scr{padding-top:5px;padding-bottom:5px;margin-top:-5px}.fsbo .sh .vzchips{margin-bottom:-5px}.fsbo .vzchips.scr{margin-bottom:7px}
+  .fsbo .seg button::after{content:'';position:absolute;inset:-6px 0}
+  .fsbo .tabs button{padding-top:6px}
+  .fsbo .drw input[type=range]{height:40px;margin:-22px 0 0!important}
+  .fsbo .rvw textarea{min-height:96px}
+  .fsbo .rvt{gap:8px}.fsbo .rvt>*{height:32px}.fsbo .rvt>button{position:relative}.fsbo .rvt>button::after{content:'';position:absolute;inset:-4px 0}
+  /* iPhone home indicator: the bottom bar, the page end and the bottom sheets keep clear of it (the page uses viewport-fit=cover) */
+  .fsbo .bnav{height:calc(72px + env(safe-area-inset-bottom));padding-bottom:calc(10px + env(safe-area-inset-bottom))}
+  .fsbo .content{padding-bottom:calc(110px + env(safe-area-inset-bottom))}
+  .fsbo .more>div{padding-bottom:calc(28px + env(safe-area-inset-bottom))}
+  .fsbo .pop,.fsbo .pmenu{padding-bottom:env(safe-area-inset-bottom)}
+  /* search: the phone has no Esc key, so the hint becomes a Close button; a long placeholder ends in an ellipsis */
+  .fsbo .pin input{min-width:0;text-overflow:ellipsis}
+  .fsbo .pin kbd{font-size:0;padding:0 2px;border:0;background:none;display:inline-flex;align-items:center;height:44px}
+  .fsbo .pin kbd::after{content:'Close';font-size:14px;font-weight:500;color:var(--sky)}
+  /* hero buttons keep their label on one line: with three, the main one takes its own row */
+  .fsbo .hbtns>*{flex:1 1 auto}
+  .fsbo .hbtns:has(>:nth-child(3))>.pri:first-child{flex-basis:100%}
+  /* home stats: the first tile of each row starts at the card edge (Payout Ready sits on its own row above) */
+  .fsbo .sumrow .sum.hl:nth-child(2)~.sum:nth-child(2n+4){padding-left:0;border-left:0}
+  .fsbo .sumrow:not(:has(.hl)) .sum:nth-child(odd){padding-left:0;border-left:0}.fsbo .sumrow:not(:has(.hl)) .sum:nth-child(even){padding-left:14px;border-left:1px solid var(--ln)}
+  .fsbo .swh:has(i:only-child){display:none!important}
+  .fsbo .abal span{white-space:nowrap}
+  /* account page: the badges wrap and the account number stays in one piece */
+  .fsbo .hin>div>.r{flex-wrap:wrap}.fsbo .hin>div>.r .mono{white-space:nowrap}
+  /* account cards: room for the full title next to the status badge */
+  .fsbo .acards{grid-auto-columns:88%}.fsbo .acard .ach{column-gap:10px}.fsbo .acard .ach .act b{letter-spacing:-.015em}
+  /* ring captions fit inside the smaller phone ring */
+  .fsbo .gz .vzr{width:100px!important;height:100px!important}.fsbo .gz .vzr span{font-size:10.5px;letter-spacing:-.02em}
+  /* stacked tables: the "·" before a badge or tag is centred on it */
+  .fsbo .tsc:not(.keep) table.t td:not(:first-child):not(:last-child):has(>.tag,>.bd)::before{top:0;bottom:0;display:flex;align-items:center;justify-content:center}
+  /* stacked tables: a status with a reason keeps the badge on the first line and puts the reason on its own line */
+  .fsbo .tsc:not(.keep) table.t td:last-child:has(>.bd+div){display:contents}
+  .fsbo .tsc:not(.keep) table.t td:last-child:has(>.bd+div)>.bd{order:1;margin-left:auto}
+  .fsbo .tsc:not(.keep) table.t td:last-child:has(>.bd+div)>div{order:3;flex:1 1 100%;min-width:0!important;margin-top:0!important;text-align:left}
+}
+/* account cards on a phone: the size tile repeats the title, so the title and a long status (Payout in Review) both fit without it */
+@media (max-width:480px){.fsbo .acard .ach{grid-template-columns:minmax(0,1fr) auto}.fsbo .acard .ach .asz{display:none}.fsbo .acard .ach .act b{grid-column:1}.fsbo .acard .ach>.bd{grid-column:2}.fsbo .acard .ach .act span{grid-column:1/3}}
+@media (max-width:339px){.fsbo .acard .ach .act b{font-size:15px;letter-spacing:-.025em;white-space:normal}.fsbo .acard .ach{column-gap:8px}}
+/* journal calendar on a phone: amounts such as +12.5K fit inside the day cell */
+@media (max-width:480px){.fsbo .cal .d{padding:6px 4px 6px 5px}}
+@media (max-width:339px){.fsbo .cal{gap:4px}.fsbo .cal .d{padding:6px 3px}.fsbo .cal .d b{font-size:10.5px;letter-spacing:-.03em}}
+/* trading hours on the narrowest phones: the Now badge never runs into the times */
+.fsbo .tcr em{flex:none}
+@media (max-width:359px){.fsbo .mclk .mhp{left:8px;right:8px;padding:18px 16px 16px}.fsbo .tcr{gap:8px;font-size:13px}.fsbo .tcr span{gap:8px}.fsbo .tcr em{padding:1px 6px}}
+
+/* qc3:mobB */
+/* support rows shared the class name of the news ticker (.tkr) and picked up its fade mask, border and clipping */
+.fsbo .row.tkr{overflow:visible;border:0;border-bottom:1px solid var(--ln2);border-radius:0;background:none;margin-bottom:0;-webkit-mask-image:none;mask-image:none}
+.fsbo .row.tkr:last-child{border-bottom:0}
+@media (max-width:860px){
+  /* iOS zooms the page when a field under 16px gets focus */
+  .fsbo input[type=text],.fsbo input[type=email],.fsbo input[type=number],.fsbo input[type=password],.fsbo input[type=search],.fsbo input[type=tel],.fsbo input[type=url],.fsbo input[type=date],.fsbo select,.fsbo textarea{font-size:16px}
+  /* small buttons and text links keep their look and get a 44px tap area */
+  .fsbo .btn.sm,.fsbo .lk,.fsbo .mtop .ib,.fsbo .mtop .avbtn,.fsbo .mtrow .crd,.fsbo .drw .dh .ib{position:relative}
+  .fsbo .btn.sm::after,.fsbo .lk::after,.fsbo .mtop .ib::after,.fsbo .mtop .avbtn::after,.fsbo .mtrow .crd::after,.fsbo .drw .dh .ib::after{content:'';position:absolute;left:50%;top:50%;width:100%;min-width:42px;height:44px;transform:translate(-50%,-50%)}
+  .fsbo .tabs button{padding-top:6px}
+  /* a toast is as wide as its text allows (it was capped at half the screen), clears the Buy button, and moves to the top while a sheet is open so it never covers the sheet's fields */
+  .fsbo .toast{left:16px;right:16px;width:fit-content;max-width:none;margin:0 auto;transform:none;bottom:calc(96px + env(safe-area-inset-bottom))}
+  .fsbo:has(.ov) .toast{bottom:auto;top:calc(66px + env(safe-area-inset-top))}
+  /* stacked tables with long first cells: the number stays on the first line */
+  .fsbo .tsc.lw:not(.keep) table.t td:first-child{flex:1 1 0;min-width:58%}
+  /* packs: tabs stick under the top bar instead of behind it; chips keep the page gutter; 40px tap height */
+  .fsbo .pk [role=tablist]{top:58px!important}
+  .fsbo .pk section>.hs{scroll-padding:0 16px}
+  .fsbo .pk button.pkseg,.fsbo .pk button.tab{height:40px}
+}
+@media (max-width:860px){
+  /* leaderboard rows are a grid: no separator dots or dot gutters from the generic stacked table */
+  .fsbo .tsc:not(.keep) table.t.lbt td:not(:first-child):not(:last-child)::before{content:none!important}
+  .fsbo .tsc:not(.keep) table.t.lbt td:not(:first-child):not(:last-child){margin:0;padding-left:0!important}
+}
+/* trading hours: long holiday names wrap instead of crushing the time column and pushing it off the screen; the two one-hour sessions keep room for their names */
+.fsbo .holkv .kv>div>span{white-space:normal;min-width:0}
+.fsbo .holkv .kv b{flex:none;white-space:nowrap}
+.fsbo .holkv .nw{white-space:nowrap}
+@media (max-width:340px){.fsbo .holkv .nw{white-space:normal}}
+@media (max-width:860px){
+  .fsbo .sess>div{min-width:46px}
+  .fsbo .tsc.rt table.t :is(th,td):first-child,.fsbo .tsc.rt table.t tr.g td{padding-left:0}
+  .fsbo .tsc.rt table.t :is(th,td):last-child{padding-right:0}
+  .fsbo .vzchips.edchips{padding-top:7px;padding-bottom:7px;margin-top:-7px;margin-bottom:-7px}
+  .fsbo .vzchips.edchips button{position:relative}
+  .fsbo .vzchips.edchips button::after{content:'';position:absolute;left:0;right:0;top:50%;height:44px;transform:translateY(-50%)}
+  .fsbo .seg.rsz button{height:40px}
+  .fsbo .sw::before{content:'';position:absolute;left:50%;top:50%;width:48px;height:44px;transform:translate(-50%,-50%)}
+}
+/* small phones: a long name or a long competition name wraps inside its hero instead of being cut off at the card edge */
+@media (max-width:860px){
+  .fsbo .sethero .prof>div,.fsbo .cmph>div{min-width:0;max-width:100%}
+  .fsbo .sethero .prof .hero{overflow-wrap:anywhere}
+  .fsbo .cmph .hbtns .bd{white-space:normal;height:auto;min-height:22px;padding-top:3px;padding-bottom:3px;text-align:left}
+}
+@media (max-width:374px){.fsbo .sess>div.on{min-width:62px}}
+
+/* unverified email notice above every page */
+.fsbo .note.evn{margin:0 0 18px}.fsbo .note.evn .lk{margin-left:6px}
+
+/* dec:D */
+/* 1. wide screens (1920px+): the page column keeps its max width and sits in the middle; the top bar's title and controls line up with it */
+@media (min-width:1361px){.fsbo .content{margin-left:auto;margin-right:auto}.fsbo .top{padding-left:calc(68px + max(0px,(100% - 1400px) / 2));padding-right:calc(40px + max(0px,(100% - 1400px) / 2))}}
+@media (min-width:1649px){.fsbo .content{padding-right:68px!important}.fsbo .top{padding-right:calc(68px + max(0px,(100% - 1400px) / 2))}}
+/* 4. empty Certificates tab: the "Sample" stamp is a small tag on the certificate's top-right corner, clear of its title and text */
+.fsbo .certsm .certsb{left:auto;top:-11px;right:16px;transform:none;padding:3px 10px;border-width:1.5px;border-radius:6px;background:#0E1420;font-size:11px;letter-spacing:.16em;line-height:1.3}
+/* 5. rewards track: a label that would run into its neighbour sits above the line instead */
+.fsbo .trk.alt{margin-top:44px}
+.fsbo .trk .mk.up{top:auto;bottom:calc(100% - 28px);flex-direction:column-reverse}
+/* 3. breached funded card: "Buy a New Account" takes the account number's place in the footer, so Details and the button stay on one line */
+.fsbo .acf:has(.bnew) .mono{display:none}.fsbo .acf:has(.bnew) .lk{margin-right:auto}
+/* 16. Settings > Payout Methods: the remove confirmation ("Yes, Remove" and "Keep") stays together on one line on phones */
+.fsbo span:has(>[data-act=pmRmGo]){flex:none;flex-wrap:nowrap;white-space:nowrap}

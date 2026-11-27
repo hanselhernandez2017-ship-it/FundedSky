@@ -719,7 +719,7 @@ function startCatalog(root) {
     if (kind === 'batch') { const pre = (f.prefix || 'CODE').toUpperCase().replace(/[^A-Z0-9]/g, ''); const AB = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; const codes = Array.from({ length: Math.min(500, +f.count || 1) }, () => pre + '-' + Array.from({ length: 4 }, () => AB[Math.floor(Math.random() * AB.length)]).join('')); const b = Object.assign({}, f, { id: uid('cb'), prefix: pre, used: 0, created: F.md(new Date()), codes }); S.batches.unshift(b); log('Codes', `Generated ${b.count} codes ${b.prefix}-XXXX`); return true; }
     if (kind === 'aff') { f.code = (f.code || '').toUpperCase().replace(/\s+/g, ''); if (!f.id) { f.id = uid('af'); f.uses = 0; f.revenue = 0; S.affiliates.push(f); } else Object.assign(S.affiliates.find((x) => x.id === f.id), f); log('Affiliates', `${f.name}: code ${f.code}, ${f.pct}% off, ${f.commission}% commission`); return true; }
     if (kind === 'test') { const a = (sizeOf(f.plan, +f.size) || {}).price || 0; S.tests.unshift({ id: uid('t'), name: f.name, plan: f.plan, size: +f.size, a, b: +f.b, split: +f.split, status: 'running', start: 'Today', va: 0, vb: 0, ba: 0, bb: 0 }); log('Price Tests', `Started ${f.name}: ${money(a)} vs ${money(+f.b)}`); return true; }
-    if (kind === 'import') { let c; try { c = JSON.parse(f.text); } catch (e) { toast('That is not a catalog file'); return false; } if (!c || !Array.isArray(c.plans)) { toast('That file has no plans in it'); return false; } loadCat(c); log('Import', 'Imported a catalog file into the draft'); return true; }
+    if (kind === 'import') { let c; try { c = JSON.parse(f.text); } catch (e) { toast('That is not a catalog file.'); return false; } if (!c || !Array.isArray(c.plans)) { toast('That file has no plans in it.'); return false; } loadCat(c); log('Import', 'Imported a catalog file into the draft'); return true; }
     return false;
   }
 
@@ -728,9 +728,9 @@ function startCatalog(root) {
     switch (a) {
       case 'editIntg': location.href = '/admin/settings#int'; return 'noRender';
       case 'intgShow': D.show[el.dataset.k] = !D.show[el.dataset.k]; return true;
-      case 'intgEnv': if (D.id === 'stripe' && el.dataset.k === 'live') { toast("Stripe can't be used for live payments here"); return 'noRender'; } D.env = el.dataset.k; return true;
+      case 'intgEnv': if (D.id === 'stripe' && el.dataset.k === 'live') { toast("Stripe can't be used for live payments here."); return 'noRender'; } D.env = el.dataset.k; return true;
       case 'intgCopy': toast('Webhook URL copied'); return 'noRender';
-      case 'intgTest': { F.api('/integrations/' + D.id + '/test', {}).then((r2) => toast((r2 && r2.message) || `${D.name} answered`)).catch((x) => toast(x.message)); return 'noRender'; }
+      case 'intgTest': { F.api('/integrations/' + D.id + '/test', {}).then((r2) => toast((r2 && r2.message) || `${D.name} answered.`)).catch((x) => toast(x.message)); return 'noRender'; }
       case 'intgOff': { const x = S.integrations.find((y) => y.id === D.id); x.status = 'off'; log('Integrations', `${x.name} disconnected`); S.drawer = null; toast(`${x.name} disconnected`); return 'noRender'; }
       case 'feeDisc': { const f = S.fees[el.dataset.p][+el.dataset.s]; f.resetDiscountable = !f.resetDiscountable; log('Fees', `${plan(el.dataset.p).name} ${K(+el.dataset.s)} resets ${f.resetDiscountable ? 'can' : "can't"} be discounted`); return true; }
       case 'upAdd': S.upgrades.push({ plan: S.plans[0].id, from: 25000, to: 50000, price: 49 }); log('Fees', 'Added an upgrade path'); return true;
@@ -759,7 +759,7 @@ function startCatalog(root) {
       case 'testApply': { const t = S.tests.find((x) => x.id === id); const w = el.dataset.w; const z = sizeOf(t.plan, t.size); const np = w === 'B' ? t.b : t.a; const old = z.price; z.price = np; t.status = 'ended'; t.applied = 'Used ' + money(np); log('Prices', `${plan(t.plan).name} ${K(t.size)} price from ${t.name}`, { before: money(old), after: money(np), approve: old !== np }); toast('Price change added to the draft'); return 'noRender'; }
       case 'perfRange': S.perfRange = +el.dataset.k; return true;
       case 'newBatch': S.drawer = { kind: 'batch', f: { promo: 'p2', prefix: 'CREATOR', count: 50, usesEach: 1 } }; return true;
-      case 'batchExport': { const b = S.batches.find((x) => x.id === id) || S.batches[0]; if (!b || !(b.codes || []).length) { toast('This batch has no codes yet'); return 'noRender'; } const used = (c) => paidOrders.filter((o) => String(o.promo || '').toUpperCase() === c).length; window.FSG.csvDl(b.prefix.toLowerCase() + '-codes.csv', [['Code', 'Times Used']].concat(b.codes.map((c) => [c, used(c)]))); toast('CSV of codes downloaded'); return 'noRender'; }
+      case 'batchExport': { const b = S.batches.find((x) => x.id === id) || S.batches[0]; if (!b || !(b.codes || []).length) { toast('This batch has no codes yet.'); return 'noRender'; } const used = (c) => paidOrders.filter((o) => String(o.promo || '').toUpperCase() === c).length; window.FSG.csvDl(b.prefix.toLowerCase() + '-codes.csv', [['Code', 'Times Used']].concat(b.codes.map((c) => [c, used(c)]))); toast('CSV of codes downloaded'); return 'noRender'; }
       case 'editAff': { const af = S.affiliates.find((x) => x.id === id) || { id: '', name: 'New Affiliate', code: '', pct: 10, commission: 15, status: 'active' }; S.drawer = { kind: 'aff', f: JSON.parse(JSON.stringify(af)) }; return true; }
       case 'flagDone': S.flags[i].done = true; return true;
       case 'recOn': S.recovery.on = !S.recovery.on; log('Abandoned Checkout', `Recovery emails ${S.recovery.on ? 'on' : 'off'}`); return true;
@@ -1024,8 +1024,8 @@ function startCatalog(root) {
       case 'tFlag': S.tester[el.dataset.k] = el.checked; break;
       case 'dropChange': S.changes = S.changes.filter((x) => x.id !== id); break;
       case 'discardAll': F.put('catalog.draft', null).then(() => { toast('Draft discarded'); setTimeout(() => location.reload(), 500); }).catch((x) => toast(x.message)); return;
-      case 'publish': { if (awaiting()) { toast('Price and rule changes need approval before publishing'); return; } const n = S.changes.length; publish(S.changes.slice(0, 2).map((x) => x.text).join('; ') + (n > 2 ? `; and ${n - 2} more` : '') || 'Published the catalog', n); return; }
-      case 'rollback': { const v = +el.dataset.v; const old = VERS.find((x) => x.v === v); if (!old || !old.cat) { toast('That version was not saved here, so it cannot be restored'); return; } loadCat(JSON.parse(JSON.stringify(old.cat))); log('Publishing', `Rolled back to the catalog from v${v}`, { approve: true }); toast(`v${v} is in the draft now. Review it, then publish.`); break; }
+      case 'publish': { if (awaiting()) { toast('Price and rule changes need approval before publishing.'); return; } const n = S.changes.length; publish(S.changes.slice(0, 2).map((x) => x.text).join('; ') + (n > 2 ? `; and ${n - 2} more` : '') || 'Published the catalog', n); return; }
+      case 'rollback': { const v = +el.dataset.v; const old = VERS.find((x) => x.v === v); if (!old || !old.cat) { toast('That version was not saved here, so it cannot be restored.'); return; } loadCat(JSON.parse(JSON.stringify(old.cat))); log('Publishing', `Rolled back to the catalog from v${v}`, { approve: true }); toast(`v${v} is in the draft now. Review it, then publish.`); break; }
       case 'pvFrom': S.preview.plan = id; S.view = 'preview'; S.drawer = null; break;
       default: { const r = extClick(a, el); if (!r || r === 'noRender') return; }
     }
@@ -1072,7 +1072,7 @@ function startCatalog(root) {
       S.plans.forEach((p) => { p.bundles[b.id] = !!on[p.id]; }); log('Bundles', `${f.id ? 'Updated' : 'Created'} ${b.name}`);
     } else if (kind === 'promo') {
       if (f.kind === 'code') f.code = (f.code || '').toUpperCase().replace(/\s+/g, '');
-      if (f.kind === 'code' && S.promos.some((x) => x.id !== f.id && x.kind === 'code' && x.code === f.code)) { toast('That code is already used by another promotion'); return; }
+      if (f.kind === 'code' && S.promos.some((x) => x.id !== f.id && x.kind === 'code' && x.code === f.code)) { toast('That code is already used by another promotion.'); return; }
       if (!f.id) { f.id = uid('pr'); S.promos.push(f); } else Object.assign(S.promos.find((x) => x.id === f.id), f);
       log('Promotions', `${S.drawer.f.id && S.promos.find((x) => x.id === f.id) ? 'Saved' : 'Created'} ${f.name}${f.kind === 'code' ? ' (' + f.code + ')' : ''}`);
     } else if (kind === 'rule') {

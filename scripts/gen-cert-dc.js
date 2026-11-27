@@ -34,7 +34,7 @@ const logic = `class Component extends DCLogic {
     // one template, five kinds: what the headline, sentence, emblem and figure say
     const KIND = {
       passed: { tone: 'sky', icon: 'check', over: 'Certificate of Achievement', title: 'Evaluation Passed', line: \`\${first} passed the \${what} by reaching the profit target inside every trading rule.\`, big: size, bigSub: 'Evaluation' },
-      funded: { tone: 'green', icon: 'wing', over: 'Certificate of Funding', title: 'Funded Trader', line: \`\${first} earned a \${what} and now trades it for a share of the profits.\`, big: size, bigSub: 'Funded' },
+      funded: { tone: 'green', icon: 'wing', over: 'Certificate of Funding', title: 'Funded Trader', line: \`\${first} earned a \${what} and now earns performance rewards from a simulated funded account.\`, big: size, bigSub: 'Funded' },
       payout: { tone: 'gold', icon: 'coin', over: 'Payout Certificate', title: 'Paid Out', line: \`\${first} was paid \${amount} from a \${what}.\`, big: amount, bigSub: 'Paid' },
       lifetime: { tone: 'gold', icon: 'star', over: 'Lifetime Payouts', title: \`\${amount} Club\`, line: \`\${first} has been paid more than \${amount} in total across funded accounts.\`, big: amount, bigSub: 'Lifetime' },
       comp: { tone: 'gold', icon: 'cup', over: 'Competition Result', title: \`\${place} Place\`, line: \`\${first} finished \${String(place).toLowerCase()} of \${of} \${String(of) === '1' ? 'trader' : 'traders'} in \${what}.\`, big: '#' + rank, bigSub: 'of ' + of }

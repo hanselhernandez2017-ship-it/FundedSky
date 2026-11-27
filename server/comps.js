@@ -34,6 +34,8 @@ const dayText = (iso) => { const [y, m, d] = iso.split('-').map(Number); return 
 
 // ---- Prizes: each competition has its own list, one entry per place. The text traders see is made from it.
 const prizeLabel = (p) => (p.type === 'funded' ? `${K(p.size)} Funded Account` : p.type === 'eval' ? `Free ${K(p.size)} Evaluation` : p.type === 'credits' ? `${Number(p.amount).toLocaleString('en-US')} Credits` : p.note);
+// "You won a $50K Funded Account" / "You won 5,000 Credits": an article only for an account prize
+const aPrize = (s) => (/(Funded Account|Evaluation)$/.test(String(s || '')) ? 'a ' : '') + (s || '');
 function prizeText(P) {
   if (!P.length) return 'No prizes'; const L = P.map(prizeLabel);
   if (L.length > 1 && L.every((x) => x === L[0])) return `${L.length} × ${L[0]}${P[0].type === 'funded' || P[0].type === 'eval' ? 's' : ''}`;
@@ -57,12 +59,12 @@ function prizesFromText(text, table) {
   const one = prizeFromText(s); return one && one.type !== 'cash' ? [one] : std;
 }
 function cleanPrize(p, i) {
-  if (!p || typeof p !== 'object' || Array.isArray(p)) bad(`Prize ${i + 1} is not in the right shape`);
+  if (!p || typeof p !== 'object' || Array.isArray(p)) bad(`Prize ${i + 1} is not in the right shape.`);
   const type = String(p.type || '');
-  if (type === 'funded' || type === 'eval') { const size = Number(p.size); if (!Number.isInteger(size) || size < 5000 || size > 1000000 || size % 1000) bad(`Prize ${i + 1}: pick an account size`); return { type, size }; }
-  if (type === 'credits') { const amount = Math.round(Number(p.amount)); if (!(amount > 0) || amount > 10000000) bad(`Prize ${i + 1}: enter how many credits`); return { type, amount }; }
-  if (type === 'cash') { const note = clean(p.note, 80); if (!note) bad(`Prize ${i + 1}: describe the cash prize, for example $500 Cash`); return { type, note }; }
-  return bad(`Prize ${i + 1}: choose a funded account, a free evaluation, credits or cash`);
+  if (type === 'funded' || type === 'eval') { const size = Number(p.size); if (!Number.isInteger(size) || size < 5000 || size > 1000000 || size % 1000) bad(`Prize ${i + 1}: pick an account size.`); return { type, size }; }
+  if (type === 'credits') { const amount = Math.round(Number(p.amount)); if (!(amount > 0) || amount > 10000000) bad(`Prize ${i + 1}: enter how many credits.`); return { type, amount }; }
+  if (type === 'cash') { const note = clean(p.note, 80); if (!note) bad(`Prize ${i + 1}: describe the cash prize, for example $500 Cash.`); return { type, note }; }
+  return bad(`Prize ${i + 1}: choose a funded account, a free evaluation, credits or cash.`);
 }
 
 // How ranking works, in the words traders read on the Competitions page
@@ -85,22 +87,22 @@ async function list() { const C = await content.all(); return shapeAll(C.competi
 
 // Check a list sent from the Back Office before it is saved: real names, dates, sizes and prizes, no duplicate ids
 async function validate(value) {
-  if (!Array.isArray(value)) bad('This content is not in the right shape');
-  if (value.length > 200) bad('That is too many competitions');
+  if (!Array.isArray(value)) bad('This content is not in the right shape.');
+  if (value.length > 200) bad('That is too many competitions.');
   const table = (await content.all()).cprizes; const cat = await core.catalog(); const sizes = new Set(cat.plans.filter((p) => p.kind !== 'funded' && p.id !== 'instant').flatMap((p) => p.sizes.map((z) => z.size))); const seen = new Set();
   return value.map((c, i) => { const at = `Competition ${i + 1}`;
-    if (!c || typeof c !== 'object' || Array.isArray(c)) bad(`${at} is not in the right shape`);
-    const id = clean(c.id, 30); if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,19}$/.test(id)) bad(`${at} needs an id (letters, numbers and dashes, up to 20)`);
-    if (seen.has(id)) bad(`Two competitions have the id ${id}`); seen.add(id);
-    const n = clean(c.n, 80); if (!n) bad(`${at} needs a name`);
-    if (!['upcoming', 'live', 'running', 'ended', 'done'].includes(c.st)) bad(`${n}: the status must be upcoming, live or ended`);
+    if (!c || typeof c !== 'object' || Array.isArray(c)) bad(`${at} is not in the right shape.`);
+    const id = clean(c.id, 30); if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,19}$/.test(id)) bad(`${at} needs an id (letters, numbers and dashes, up to 20).`);
+    if (seen.has(id)) bad(`Two competitions have the id ${id}.`); seen.add(id);
+    const n = clean(c.n, 80); if (!n) bad(`${at} needs a name.`);
+    if (!['upcoming', 'live', 'running', 'ended', 'done'].includes(c.st)) bad(`${n}: the status must be upcoming, live or ended.`);
     const startAt = dayOf(c.startAt != null && c.startAt !== '' ? c.startAt : c.start); const endAt = dayOf(c.endAt != null && c.endAt !== '' ? c.endAt : c.end);
-    if (!startAt) bad(`${n}: the start date is not a real date`); if (!endAt) bad(`${n}: the end date is not a real date`);
-    if (endAt < startAt) bad(`${n}: the end date is before the start date`);
-    if (!/\d\s*K/i.test(String(c.size || ''))) bad(`${n}: pick a practice account size`);
-    if (!sizes.has(sizeOf(c))) bad(`${n}: there is no ${K(sizeOf(c))} evaluation to base the practice account on`);
+    if (!startAt) bad(`${n}: the start date is not a real date.`); if (!endAt) bad(`${n}: the end date is not a real date.`);
+    if (endAt < startAt) bad(`${n}: the end date is before the start date.`);
+    if (!/\d\s*K/i.test(String(c.size || ''))) bad(`${n}: pick a practice account size.`);
+    if (!sizes.has(sizeOf(c))) bad(`${n}: there is no ${K(sizeOf(c))} evaluation to base the practice account on.`);
     const prizes = Array.isArray(c.prizes) ? c.prizes.map(cleanPrize) : prizesFromText(c.prize, table);
-    if (prizes.length > 50) bad(`${n}: at most 50 prizes`);
+    if (prizes.length > 50) bad(`${n}: at most 50 prizes.`);
     const st = isLive(c) ? 'live' : isOver(c) ? 'ended' : 'upcoming';
     return { id, n, st, start: dayText(startAt), end: dayText(endAt), startAt, endAt, size: `${K(sizeOf(c))} practice account`, entry: clean(c.entry, 40) || 'Free', players: 0, prizes, prize: prizeText(prizes), rule: clean(c.rule, 160) || 'Highest profit with no rule breaks' }; });
 }
@@ -161,7 +163,7 @@ async function openFor(c, userId, cat) {
 // A trader registers: the time is kept (it breaks ties), and if the competition is already running their account opens right away
 async function join(compId, userId) {
   const c = (await list()).find((x) => x.id === compId); if (!c) bad('Competition not found', 404);
-  if (isOver(c)) bad('This competition has ended');
+  if (isOver(c)) bad('This competition has ended.');
   await db.q("UPDATE users SET settings = jsonb_set(jsonb_set(settings, '{comps}', COALESCE(settings->'comps','{}'::jsonb) || jsonb_build_object($2::text, true)), '{compsAt}', jsonb_build_object($2::text, to_jsonb(now())) || COALESCE(settings->'compsAt','{}'::jsonb)) WHERE id=$1", [userId, c.id]);
   return isLive(c) ? openFor(c, userId) : null;
 }
@@ -175,10 +177,14 @@ const settings = async (q) => Object.assign({ pubLb: true, showCtry: true, hideN
 //   3. out: broke a rule, disqualified, or the account was closed by staff.
 async function board(compId, q) {
   q = q || db;
+  // Two indexed lookups instead of one join over every trader: the competition's accounts (accounts_comp), then traders who
+  // registered and have no account yet. The same rows as before, but the time no longer grows with the number of traders.
   const rows = await q.all(`SELECT u.id uid, u.first, u.last, u.country, u.kyc_status, u.settings->'compsAt'->>$1 regat, a.id acct, a.balance, a.start_bal, a.peak_eod, a.phase, a.days_traded, a.breach_reason, a.created_at opened,
       (SELECT count(*)::int FROM trades t WHERE t.account_id=a.id) trades, (SELECT max(t.ts) FROM trades t WHERE t.account_id=a.id) last_trade
-    FROM users u LEFT JOIN accounts a ON a.user_id=u.id AND a.comp=$1
-    WHERE a.id IS NOT NULL OR ((u.settings->'comps'->>$1)='true' AND u.status='active')`, [compId]);
+    FROM accounts a JOIN users u ON u.id=a.user_id WHERE a.comp=$1
+    UNION ALL
+    SELECT u.id, u.first, u.last, u.country, u.kyc_status, u.settings->'compsAt'->>$1, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
+    FROM users u WHERE (u.settings->'comps'->>$1)='true' AND u.status='active' AND NOT EXISTS (SELECT 1 FROM accounts a WHERE a.user_id=u.id AND a.comp=$1)`, [compId]);
   const dq = new Set(((await kvGet('store.competitions.dq', q)) || {})[compId] || []);
   const L = rows.map((r) => { const has = !!r.acct; const start = Number(r.start_bal) || 0, bal = Number(r.balance) || 0, peak = Math.max(Number(r.peak_eod) || 0, start);
     const isDq = dq.has(r.uid); const shut = has && r.phase === 'closed' && r.breach_reason !== 'Competition ended';
@@ -211,9 +217,11 @@ const stored = async (t) => { const v = await kvGet('content.competitions', t); 
 
 async function start(id, actor) {
   const made = await locked(id, async (t) => { const L = await stored(t); const c = L.find((x) => x.id === id); if (!c) bad('Competition not found', 404);
-    if (isLive(c)) return false; if (isOver(c)) bad('This competition has already ended');
+    if (isLive(c)) return false; if (isOver(c)) bad('This competition has already ended.');
     const today = todayET(); c.st = 'live'; if (!c.startAt || c.startAt > today) { c.startAt = today; c.start = dayText(today); } if (!c.endAt || c.endAt < today) { c.endAt = today; c.end = dayText(today); }
-    await saveList(L, t); return true; });
+    await saveList(L, t);
+    // accounts closed when this competition was set back to upcoming (or reopened after it ended) open again with it
+    await t.q("UPDATE accounts SET phase='active', closed_at=NULL, breach_reason=NULL WHERE comp=$1 AND phase='closed' AND breach_reason='Competition ended'", [id]); return true; });
   content.reset();
   if (made) { await core.audit(actor || null, 'competition.start', id, { auto: !actor }); await sync(); }
   return { started: made };
@@ -244,8 +252,8 @@ async function tellEnd(c, B, winners) {
     const res = x.state === 'ranked' ? `You finished ${ordinal(x.rank)} of ${B.total.ranked}${x.tied ? ' (tied)' : ''}.` : x.state === 'out' ? `Your entry was out of the ranking (${x.why.toLowerCase()}).` : 'You did not place a trade, so you were not ranked.';
     if (w) { const kyc = set.kycWin !== false && x.kyc !== 'verified';
       const next = kyc ? 'Verify your identity in Settings so we can send it.' : 'We will send it shortly. Nothing else is needed from you right now.';
-      await core.notify(null, x.uid, `You won ${w.prize} in ${c.n}`, `${res} Your prize for ${w.place} place is ${w.prize}. ${next}`, kyc ? 'settings?tab=identity' : 'competitions');
-      mail.t('compwin', x.uid, { competition: c.n, place: w.place, prize: w.prize, result: res, next, url: kyc ? base + '/app#settings?tab=identity' : url });
+      await core.notify(null, x.uid, `You won ${aPrize(w.prize)} in ${c.n}`, `${res} Your prize for ${w.place} place is ${aPrize(w.prize)}. ${next}`, kyc ? 'settings?tab=identity' : 'competitions');
+      mail.t('compwin', x.uid, { competition: c.n, place: w.place, prize: w.prize, won: aPrize(w.prize), result: res, next, url: kyc ? base + '/app#settings?tab=identity' : url });
     } else {
       await core.notify(null, x.uid, `${c.n} has ended`, `${res} ${top}${x.acct ? ` Your competition account ${x.acct} is now closed.` : ''}`, 'competitions');
       if (!noMail.has(x.uid)) mail.t('compend', x.uid, { competition: c.n, result: res, winner: top, url });
@@ -254,7 +262,7 @@ async function tellEnd(c, B, winners) {
 // A finished competition put back to upcoming or live from the list: its accounts reopen and the winners are dropped (not once a prize went out)
 async function reopen(c, t) {
   const W = (await kvGet('store.competitions.winners', t)) || {};
-  if ((W[c.id] || []).some((w) => w.status === 'Sent')) bad(`${c.n} cannot be reopened: a prize has already been sent`);
+  if ((W[c.id] || []).some((w) => w.status === 'Sent')) bad(`${c.n} cannot be reopened: a prize has already been sent.`);
   if (W[c.id]) { delete W[c.id]; await kvPut('store.competitions.winners', W, t); }
   if (isLive(c)) await t.q("UPDATE accounts SET phase='active', closed_at=NULL, breach_reason=NULL WHERE comp=$1 AND phase='closed' AND breach_reason='Competition ended'", [c.id]);
 }
@@ -280,10 +288,10 @@ async function create(b, actor) {
   let n = Math.max(9, ...[...used].map((x) => { const m = /^C-(\d+)$/.exec(x); return m ? +m[1] : 0; })) + 1; while (used.has('C-' + String(n).padStart(2, '0'))) n++;
   const id = 'C-' + String(n).padStart(2, '0');
   const startAt = dayOf(b.startAt); const endAt = dayOf(b.endAt);
-  if (!clean(b.n, 80)) bad('Give it a name'); if (!startAt) bad('Pick a start date'); if (!endAt) bad('Pick an end date');
-  if (endAt < startAt) bad('The end date is before the start date');
-  if (endAt < todayET()) bad('The end date is in the past');
-  if (!Array.isArray(b.prizes) || !b.prizes.length) bad('Add at least one prize');
+  if (!clean(b.n, 80)) bad('Give it a name.'); if (!startAt) bad('Pick a start date.'); if (!endAt) bad('Pick an end date.');
+  if (endAt < startAt) bad('The end date is before the start date.');
+  if (endAt < todayET()) bad('The end date is in the past.');
+  if (!Array.isArray(b.prizes) || !b.prizes.length) bad('Add at least one prize.');
   const next = await validate([{ id, n: b.n, st: 'upcoming', startAt, endAt, size: b.size, entry: b.entry, prizes: b.prizes, rule: b.rule }].concat(L));
   await saveList(next); await core.audit(actor || null, 'competition.create', id, { n: next[0].n });
   return next[0];
@@ -303,8 +311,8 @@ async function disqualify(id, uid, on, actor) {
   uid = +uid; const r = await locked(id, async (t) => { const L = await stored(t); const c = L.find((x) => x.id === id); if (!c) bad('Competition not found', 404);
     const D = (await kvGet('store.competitions.dq', t)) || {}; const cur = new Set(D[id] || []); if (cur.has(uid) === !!on) return { c, same: true };
     const W = (await kvGet('store.competitions.winners', t)) || {};
-    if (isOver(c) && (W[id] || []).some((w) => w.status === 'Sent')) bad('A prize has already been sent for this competition, so its results are final');
-    if (!(await board(id, t)).rows.some((x) => x.uid === uid)) bad('This trader is not in the competition', 404);
+    if (isOver(c) && (W[id] || []).some((w) => w.status === 'Sent')) bad('A prize has already been sent for this competition, so its results are final.');
+    if (!(await board(id, t)).rows.some((x) => x.uid === uid)) bad('This trader is not in the competition.', 404);
     if (on) cur.add(uid); else cur.delete(uid); D[id] = [...cur]; await kvPut('store.competitions.dq', D, t);
     if (on) await t.q("UPDATE accounts SET phase='closed', closed_at=now(), breach_reason='Disqualified' WHERE comp=$1 AND user_id=$2 AND phase IN ('active','review')", [id, uid]);
     else if (isLive(c)) await t.q("UPDATE accounts SET phase='active', closed_at=NULL, breach_reason=NULL WHERE comp=$1 AND user_id=$2 AND phase='closed' AND breach_reason='Disqualified'", [id, uid]);
@@ -316,7 +324,7 @@ async function disqualify(id, uid, on, actor) {
   await core.audit(actor || null, on ? 'competition.disqualify' : 'competition.reinstate', id, { uid });
   if (on) await core.notify(null, uid, `You were removed from ${r.c.n}`, 'Your entry broke the competition rules, so your competition account is closed. Contact support if you think this is a mistake.', 'competitions');
   else await core.notify(null, uid, `You are back in ${r.c.n}`, isLive(r.c) ? 'Your disqualification was reversed. Your competition account is open again and you are back on the leaderboard.' : 'Your disqualification was reversed and your result counts again.', 'competitions');
-  for (const w of r.fresh || []) { await core.notify(null, w.uid, `You won ${w.prize} in ${r.c.n}`, `The results were updated and you now hold ${w.place} place. Your prize is ${w.prize}.`, 'competitions'); require('./mail').t('compwin', w.uid, { competition: r.c.n, place: w.place, prize: w.prize, result: `The results were updated and you now hold ${w.place} place.`, next: 'We will be in touch about your prize.', url: require('./auth').BASE() + '/app#competitions' }); }
+  for (const w of r.fresh || []) { await core.notify(null, w.uid, `You won ${aPrize(w.prize)} in ${r.c.n}`, `The results were updated and you now hold ${w.place} place. Your prize is ${aPrize(w.prize)}.`, 'competitions'); require('./mail').t('compwin', w.uid, { competition: r.c.n, place: w.place, prize: w.prize, won: aPrize(w.prize), result: `The results were updated and you now hold ${w.place} place.`, next: 'We will be in touch about your prize.', url: require('./auth').BASE() + '/app#competitions' }); }
   return { ok: true };
 }
 
@@ -325,12 +333,12 @@ async function disqualify(id, uid, on, actor) {
 async function sendPrize(id, pos, actor) {
   const cat = await core.catalog(); let agreeFor = null;
   const w = await locked(id, async (t) => { const W = (await kvGet('store.competitions.winners', t)) || {}; const ws = W[id] || []; const k = ws.findIndex((x) => x.pos === +pos); if (k < 0) bad('Prize not found', 404);
-    const x = ws[k]; if (x.status === 'Sent') bad('This prize was already sent');
-    const u = await t.one('SELECT id, kyc_status, status FROM users WHERE id=$1 FOR UPDATE', [x.uid]); if (!u || u.status !== 'active') bad('This trader\'s account is not active');
-    if ((await settings(t)).kycWin !== false && u.kyc_status !== 'verified') bad('This winner has not passed the identity check yet');
+    const x = ws[k]; if (x.status === 'Sent') bad('This prize was already sent.');
+    const u = await t.one('SELECT id, kyc_status, status FROM users WHERE id=$1 FOR UPDATE', [x.uid]); if (!u || u.status !== 'active') bad('This trader\'s account is not active.');
+    if ((await settings(t)).kycWin !== false && u.kyc_status !== 'verified') bad('This winner has not passed the identity check yet.');
     const c = (await stored(t)).find((y) => y.id === id) || { n: 'the competition' }; const sent = { status: 'Sent', sent: new Date().toISOString() };
     if (x.type === 'funded') {
-      const p = planFor(cat, x.size); if (p.size !== x.size) bad(`There is no ${K(x.size)} account in the catalog to create`);
+      const p = planFor(cat, x.size); if (p.size !== x.size) bad(`There is no ${K(x.size)} account in the catalog to create.`);
       const acct = await core.createAccount(t, { userId: u.id, plan: p.plan, size: p.size, platform: p.platform, addons: [], fees: { price: 0, activation: 0, reset: 0 } });
       await t.q("UPDATE accounts SET phase='passed', steps=$2 WHERE id=$1", [acct, { passed: new Date().toISOString(), prize: id }]);
       await core.notify(t, u.id, `Your ${x.prize} is ready`, `Your prize from ${c.n} is here. Sign the funded agreement on ${acct} and your funded account opens right away. There is no fee.`, 'account?acct=' + acct);

@@ -8,7 +8,8 @@ const cons = (r) => (r.consOff ? 'None' : r.consistency + '%');
 const scal = (r) => (r.scaling ? r.scaling.map(([at, c]) => `${c} at ${fmt(at)}`).join(', ') : 'No');
 const scalp = (r) => (r.scalp ? `Limited: under ${r.scalp.hold}s, max ${r.scalp.pct}% of profit` : 'Allowed');
 const news = (r) => (r.news ? `Restricted: ${r.news.win} min around high-impact news` : 'Allowed');
-const hold = (r) => (r.overnight !== false && r.weekend !== false ? 'Allowed' : r.overnight === false ? `Flat by ${r.closeAt} ET daily` : `Flat by ${r.closeAt} ET Friday`);
+const t12 = (t) => { const m = /^(\d{1,2}):(\d{2})$/.exec(String(t || '')); return m ? `${+m[1] % 12 || 12}:${m[2]} ${+m[1] < 12 ? 'AM' : 'PM'}` : String(t || ''); };
+const hold = (r) => (r.overnight !== false && r.weekend !== false ? 'Allowed' : r.overnight === false ? `Flat by ${t12(r.closeAt)} ET daily` : `Flat by ${t12(r.closeAt)} ET Friday`);
 function planTable(cat, planId) {
   const pl = cat.plans.find((x) => x.id === planId); if (!pl) return null;
   const inst = pl.id === 'instant' || pl.kind === 'funded';
@@ -66,4 +67,4 @@ function summary(cat) {
   const split = {}; fu.forEach((x) => { (split[x.id] = split[x.id] || []).includes(x.split) || split[x.id].push(x.split); });
   return { news: news.text, newsWho: news.who, newsWin: win, cons, lock, split: Object.fromEntries(Object.entries(split).map(([k, v]) => [k, v.length === 1 ? v[0] : 'By size, see Rules'])) };
 }
-module.exports = { planTable, summary };
+module.exports = { planTable, summary, t12 };

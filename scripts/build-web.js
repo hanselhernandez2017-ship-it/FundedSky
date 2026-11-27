@@ -73,7 +73,7 @@ const THEME_JS = (want) => `<script>(function(){var t='dark';try{t=localStorage.
 // ---------- reset checkout ----------
 {
   const css = rd('rs.css'); const js = rd('tr_data.js') + rd('rs_app.js');
-  const RESET = (th) => `${HEAD('Funded Sky: reset your account', THEME_JS(th) + `<style>html,body{margin:0;background:#08080A}${css}${SELECT_CSS(th === 'light' ? '5E636C' : '9C9693')}</style>`)}<body><div class="rs" id="rsroot" data-mobile="0"></div><div id="fsload" style="position:fixed;inset:0;display:grid;place-items:center;font:500 14px system-ui;color:#9C9693">Loading…</div>
+  const RESET = (th) => `${HEAD('Funded Sky: Reset Your Account', THEME_JS(th) + `<style>html,body{margin:0;background:#08080A}${css}${SELECT_CSS(th === 'light' ? '5E636C' : '9C9693')}</style>`)}<body><div class="rs" id="rsroot" data-mobile="0"></div><div id="fsload" style="position:fixed;inset:0;display:grid;place-items:center;font:500 14px system-ui;color:#9C9693">Loading…</div>
 <script src="/static/morphdom.js"></script><script src="/static/pay.js"></script>
 <script>
 function startReset(root) {
@@ -117,7 +117,7 @@ DC.mount(Component, { mobileLinks: false });
 
 // ---------- 404 ----------
 // one file for both themes: the class is set from the trader's saved theme before the page paints
-out('404.html', `${HEAD('Funded Sky: page not found', `<script>(function(){var t='';try{t=localStorage.getItem('fs_theme')||''}catch(e){}if(!t)t=(document.cookie.match(/(?:^|; )fs_theme=([^;]*)/)||[])[1]||(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark');if(t==='light')document.documentElement.className='lt'})();</script><style>${require('../server/policy').VARS}body{margin:0;background:var(--bg);color:var(--hd);font-family:"Mona Sans",system-ui;display:grid;place-items:center;min-height:100vh;text-align:center}a{color:var(--lk)}</style>`)}<body><div><p style="color:var(--mu);margin:0 0 8px">404</p><h1 style="margin:0 0 12px;font-size:28px">This page doesn't exist.</h1><p><a href="/app">Go to your dashboard</a> · <a href="/checkout">Buy an account</a></p></div></body></html>`);
+out('404.html', `${HEAD('Funded Sky: Page Not Found', `<script>(function(){var t='';try{t=localStorage.getItem('fs_theme')||''}catch(e){}if(!t)t=(document.cookie.match(/(?:^|; )fs_theme=([^;]*)/)||[])[1]||(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark');if(t==='light')document.documentElement.className='lt'})();</script><style>${require('../server/policy').VARS}body{margin:0;background:var(--bg);color:var(--hd);font-family:"Mona Sans",system-ui;line-height:1.6}main{max-width:720px;margin:0 auto;padding:56px 24px}${require('../server/policy').TOP_CSS}a{color:var(--lk)}</style>`)}<body><main>${require('../server/policy').TOP}<p style="color:var(--mu);margin:28px 0 4px">404</p><h1 style="margin:0 0 12px;font-size:28px;line-height:1.2">This Page Doesn't Exist.</h1><p style="margin:0"><a href="/app">Go to Your Dashboard</a> · <a href="/checkout">Buy an Account</a></p></main></body></html>`);
 
 // ---------- back office ----------
 if (fs.existsSync(path.join(__dirname, 'build-admin.js'))) require('./build-admin.js')({ SRC, DIST, HEAD, out, rd });

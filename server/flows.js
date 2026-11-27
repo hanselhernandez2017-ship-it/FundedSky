@@ -38,17 +38,17 @@ async function sumsubHook(req, res) {
 // (kv taxform.<user id>, never sent to the browser); only the last 4 of the tax number are shown back.
 async function taxSelf(user, b) {
   const formType = user.country === 'United States' ? 'W-9' : 'W-8BEN';
-  if (user.tax_status === 'on_file') bad('Your tax form is already on file');
-  const name = clean(b.name, 120); if (name.length < 3) bad('Enter your full legal name');
+  if (user.tax_status === 'on_file') bad('Your tax form is already on file.');
+  const name = clean(b.name, 120); if (name.length < 3) bad('Enter your full legal name.');
   const tin = clean(b.tin, 40).replace(/[\s-]/g, '');
-  if (formType === 'W-9' && !/^\d{9}$/.test(tin)) bad('Enter your 9-digit SSN or EIN');
-  if (formType === 'W-8BEN' && !/^[A-Za-z0-9]{4,30}$/.test(tin)) bad('Enter the tax number from your country of residence');
-  const address = clean(b.address, 200); if (address.length < 8) bad('Enter your full street address');
-  const crow = require('./phone').DIAL.find((x) => x[0].toLowerCase() === clean(b.country, 60).toLowerCase()); if (!crow) bad('Choose your country from the list');
+  if (formType === 'W-9' && !/^\d{9}$/.test(tin)) bad('Enter your 9-digit SSN or EIN.');
+  if (formType === 'W-8BEN' && !/^[A-Za-z0-9]{4,30}$/.test(tin)) bad('Enter the tax number from your country of residence.');
+  const address = clean(b.address, 200); if (address.length < 8) bad('Enter your full street address.');
+  const crow = require('./phone').DIAL.find((x) => x[0].toLowerCase() === clean(b.country, 60).toLowerCase()); if (!crow) bad('Choose your country from the list.');
   if (formType === 'W-9' && crow[0] !== 'United States') bad('A W-9 is for US persons. Contact support if you live outside the US.');
   if (formType === 'W-8BEN' && crow[0] === 'United States') bad('A W-8BEN is for people outside the US. Contact support if you live in the US.');
-  if (b.certify !== true) bad('Tick the box to confirm the form is correct');
-  if (clean(b.signature, 120).toLowerCase() !== name.toLowerCase()) bad('Type your full legal name to sign, exactly as above');
+  if (b.certify !== true) bad('Check the box to confirm the form is correct.');
+  if (clean(b.signature, 120).toLowerCase() !== name.toLowerCase()) bad('Type your full legal name to sign, exactly as above.');
   // The tax number and address are encrypted at rest (same key as wallet addresses); read them back with taxFormOf()
   const form = { formType, name, tin: I.enc(tin), tinLast4: tin.slice(-4), address: I.enc(address), country: crow[0], signedAt: new Date().toISOString() };
   await db.q('INSERT INTO kv(k,v) VALUES($1,$2) ON CONFLICT (k) DO UPDATE SET v=$2, updated_at=now()', ['taxform.' + user.id, JSON.stringify(form)]);

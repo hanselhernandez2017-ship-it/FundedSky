@@ -14,12 +14,12 @@ const liveCourses = (C) => (C.courses || []).filter((c) => c && c.status !== 'Dr
 // Tidy what the Content board saves. A course cannot be published without lessons.
 const NORM = {
   courses: (v, prev) => { const ids = new Set(); return v.map((c) => {
-    if (!c || typeof c !== 'object') bad('This content is not in the right shape', 400);
-    const id = clean(c.id, 40); if (!/^[A-Za-z0-9_-]+$/.test(id) || ids.has(id)) bad('Every course needs its own ID'); ids.add(id);
-    const n = clean(c.n, 80); if (!n) bad('Every course needs a name');
+    if (!c || typeof c !== 'object') bad('This content is not in the right shape.', 400);
+    const id = clean(c.id, 40); if (!/^[A-Za-z0-9_-]+$/.test(id) || ids.has(id)) bad('Every course needs its own ID.'); ids.add(id);
+    const n = clean(c.n, 80); if (!n) bad('Every course needs a name.');
     const l = Math.max(0, Math.min(60, parseInt(c.l, 10) || 0)); let status = c.status === 'Draft' ? 'Draft' : 'Published';
     // A course that was already live with no lessons (an old save) is taken down instead of blocking every other change
-    if (status === 'Published' && !l) { const p = (prev || []).find((x) => x && x.id === id); if (p && p.status !== 'Draft' && !(p.l > 0)) status = 'Draft'; else bad(`Add at least one lesson before you publish ${n}`); }
+    if (status === 'Published' && !l) { const p = (prev || []).find((x) => x && x.id === id); if (p && p.status !== 'Draft' && !(p.l > 0)) status = 'Draft'; else bad(`Add at least one lesson before you publish ${n}.`); }
     return { ...c, id, n, d: clean(c.d, 200), tag: clean(c.tag, 30) || 'Skills', l, min: Math.max(1, Math.min(600, parseInt(c.min, 10) || 10)), hue: Math.abs(parseInt(c.hue, 10) || 0) % 6, status };
   }); },
   lessons: (v) => Object.fromEntries(Object.entries(v).filter(([k, a]) => Array.isArray(a) && /^[A-Za-z0-9_-]{1,40}$/.test(k)).map(([k, a]) => [k, a.slice(0, 60).map(lessonOf)]))
@@ -41,22 +41,22 @@ function rewardDef(r) {
   return o;
 }
 async function checkRewards(list) {
-  if (!Array.isArray(list)) bad('This content is not in the right shape', 400); if (list.length > 40) bad('A catalog can hold up to 40 rewards');
+  if (!Array.isArray(list)) bad('This content is not in the right shape.', 400); if (list.length > 40) bad('A catalog can hold up to 40 rewards.');
   const cat = await require('./core').catalog(); const sizes = [...new Set([].concat(...cat.plans.filter((p) => p.active).map((p) => p.sizes.map((s) => Number(s.size)))))]; const seen = new Set();
   return list.map((r, i) => {
     const nm = String((r && r.n) || '').trim(); const at = nm ? `"${nm}"` : 'Reward ' + (i + 1);
-    if (!r || typeof r !== 'object' || !/^[a-z0-9_-]{1,24}$/i.test(String(r.id || ''))) bad(`${at}: the reward ID is missing or not valid`); if (seen.has(String(r.id))) bad(`${at}: two rewards share the same ID`); seen.add(String(r.id));
-    if (!nm || nm.length > 60) bad(`${at}: add a name of up to 60 characters`); if (String(r.d || '').length > 160) bad(`${at}: keep the description under 160 characters`);
-    if (!Number.isInteger(r.pts) || r.pts <= 0 || r.pts > 10000000) bad(`${at}: the cost must be a whole number of credits above zero`);
-    const type = r.type || (RW_LEGACY[r.id] || [])[0]; if (!RW_TYPES[type]) bad(`${at}: pick what the reward gives (discount, free reset, free account, split boost or merchandise)`);
+    if (!r || typeof r !== 'object' || !/^[a-z0-9_-]{1,24}$/i.test(String(r.id || ''))) bad(`${at}: the reward ID is missing or not valid.`); if (seen.has(String(r.id))) bad(`${at}: two rewards share the same ID.`); seen.add(String(r.id));
+    if (!nm || nm.length > 60) bad(`${at}: add a name of up to 60 characters.`); if (String(r.d || '').length > 160) bad(`${at}: keep the description under 160 characters.`);
+    if (!Number.isInteger(r.pts) || r.pts <= 0 || r.pts > 10000000) bad(`${at}: the cost must be a whole number of credits above zero.`);
+    const type = r.type || (RW_LEGACY[r.id] || [])[0]; if (!RW_TYPES[type]) bad(`${at}: pick what the reward gives (discount, free reset, free account, split boost or merchandise).`);
     const v = r.type ? r.value : RW_LEGACY[r.id][1];
-    if (type === 'discount' && !(Number.isInteger(v) && v >= 1 && v <= 100)) bad(`${at}: the discount must be a whole number from 1 to 100 percent`);
-    if (type === 'free_eval' && !sizes.includes(v)) bad(`${at}: pick an account size that is on sale (${sizes.sort((a, b) => a - b).map((z) => '$' + z / 1000 + 'K').join(', ')})`);
-    if (type === 'split' && !(Number.isInteger(v) && v >= 50 && v <= 100)) bad(`${at}: the payout split must be a whole number from 50 to 100 percent`);
+    if (type === 'discount' && !(Number.isInteger(v) && v >= 1 && v <= 100)) bad(`${at}: the discount must be a whole number from 1 to 100 percent.`);
+    if (type === 'free_eval' && !sizes.includes(v)) bad(`${at}: pick an account size that is on sale (${sizes.sort((a, b) => a - b).map((z) => '$' + z / 1000 + 'K').join(', ')}).`);
+    if (type === 'split' && !(Number.isInteger(v) && v >= 50 && v <= 100)) bad(`${at}: the payout split must be a whole number from 50 to 100 percent.`);
     return rewardDef(Object.assign({}, r, { type, value: v }));
   });
 }
-const checkEarn = (list) => { if (!Array.isArray(list) || list.length > 20 || !list.every((e) => Array.isArray(e) && e.length === 2 && e.every((x) => typeof x === 'string' && x.trim() && x.length <= 80))) bad('Ways to earn must be a list of an action and what it earns', 400); return list; };
+const checkEarn = (list) => { if (!Array.isArray(list) || list.length > 20 || !list.every((e) => Array.isArray(e) && e.length === 2 && e.every((x) => typeof x === 'string' && x.trim() && x.length <= 80))) bad('Ways to earn must be a list of an action and what it earns.', 400); return list; };
 let cache = null, at = 0;
 async function all() {
   if (cache && Date.now() - at < 20000) return cache;
@@ -68,7 +68,7 @@ async function set(key, value) {
   if (!(key in seed)) bad('Unknown content', 400);
   if (key === 'rewards') value = await checkRewards(value); if (key === 'earn') value = checkEarn(value);
   if (key === 'rewards') value = await checkRewards(value); if (key === 'earn') value = checkEarn(value);
-  if ((SHAPE[key] || ((v) => Array.isArray(seed[key]) ? Array.isArray(v) : v != null))(value) !== true) bad('This content is not in the right shape', 400);
+  if ((SHAPE[key] || ((v) => Array.isArray(seed[key]) ? Array.isArray(v) : v != null))(value) !== true) bad('This content is not in the right shape.', 400);
   if (NORM[key]) { cache = null; value = NORM[key](value, (await all())[key]); }
   await db.q('INSERT INTO kv(k,v,updated_at) VALUES($1,$2,now()) ON CONFLICT (k) DO UPDATE SET v=$2, updated_at=now()', ['content.' + key, JSON.stringify(value)]);
   cache = null;

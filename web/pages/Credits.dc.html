@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Funded Sky: buy credits</title>
+<title>Funded Sky: Buy Credits</title>
 <script src="./support.js"></script>
 </head>
 <body>
@@ -30,7 +30,9 @@ a{color:#7CC4FF}a:hover{color:#A9D8FF}
 .fs-bar{display:none}
 .fs-mprog{display:none}
 button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4FF;outline-offset:2px}
+@media (min-width:761px) and (max-width:1000px){.fs-secure{display:none!important}.fs-steps{gap:8px!important;white-space:nowrap}.fs-sep{width:24px!important}}
 @media (max-width: 760px){
+.fs-hdr>a:first-child{min-height:44px}
 .fs-steps,.fs-secure{display:none!important}
 .fs-hdr{padding:0 20px!important;height:64px;box-sizing:border-box}
 .fs-mprog{display:flex!important}
@@ -42,6 +44,8 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 .fs-cta{display:none!important}
 .fs-total{display:none!important}
 .fs-bar{display:flex!important}
+.fs-amtbtn{position:relative}.fs-amtbtn:after{content:'';position:absolute;inset:-4px -2px}
+.fs-bar a,.fs-aside a{position:relative}.fs-bar a:after,.fs-aside a:after{content:'';position:absolute;inset:-13px -8px}
 .fs-in{font-size:16px!important}
 .fs-main{flex-direction:column!important;flex-wrap:nowrap!important;align-items:stretch!important}
 .fs-col{display:contents!important}
@@ -49,7 +53,7 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 .fs-agree{order:2}
 }
 .fs-bgrid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
-.fs-tile{box-sizing:border-box;aspect-ratio:1/1;display:flex;flex-direction:column;gap:10px;border-radius:8px;padding:14px;cursor:pointer;min-width:0}
+.fs-tile{box-sizing:border-box;min-height:144px;display:flex;flex-direction:column;gap:10px;border-radius:8px;padding:14px;cursor:pointer;min-width:0}
 @media (max-width:1100px){.fs-bgrid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media (max-width:760px){.fs-bgrid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.fs-tile{aspect-ratio:auto;min-height:128px}.fs-bgrid>.fs-tile:last-child{grid-column:1 / -1;min-height:0}}
 .fs-amt{position:relative}
@@ -68,29 +72,27 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 <div class="fs-hdr" style="max-width: 1200px; width: 100%; box-sizing: border-box; margin: 0 auto; padding: 18px 32px; display: flex; align-items: center; justify-content: space-between; gap: 24px;">
 <a href="/" style="display: flex; align-items: center; gap: 6px; text-decoration: none;"><span style="font-weight: 700; font-size: 22px; letter-spacing: -0.045em; color: #F4F2F1; line-height: 1;">fundedsky</span><span style="background: #7CC4FF; color: #08080A; font-weight: 600; font-size: 15px; letter-spacing: -0.01em; padding: 2px 6px 3px; border-radius: 4px; line-height: 1;">futures</span></a>
 <ol class="fs-steps" style="display: flex; gap: 14px; align-items: center; list-style: none; margin: 0; padding: 0; font-size: 13px; color: #9C9693;" aria-label="Checkout steps">
-<li style="display: flex; align-items: center; gap: 8px; color: #D4CFCD;"><span style="width: 22px; height: 22px; border-radius: 11px; background: #26262A; color: #7CC4FF; display: flex; align-items: center; justify-content: center;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"></path></svg></span>Choose Credits</li>
-<li class="fs-sep" aria-hidden="true" style="width: 64px; height: 3px; border-radius: 2px; background: #26262A; overflow: hidden; align-self: center;"><i style="display: block; height: 100%; width: 100%; background: #7CC4FF; border-radius: 2px;"></i></li>
-<li style="display: flex; align-items: center; gap: 8px; color: #F4F2F1;" aria-current="step"><span style="width: 22px; height: 22px; border-radius: 11px; background: #7CC4FF; color: #08080A; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center;">2</span>Payment</li>
+<li style="display: flex; align-items: center; gap: 8px; color: #F4F2F1;" aria-current="step"><span style="width: 22px; height: 22px; border-radius: 11px; background: #7CC4FF; color: #08080A; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center;">1</span>Credits &amp; Payment</li>
 <li class="fs-sep" aria-hidden="true" style="width: 64px; height: 3px; border-radius: 2px; background: #26262A; overflow: hidden; align-self: center;"><i style="display: block; height: 100%; width: 34%; background: #7CC4FF; border-radius: 2px;"></i></li>
-<li style="display: flex; align-items: center; gap: 8px;"><span style="width: 22px; height: 22px; border-radius: 11px; border: 1px solid #3A3A40; font-size: 12px; display: flex; align-items: center; justify-content: center;">3</span>Open Packs</li>
+<li style="display: flex; align-items: center; gap: 8px;"><span style="width: 22px; height: 22px; border-radius: 11px; border: 1px solid #3A3A40; font-size: 12px; display: flex; align-items: center; justify-content: center;">2</span>Done</li>
 </ol>
 <div style="display: flex; align-items: center; gap: 20px;">
-<span style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #D4CFCD;"><span style="width: 32px; height: 32px; border-radius: 16px; background: #26262A; color: #F4F2F1; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center;">{{ ini }}</span><span class="fs-secure">{{ firstName }}</span></span>
+<span style="display: flex; align-items: center; gap: 8px; min-height: 44px; font-size: 13px; color: #D4CFCD;"><span style="width: 32px; height: 32px; border-radius: 16px; background: #26262A; color: #F4F2F1; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center;">{{ ini }}</span><span class="fs-secure">{{ firstName }}</span></span>
 <span style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: #9C9693;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg><span class="fs-secure">Secure Checkout</span></span>
 </div>
 </div>
 </header>
 
 <div class="fs-mprog" style="padding: 12px 20px 0; flex-direction: column; gap: 8px;">
-<div style="display: flex; justify-content: space-between; font-size: 12px; line-height: 16px; color: #9C9693;"><span>Payment</span><span style="font-family: 'Geist Mono', monospace;">2 / 3</span></div>
-<div style="height: 4px; border-radius: 2px; background: #26262A;"><div style="width: 66.67%; height: 4px; border-radius: 2px; background: #7CC4FF;"></div></div>
+<div style="display: flex; justify-content: space-between; font-size: 12px; line-height: 16px; color: #9C9693;"><span>Credits &amp; Payment</span><span style="font-family: 'Geist Mono', monospace;">1 / 2</span></div>
+<div style="height: 4px; border-radius: 2px; background: #26262A;"><div style="width: 50%; height: 4px; border-radius: 2px; background: #7CC4FF;"></div></div>
 </div>
 
 <main class="fs-main" style="max-width: 1200px; margin: 0 auto; padding: 40px 32px 64px; display: flex; flex-wrap: wrap; gap: 32px; align-items: flex-start; box-sizing: border-box;">
 
 <form class="fs-col" style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 32px;">
 <div style="display: flex; flex-direction: column; gap: 10px;">
-<p class="fs-steps" style="margin: 0; font-stretch: 125%; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: #9C9693; font-weight: 500;">Step 2 of 3</p>
+<p class="fs-steps" style="margin: 0; font-stretch: 125%; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: #9C9693; font-weight: 500;">Step 1 of 2</p>
 <h1 class="fs-h1" style="margin: 0; font-size: 44px; line-height: 48px; font-weight: 600; letter-spacing: -0.03em;">Buy Credits.</h1>
 <p class="fs-lead" style="margin: 0; font-size: 17px; line-height: 26px; color: #D4CFCD;">You have <span style="color: #F4F2F1; font-family: \'Geist Mono\', monospace;">{{ balTxt }}</span> credits. Credits pay for packs and never expire.</p>
 </div>
@@ -99,7 +101,7 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 <legend style="font-size: 18px; line-height: 24px; font-weight: 600; letter-spacing: -0.01em; margin-bottom: 14px; padding: 0;">How Many Credits</legend>
 <div class="fs-bgrid">
 <sc-for list="{{ bundles }}" as="b" hint-placeholder-count="5">
-<label class="fs-opt fs-tile" style="background: {{ b.bg }}; border: 1px solid {{ b.bd }};"><span style="display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 20px;"><input type="radio" class="fs-radio" name="bundle" checked="{{ b.on }}" onChange="{{ b.pick }}"><sc-if value="{{ b.hasTag }}" hint-placeholder-val="{{ false }}"><span style="background: #7CC4FF; color: #08080A; font-size: 10px; line-height: 1; font-weight: 600; font-stretch: 112%; padding: 4px 7px 5px; border-radius: 4px; white-space: nowrap;">{{ b.tag }}</span></sc-if></span><span style="margin-top: auto; display: flex; flex-direction: column; gap: 2px;"><span style="font-family: 'Geist Mono', monospace; font-size: 20px; line-height: 24px; font-weight: 500;">{{ b.big }}</span><span style="font-size: 13px; line-height: 18px; color: #9C9693;">{{ b.unit }}</span></span><span style="display: flex; flex-direction: column; gap: 2px; border-top: 1px solid #26262A; padding-top: 10px;"><span style="font-family: 'Geist Mono', monospace; font-size: 15px; line-height: 20px; white-space: nowrap;">{{ b.price }}</span><span style="font-size: 12px; line-height: 16px; color: #9C9693;">{{ b.sub }}</span></span></label>
+<label class="fs-opt fs-tile" style="background: {{ b.bg }}; border: 1px solid {{ b.bd }};"><span style="display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 20px;"><input type="radio" class="fs-radio" name="bundle" checked="{{ b.on }}" onChange="{{ b.pick }}"><sc-if value="{{ b.hasTag }}" hint-placeholder-val="{{ false }}"><span style="background: #7CC4FF; color: #08080A; font-size: 10px; line-height: 1; font-weight: 600; font-stretch: 112%; padding: 4px 7px 5px; border-radius: 4px; white-space: nowrap;">{{ b.tag }}</span></sc-if></span><span style="display: flex; flex-direction: column; gap: 2px;"><span style="font-family: 'Geist Mono', monospace; font-size: 20px; line-height: 24px; font-weight: 500;">{{ b.big }}</span><span style="font-size: 13px; line-height: 18px; color: #9C9693;">{{ b.unit }}</span></span><span style="display: flex; flex-direction: column; gap: 2px; border-top: 1px solid #26262A; padding-top: 10px;"><span style="font-family: 'Geist Mono', monospace; font-size: 15px; line-height: 20px; white-space: nowrap;">{{ b.price }}</span><span style="font-size: 12px; line-height: 16px; color: #9C9693;">{{ b.sub }}</span></span></label>
 </sc-for>
 </div>
 <sc-if value="{{ custom }}" hint-placeholder-val="{{ false }}">
@@ -130,7 +132,7 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 </sc-if>
 </fieldset>
 
-<label class="fs-agree" style="display: flex; gap: 12px; align-items: flex-start; font-size: 14px; line-height: 20px; color: #D4CFCD; cursor: pointer;"><input type="checkbox" class="fs-check" checked="{{ agreed }}" onChange="{{ toggleAgree }}"><span>I've read the <a href="/checkout#order">Trading Rules</a> and agree to the <a href="/terms" target="_blank">Terms</a> and <a href="/refund-policy" target="_blank">Refund Policy</a>.</span></label>
+<label class="fs-agree" style="display: flex; gap: 12px; align-items: flex-start; font-size: 14px; line-height: 20px; color: #D4CFCD; cursor: pointer;"><input type="checkbox" class="fs-check" checked="{{ agreed }}" onChange="{{ toggleAgree }}"><span>I've read the <a href="/rules" target="_blank">Trading Rules</a> and agree to the <a href="/terms" target="_blank">Terms</a> and <a href="/refund-policy" target="_blank">Refund Policy</a>.</span></label>
 </form>
 
 <aside class="fs-aside" style="flex: 1 1 340px; min-width: 0; position: sticky; top: 24px; background: #18181A; border: 1px solid #26262A; border-radius: 8px; padding: 24px; box-sizing: border-box; display: flex; flex-direction: column; gap: 18px;">
@@ -143,12 +145,12 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 <a href="{{ backHref }}" style="font-size: 13px;">Back</a>
 </div>
 <div style="display: flex; flex-direction: column; gap: 8px; font-size: 14px; border-top: 1px solid #26262A; padding-top: 16px;">
-<sc-for list="{{ lines }}" as="l"><div style="display: flex; justify-content: space-between; gap: 12px; color: {{ l.color }};"><span>{{ l.label }}</span><span style="font-family: 'Geist Mono', monospace; white-space: nowrap;">{{ l.amount }}</span></div></sc-for>
+<sc-for list="{{ lines }}" as="l"><div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px; color: {{ l.color }};"><span>{{ l.label }}</span><span style="font-family: 'Geist Mono', monospace; white-space: nowrap;">{{ l.amount }}</span></div></sc-for>
 <div class="fs-total" style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 6px;"><span style="font-size: 16px; font-weight: 600;">Total Today</span><span style="font-family: 'Geist Mono', monospace; font-size: 26px; font-weight: 500;">{{ total }}</span></div>
 </div>
 <div class="fs-cta" style="display: flex; flex-direction: column; gap: 8px;">
 <sc-if value="{{ agreed }}" hint-placeholder-val="{{ true }}"><button type="button" onClick="{{ submit }}" disabled="{{ busy }}" style="width: 100%; border: 0; cursor: pointer; font: inherit; text-align: center; background: #FFFFFF; color: #111113; border-radius: 4px; padding: 14px; font-size: 15px; font-weight: 600; font-stretch: 112%; text-decoration: none;">{{ payLabel }}</button></sc-if>
-<sc-if value="{{ notAgreed }}" hint-placeholder-val="{{ false }}"><button type="button" disabled style="width: 100%; background: #26262A; color: #9C9693; border: 0; border-radius: 4px; padding: 14px; font: inherit; font-size: 15px; font-weight: 600; font-stretch: 112%;">{{ payLabel0 }}</button><p style="margin: 0; font-size: 12px; color: #9C9693; text-align: center;">Tick the box to agree to the rules and terms first.</p></sc-if>
+<sc-if value="{{ notAgreed }}" hint-placeholder-val="{{ false }}"><button type="button" disabled style="width: 100%; background: #26262A; color: #9C9693; border: 0; border-radius: 4px; padding: 14px; font: inherit; font-size: 15px; font-weight: 600; font-stretch: 112%;">{{ payLabel0 }}</button><p style="margin: 0; font-size: 12px; color: #9C9693; text-align: center;">Check the box to agree to the rules and terms first.</p></sc-if>
 <sc-if value="{{ err }}"><p role="alert" style="margin: 10px 0 0; font-size: 13.5px; line-height: 19px; color: #F2777F;">{{ err }}</p></sc-if><sc-if value="{{ fallback }}"><button type="button" onClick="{{ payBackup }}" style="width: 100%; margin-top: 10px; background: transparent; color: #F4F2F1; border: 1px solid #3A3A40; border-radius: 4px; padding: 13px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;">Pay With Backup Processor</button></sc-if></div>
 <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; font-size: 13px; color: #9C9693; border-top: 1px solid #26262A; padding-top: 16px;">
 <li style="display: flex; gap: 10px; align-items: flex-start; line-height: 18px;"><svg style="flex: none; margin-top: 1px;" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7CC4FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"></path></svg>{{ trust1 }}</li>
@@ -240,7 +242,7 @@ class Component extends DCLogic {
     const tiers = C.bundles.filter((b) => b.bonus).map((b) => `${usd(b.usd)} for ${b.bonus}%`);
     const price = k.bad ? '—' : usd(k.usd);
     const lines = [{ label: fmt(k.base) + ' Credits', amount: price, color: '#D4CFCD' }];
-    if (k.cr > k.base) lines.push({ label: `Bundle Bonus (${k.bonus}%)`, amount: '+' + fmt(k.cr - k.base), color: '#5FD39B' });
+    if (k.cr > k.base) lines.push({ label: `${st.custom ? 'Bonus' : 'Bundle Bonus'} (${k.bonus}%)`, amount: '+' + fmt(k.cr - k.base), color: '#5FD39B' });
     if (cryptoCr) lines.push({ label: `Crypto Bonus (${C.cryptoBonus}%)`, amount: '+' + fmt(cryptoCr), color: '#5FD39B' });
     if (k.bad) lines.length = 0;
     lines.push({ label: 'Balance After', amount: fmt(st.bal + (k.bad ? 0 : total)) + ' credits', color: '#9C9693' });

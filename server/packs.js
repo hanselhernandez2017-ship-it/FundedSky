@@ -16,8 +16,8 @@ const DEF = {
   packs: [
     { id: 'takeoff', name: 'Scalper Pack', short: 'Scalper', price: 2500, tag: 'The everyday pack. Discounts and day skips, with a shot at a free reset.', odds: [60, 30, 7.5, 2, 0.45, 0.05], g: 'Any rarity', on: true, limit: 0 },
     { id: 'climb', name: 'Day Trader Pack', short: 'Day Trader', price: 5000, tag: 'One card in seven is Rare or better. Rule removals start to show up.', odds: [50, 35, 11, 3, 0.85, 0.15], g: 'Any rarity', on: true, limit: 0 },
-    { id: 'jet', name: 'Swing Pack', short: 'Swing', price: 9000, tag: 'Free 25K evaluations and split boosts live here.', odds: [42, 36, 15, 5, 1.6, 0.4], g: 'Any rarity', on: true, limit: 0 },
-    { id: 'strato', name: 'Sniper Pack', short: 'Sniper', price: 12500, tag: 'No Common cards. Free 50K evaluations show up.', odds: [0, 62, 28, 7, 2.2, 0.8], g: 'Uncommon or better on all three', on: true, limit: 0 },
+    { id: 'jet', name: 'Swing Pack', short: 'Swing', price: 9000, tag: 'Free $25K evaluations and split boosts live here.', odds: [42, 36, 15, 5, 1.6, 0.4], g: 'Any rarity', on: true, limit: 0 },
+    { id: 'strato', name: 'Sniper Pack', short: 'Sniper', price: 12500, tag: 'No Common cards. Free $50K evaluations show up.', odds: [0, 62, 28, 7, 2.2, 0.8], g: 'Uncommon or better on all three', on: true, limit: 0 },
     { id: 'orbit', name: 'Mastermind Pack', short: 'Mastermind', price: 15000, tag: 'Rare or better on every card, and the best Mythic odds.', odds: [0, 0, 80, 14, 4.5, 1.5], g: 'Rare or better on all three', on: true, limit: 0 }
   ],
   // fx: what the card does. on: which accounts it can go on.
@@ -32,11 +32,11 @@ const DEF = {
     { id: 'rreset', r: 'Rare', kind: 'Evaluation', big: 'Reset', name: 'Free Reset', desc: 'One free reset on a failed evaluation.', uses: '1 use', on: 'failed', fx: { t: 'reset' }, active: true, cost: 8 },
     { id: 'r15', r: 'Rare', kind: 'Checkout', big: '15%', name: 'Extra 15% Off', desc: 'Fifteen percent off your next purchase.', uses: '1 use', on: 'checkout', fx: { t: 'coupon', pct: 15 }, active: true, cost: 2 },
     { id: 'rcons', r: 'Rare', kind: 'Funded', big: 'No Rule', name: 'Skip Consistency Once', desc: 'No consistency check on your next payout.', uses: '1 payout', on: 'funded', fx: { t: 'payCons' }, active: true, cost: 6 },
-    { id: 'e25', r: 'Epic', kind: 'New Account', big: 'Free 25K', name: 'Free 25K Essential', desc: 'A $25K Essential evaluation, opened at no cost.', uses: '1 use', on: 'new', fx: { t: 'account', plan: 'essential', size: 25000 }, active: true, cost: 12 },
+    { id: 'e25', r: 'Epic', kind: 'New Account', big: 'Free $25K', name: 'Free $25K Essential', desc: 'A $25K Essential evaluation, opened at no cost.', uses: '1 use', on: 'new', fx: { t: 'account', plan: 'essential', size: 25000 }, active: true, cost: 12 },
     { id: 'esplit', r: 'Epic', kind: 'Funded', big: '+5%', name: 'Split Boost', desc: '5% more profit split on one funded account, for good.', uses: 'Permanent', on: 'funded', fx: { t: 'split', add: 5 }, active: true, cost: 15 },
-    { id: 'l50', r: 'Legendary', kind: 'New Account', big: 'Free 50K', name: 'Free 50K Prime', desc: 'A $50K Prime evaluation, opened at no cost.', uses: '1 use', on: 'new', fx: { t: 'account', plan: 'prime', size: 50000 }, active: true, cost: 20 },
+    { id: 'l50', r: 'Legendary', kind: 'New Account', big: 'Free $50K', name: 'Free $50K Prime', desc: 'A $50K Prime evaluation, opened at no cost.', uses: '1 use', on: 'new', fx: { t: 'account', plan: 'prime', size: 50000 }, active: true, cost: 20 },
     { id: 'l100', r: 'Legendary', kind: 'Funded', big: '100%', name: 'Full Split', desc: 'You keep 100% of profits on one funded account, for good.', uses: 'Permanent', on: 'funded', fx: { t: 'split', to: 100 }, active: true, cost: 40 },
-    { id: 'm150', r: 'Mythic', kind: 'New Account', big: 'Free 150K', name: 'Free 150K Prime', desc: 'A $150K Prime evaluation, opened at no cost.', uses: '1 use', on: 'new', fx: { t: 'account', plan: 'prime', size: 150000 }, active: true, cost: 45 },
+    { id: 'm150', r: 'Mythic', kind: 'New Account', big: 'Free $150K', name: 'Free $150K Prime', desc: 'A $150K Prime evaluation, opened at no cost.', uses: '1 use', on: 'new', fx: { t: 'account', plan: 'prime', size: 150000 }, active: true, cost: 45 },
     { id: 'mcash', r: 'Mythic', kind: 'Funded', big: '+$1,000', name: '$1,000 Balance Card', desc: 'Adds $1,000 to a funded account balance.', uses: '1 use', on: 'funded', fx: { t: 'balance', amt: 1000 }, active: true, cost: 900 }
   ],
   bundles: [
@@ -93,52 +93,52 @@ async function config(force) {
 // Settings are checked as they were sent: a bad value is refused with its reason, never quietly changed to something else
 function checkInput(v, before) {
   const N = strictNum; const whole = (x) => Number.isInteger(N(x));
-  if (!v || typeof v !== 'object' || Array.isArray(v)) bad('Send the pack settings');
+  if (!v || typeof v !== 'object' || Array.isArray(v)) bad('Send the pack settings.');
   if (v.packs !== undefined) {
-    if (!Array.isArray(v.packs)) bad('Packs must be a list');
-    v.packs.forEach((p) => { const nm = clean((p && (p.name || p.id)) || 'A pack', 60); if (!p || typeof p !== 'object' || !p.id) bad('Every pack needs an id');
-      if (p.price !== undefined && !(whole(p.price) && N(p.price) >= 1 && N(p.price) <= 10000000)) bad(`${nm}: the price must be a whole number of credits, 1 or more`);
-      if (p.limit !== undefined && !(whole(p.limit) && N(p.limit) >= 0)) bad(`${nm}: the daily limit must be a whole number, 0 for no limit`);
-      if (p.odds !== undefined) { if (!Array.isArray(p.odds) || p.odds.length !== 6) bad(`${nm}: send six odds, one for each rarity from Common to Mythic`); p.odds.forEach((x, i) => { if (!(N(x) >= 0 && N(x) <= 100)) bad(`${nm}: the ${RN[i]} odds must be a number from 0 to 100`); }); }
-      if (p.gmin !== undefined && p.gmin !== null && !(whole(p.gmin) && N(p.gmin) >= 0 && N(p.gmin) <= 5)) bad(`${nm}: pick the guarantee from the list`);
+    if (!Array.isArray(v.packs)) bad('Packs must be a list.');
+    v.packs.forEach((p) => { const nm = clean((p && (p.name || p.id)) || 'A pack', 60); if (!p || typeof p !== 'object' || !p.id) bad('Every pack needs an id.');
+      if (p.price !== undefined && !(whole(p.price) && N(p.price) >= 1 && N(p.price) <= 10000000)) bad(`${nm}: the price must be a whole number of credits, 1 or more.`);
+      if (p.limit !== undefined && !(whole(p.limit) && N(p.limit) >= 0)) bad(`${nm}: the daily limit must be a whole number, 0 for no limit.`);
+      if (p.odds !== undefined) { if (!Array.isArray(p.odds) || p.odds.length !== 6) bad(`${nm}: send six odds, one for each rarity from Common to Mythic.`); p.odds.forEach((x, i) => { if (!(N(x) >= 0 && N(x) <= 100)) bad(`${nm}: the ${RN[i]} odds must be a number from 0 to 100.`); }); }
+      if (p.gmin !== undefined && p.gmin !== null && !(whole(p.gmin) && N(p.gmin) >= 0 && N(p.gmin) <= 5)) bad(`${nm}: pick the guarantee from the list.`);
       // odds may not break the guarantee the pack states (the one sent, or the one it already has)
       const b = before.packs.find((x) => x.id === p.id); const odds = Array.isArray(p.odds) ? p.odds.map(Number) : b ? b.odds : null; const stated = p.gmin != null ? N(p.gmin) : b ? b.gmin : null;
       if (odds && stated != null) for (let i = 0; i < stated; i++) if (odds[i] > 0) bad(`${nm} promises "${gText(stated)}", but ${RN[i]} is at ${odds[i]}%. Set it to 0% or change the guarantee first.`);
     });
   }
   if (v.cards !== undefined) {
-    if (!Array.isArray(v.cards)) bad('Cards must be a list');
-    v.cards.forEach((c) => { if (!c || typeof c !== 'object' || !c.id) bad('Every card needs an id'); const nm = clean(c.name || c.id, 60); const fx = c.fx;
-      if (c.cost !== undefined && !(N(c.cost) >= 0)) bad(`${nm}: the cost must be 0 or more`);
-      if (fx === undefined) return; if (!fx || typeof fx !== 'object' || !fx.t) bad(`${nm}: pick what the card does`);
+    if (!Array.isArray(v.cards)) bad('Cards must be a list.');
+    v.cards.forEach((c) => { if (!c || typeof c !== 'object' || !c.id) bad('Every card needs an id.'); const nm = clean(c.name || c.id, 60); const fx = c.fx;
+      if (c.cost !== undefined && !(N(c.cost) >= 0)) bad(`${nm}: the cost must be 0 or more.`);
+      if (fx === undefined) return; if (!fx || typeof fx !== 'object' || !fx.t) bad(`${nm}: pick what the card does.`);
       const rng = (x, lo, hi) => N(x) >= lo && N(x) <= hi;
-      if (['coupon', 'resetCoupon'].includes(fx.t) && !rng(fx.pct, 1, 100)) bad(`${nm}: the discount must be from 1% to 100%`);
-      if (fx.t === 'minDays' && !(whole(fx.n) && rng(fx.n, 1, 30))) bad(`${nm}: days cut must be a whole number from 1 to 30`);
-      if (['news', 'idle'].includes(fx.t) && !(whole(fx.days) && rng(fx.days, 1, 365))) bad(`${nm}: days must be a whole number from 1 to 365`);
-      if (fx.t === 'split' && !(fx.to != null ? rng(fx.to, 1, 100) : rng(fx.add, 1, 100))) bad(`${nm}: the split must be from 1% to 100%`);
-      if (fx.t === 'balance' && !rng(fx.amt, 1, 1000000)) bad(`${nm}: the amount must be $1 or more`);
-      if (fx.t === 'account' && !(fx.plan && N(fx.size) > 0)) bad(`${nm}: pick the plan and size of the free account`);
+      if (['coupon', 'resetCoupon'].includes(fx.t) && !rng(fx.pct, 1, 100)) bad(`${nm}: the discount must be from 1% to 100%.`);
+      if (fx.t === 'minDays' && !(whole(fx.n) && rng(fx.n, 1, 30))) bad(`${nm}: days cut must be a whole number from 1 to 30.`);
+      if (['news', 'idle'].includes(fx.t) && !(whole(fx.days) && rng(fx.days, 1, 365))) bad(`${nm}: days must be a whole number from 1 to 365.`);
+      if (fx.t === 'split' && !(fx.to != null ? rng(fx.to, 1, 100) : rng(fx.add, 1, 100))) bad(`${nm}: the split must be from 1% to 100%.`);
+      if (fx.t === 'balance' && !rng(fx.amt, 1, 1000000)) bad(`${nm}: the amount must be $1 or more.`);
+      if (fx.t === 'account' && !(fx.plan && N(fx.size) > 0)) bad(`${nm}: pick the plan and size of the free account.`);
     });
   }
   if (v.bundles !== undefined) {
-    if (!Array.isArray(v.bundles)) bad('Bundles must be a list');
-    v.bundles.forEach((b, i) => { const nm = `Bundle ${i + 1}`; if (!b || typeof b !== 'object') bad(`${nm} is not valid`);
-      if (!(N(b.usd) >= 1 && N(b.usd) <= 100000)) bad(`${nm}: the price must be $1 or more`);
-      if (!(whole(b.cr) && N(b.cr) >= 1)) bad(`${nm}: credits must be a whole number, 1 or more`);
-      if (b.bonus !== undefined && !(N(b.bonus) >= 0 && N(b.bonus) <= 500)) bad(`${nm}: the bonus must be from 0% to 500%`); });
+    if (!Array.isArray(v.bundles)) bad('Bundles must be a list.');
+    v.bundles.forEach((b, i) => { const nm = `Bundle ${i + 1}`; if (!b || typeof b !== 'object') bad(`${nm} is not valid.`);
+      if (!(N(b.usd) >= 1 && N(b.usd) <= 100000)) bad(`${nm}: the price must be $1 or more.`);
+      if (!(whole(b.cr) && N(b.cr) >= 1)) bad(`${nm}: credits must be a whole number, 1 or more.`);
+      if (b.bonus !== undefined && !(N(b.bonus) >= 0 && N(b.bonus) <= 500)) bad(`${nm}: the bonus must be from 0% to 500%.`); });
   }
   if (v.ladder !== undefined && v.ladder !== null) {
-    if (typeof v.ladder !== 'object') bad('Checkout rewards are not valid');
-    if (v.ladder.tiers !== undefined) { if (!Array.isArray(v.ladder.tiers)) bad('Checkout reward steps must be a list');
-      v.ladder.tiers.forEach((t) => { if (!t || !(whole(t.n) && N(t.n) >= 1)) bad('Checkout rewards: the number of accounts must be a whole number, 1 or more'); if (t.credits !== undefined && !(whole(t.credits) && N(t.credits) >= 0)) bad('Checkout rewards: credits must be a whole number, 0 or more'); if (t.packs !== undefined && !Array.isArray(t.packs)) bad('Checkout rewards: packs must be a list'); }); }
+    if (typeof v.ladder !== 'object') bad('Checkout rewards are not valid.');
+    if (v.ladder.tiers !== undefined) { if (!Array.isArray(v.ladder.tiers)) bad('Checkout reward steps must be a list.');
+      v.ladder.tiers.forEach((t) => { if (!t || !(whole(t.n) && N(t.n) >= 1)) bad('Checkout rewards: the number of accounts must be a whole number, 1 or more.'); if (t.credits !== undefined && !(whole(t.credits) && N(t.credits) >= 0)) bad('Checkout rewards: credits must be a whole number, 0 or more.'); if (t.packs !== undefined && !Array.isArray(t.packs)) bad('Checkout rewards: packs must be a list.'); }); }
   }
   if (v.rules !== undefined && v.rules !== null) {
-    const R = v.rules; if (typeof R !== 'object') bad('Credit rules are not valid');
-    if (R.perDollar !== undefined && !(whole(R.perDollar) && N(R.perDollar) >= 1)) bad('Credits per dollar must be a whole number, 1 or more');
-    if (R.cryptoBonus !== undefined && !(N(R.cryptoBonus) >= 0 && N(R.cryptoBonus) <= 100)) bad('The crypto bonus must be from 0% to 100%');
-    if (R.dailyCap !== undefined && !(whole(R.dailyCap) && N(R.dailyCap) >= 0)) bad('The daily limit must be a whole number of credits, 0 for no limit');
+    const R = v.rules; if (typeof R !== 'object') bad('Credit rules are not valid.');
+    if (R.perDollar !== undefined && !(whole(R.perDollar) && N(R.perDollar) >= 1)) bad('Credits per dollar must be a whole number, 1 or more.');
+    if (R.cryptoBonus !== undefined && !(N(R.cryptoBonus) >= 0 && N(R.cryptoBonus) <= 100)) bad('The crypto bonus must be from 0% to 100%.');
+    if (R.dailyCap !== undefined && !(whole(R.dailyCap) && N(R.dailyCap) >= 0)) bad('The daily limit must be a whole number of credits, 0 for no limit.');
     if (R.custom !== undefined && R.custom !== null) { const cu = Object.assign({}, before.rules.custom, R.custom);
-      if (!(N(cu.min) >= 1)) bad('The smallest custom amount must be $1 or more'); if (!(N(cu.max) >= N(cu.min))) bad(`The largest custom amount ($${cu.max}) must not be below the smallest ($${cu.min})`); }
+      if (!(N(cu.min) >= 1)) bad('The smallest custom amount must be $1 or more.'); if (!(N(cu.max) >= N(cu.min))) bad(`The largest custom amount ($${cu.max}) must not be below the smallest ($${cu.min}).`); }
   }
 }
 // What changed, for the audit trail: one line per setting with the old and the new value
@@ -156,20 +156,37 @@ async function saveConfig(v, actorId) {
   const next = normalize(v);
   // a pack whose odds or price changed gets a new version; packs already bought keep the odds they were sold with
   next.packs.forEach((p) => { const b = before.packs.find((x) => x.id === p.id); if (b) p.ver = b.ver + (JSON.stringify(b.odds) !== JSON.stringify(p.odds) || b.price !== p.price ? 1 : 0); });
-  next.packs.forEach((p) => { const s = p.odds.reduce((a, b) => a + b, 0); if (Math.abs(s - 100) > 0.01) bad(`${p.name}: the odds add up to ${round2(s)}%, not 100%`); });
-  if (!next.packs.length) bad('Keep at least one pack');
-  for (const p of next.packs) for (let i = 0; i < 6; i++) if (p.odds[i] > 0 && !next.cards.some((c) => c.active && c.r === RN[i])) bad(`${p.name} can draw ${RN[i]} cards, but no ${RN[i]} card is active`);
+  next.packs.forEach((p) => { const s = p.odds.reduce((a, b) => a + b, 0); if (Math.abs(s - 100) > 0.01) bad(`${p.name}: the odds add up to ${round2(s)}%, not 100%.`); });
+  if (!next.packs.length) bad('Keep at least one pack.');
+  for (const p of next.packs) for (let i = 0; i < 6; i++) if (p.odds[i] > 0 && !next.cards.some((c) => c.active && c.r === RN[i])) bad(`${p.name} can draw ${RN[i]} cards, but no ${RN[i]} card is active.`);
   await db.q('INSERT INTO kv(k,v) VALUES($1,$2) ON CONFLICT (k) DO UPDATE SET v=$2, updated_at=now()', [KEY, JSON.stringify(next)]);
   const ch = changes(before, next);
   cache = null; await core.audit(actorId, 'packs.config', 'packs', { changed: ch.length, changes: ch.slice(0, 60) });
   return config(true);
+}
+// One-time: free-account card names, their card art text and pack blurbs read "$25K" like every other size ("Free 25K Essential" -> "Free $25K Essential").
+// Only text still reading "Free 25K…" on the built-in free-account cards and pack blurbs changes, and a flag makes it run once.
+async function migrateDollarNames() {
+  if (await db.one("SELECT 1 FROM kv WHERE k='mig.packs.dollar'")) return;
+  const fix = (s) => String(s).replace(/\bFree (\d+K)\b/g, 'Free $$$1');
+  const r = await db.one('SELECT v FROM kv WHERE k=$1', [KEY]);
+  if (r && r.v) { const v = r.v; let n = 0;
+    (v.cards || []).forEach((c) => { if (c && DEF.cards.some((d) => d.id === c.id && d.fx.t === 'account')) ['name', 'big'].forEach((k) => { if (typeof c[k] === 'string' && fix(c[k]) !== c[k]) { c[k] = fix(c[k]); n++; } }); });
+    (v.packs || []).forEach((p) => { if (p && typeof p.tag === 'string' && /^(Free 25K evaluations and split boosts live here\.|No Common cards\. Free 50K evaluations show up\.)$/.test(p.tag)) { p.tag = fix(p.tag); n++; } });
+    if (n) { await db.q('UPDATE kv SET v=$2 WHERE k=$1', [KEY, JSON.stringify(v)]); cache = null; } }
+  // the cards traders already hold keep a copy of the card as drawn; history lines and saved codes name them too
+  await db.q("UPDATE user_cards SET data = data || jsonb_build_object('name', regexp_replace(data->>'name', '^Free ([0-9]+K)', 'Free $\\1')) WHERE data->>'name' ~ '^Free [0-9]+K'");
+  await db.q("UPDATE user_cards SET data = data || jsonb_build_object('big', regexp_replace(data->>'big', '^Free ([0-9]+K)', 'Free $\\1')) WHERE data->>'big' ~ '^Free [0-9]+K'");
+  await db.q("UPDATE points_log SET label = regexp_replace(label, 'Free ([0-9]+K) (Essential|Prime)', 'Free $\\1 \\2', 'g') WHERE label ~ 'Free [0-9]+K (Essential|Prime)'");
+  await db.q("UPDATE coupons SET label = regexp_replace(label, 'Free ([0-9]+K) (Essential|Prime)', 'Free $\\1 \\2', 'g') WHERE label ~ 'Free [0-9]+K (Essential|Prime)'");
+  await db.q("INSERT INTO kv(k,v) VALUES('mig.packs.dollar','true'::jsonb) ON CONFLICT (k) DO NOTHING");
 }
 async function enabled() { const f = ((await db.one("SELECT v FROM kv WHERE k='settings.flags'")) || {}).v || {}; return f.packs !== false; }
 async function setEnabled(on, actorId) {
   await db.q("INSERT INTO kv(k,v) VALUES('settings.flags', $1) ON CONFLICT (k) DO UPDATE SET v = kv.v || $1, updated_at=now()", [JSON.stringify({ packs: !!on })]);
   await core.audit(actorId, on ? 'packs.on' : 'packs.off', 'packs', {});
 }
-async function need() { if (!(await enabled())) bad('Packs are switched off right now', 403); }
+async function need() { if (!(await enabled())) bad('Packs are switched off right now.', 403); }
 
 // ---------- ledger ----------
 // Every credit movement goes through here so the balance and the ledger never drift apart.
@@ -217,7 +234,7 @@ const hidden = (x) => x.status === 'ready' && !x.revealed_at;
 async function buy(user, packId) {
   await require('./payments').maintGuard();
   await need(); const cfg = await config(); const p = cfg.packs.find((x) => x.id === packId && x.on);
-  if (!p) bad('That pack is not on sale');
+  if (!p) bad('That pack is not on sale.');
   return db.tx(async (c) => {
     if (p.limit) { const n = (await c.one("SELECT count(*)::int n FROM user_packs WHERE user_id=$1 AND pack=$2 AND source='bought' AND created_at >= date_trunc('day', now())", [user.id, p.id])).n; if (n >= p.limit) bad(`You can open up to ${p.limit} ${p.name}${p.limit === 1 ? '' : 's'} a day. Come back tomorrow.`); }
     await credit(c, user.id, -p.price, 'Opened ' + p.name, 'spent', p.id);
@@ -233,11 +250,11 @@ async function openOwned(user, id) {
   return db.tx(async (c) => {
     if (id != null && rowId(id) == null) bad('Pack not found', 404);
     const row = id != null ? await c.one("SELECT * FROM user_packs WHERE id=$1 AND user_id=$2 FOR UPDATE", [rowId(id), user.id]) : await c.one("SELECT * FROM user_packs WHERE user_id=$1 AND status='unopened' ORDER BY id LIMIT 1 FOR UPDATE", [user.id]);
-    if (!row) bad('Pack not found', 404); if (row.status === 'revoked') bad('This pack was removed' + (row.note ? ': ' + row.note.charAt(0).toLowerCase() + row.note.slice(1) : ''));
+    if (!row) bad('Pack not found', 404); if (row.status === 'revoked') bad('This pack was removed' + (row.note ? ': ' + row.note.charAt(0).toLowerCase() + row.note.slice(1).replace(/\.$/, '') : '') + '.');
     if (row.status !== 'unopened') {
       // opened before but not every card was flipped: carry on with the same cards, never a new draw
       const mine = (await c.all('SELECT * FROM user_cards WHERE pack_id=$1 AND user_id=$2 ORDER BY id', [row.id, user.id])).filter((x) => x.status !== 'revoked');
-      if (!mine.some(hidden)) bad('This pack has already been opened');
+      if (!mine.some(hidden)) bad('This pack has already been opened.');
       return { pack: row.id, cards: mine.map(seen), left: mine.filter(hidden).length, resumed: true };
     }
     const cards = await openPack(c, user.id, row, cfg);
@@ -252,13 +269,13 @@ async function reveal(user, by) {
   if (by.card != null && cardId == null) bad('Card not found', 404); if (by.card == null && packId == null) bad('Pack not found', 404);
   return db.tx(async (c) => {
     let pid = packId;
-    if (cardId != null) { const x = await c.one('SELECT * FROM user_cards WHERE id=$1 AND user_id=$2', [cardId, user.id]); if (!x) bad('Card not found', 404); if (x.status === 'revoked') bad('This card was removed');
+    if (cardId != null) { const x = await c.one('SELECT * FROM user_cards WHERE id=$1 AND user_id=$2', [cardId, user.id]); if (!x) bad('Card not found', 404); if (x.status === 'revoked') bad('This card was removed.');
       if (x.pack_id == null) return { card: seen(x), cards: [seen(x)], left: 0 }; pid = x.pack_id; }
     // the pack row is the lock: two flips at once wait for each other
     const p = await c.one('SELECT * FROM user_packs WHERE id=$1 AND user_id=$2 FOR UPDATE', [pid, user.id]); if (!p) bad('Pack not found', 404);
     const rows = await c.all('SELECT * FROM user_cards WHERE pack_id=$1 AND user_id=$2 ORDER BY id FOR UPDATE', [p.id, user.id]);
-    const one = cardId != null ? rows.find((x) => x.id === cardId) : null; if (cardId != null && (!one || one.status === 'revoked')) bad('This card was removed');
-    const live = rows.filter((x) => x.status !== 'revoked'); if (!live.length) bad(p.status === 'unopened' ? 'Open this pack first' : 'This pack was removed');
+    const one = cardId != null ? rows.find((x) => x.id === cardId) : null; if (cardId != null && (!one || one.status === 'revoked')) bad('This card was removed.');
+    const live = rows.filter((x) => x.status !== 'revoked'); if (!live.length) bad(p.status === 'unopened' ? 'Open this pack first.' : 'This pack was removed.');
     const fresh = (one ? [one] : live).filter(hidden);
     if (fresh.length) {
       const at = (await c.one('UPDATE user_cards SET revealed_at=now() WHERE id = ANY($1) RETURNING revealed_at', [fresh.map((x) => x.id)])).revealed_at; fresh.forEach((x) => { x.revealed_at = at; });
@@ -286,7 +303,7 @@ async function useCard(user, cardUid, body) {
   await need(); if (rowId(cardUid) == null) bad('Card not found', 404);
   return db.tx(async (c) => {
     const uc = await c.one('SELECT * FROM user_cards WHERE id=$1 AND user_id=$2 FOR UPDATE', [rowId(cardUid), user.id]);
-    if (!uc) bad('Card not found', 404); if (uc.status === 'revoked') bad('This card was removed from your collection'); if (uc.status !== 'ready') bad('This card has already been used');
+    if (!uc) bad('Card not found', 404); if (uc.status === 'revoked') bad('This card was removed from your collection.'); if (uc.status !== 'ready') bad('This card has already been used.');
     if (!uc.revealed_at) bad('Flip this card over first. Its pack is waiting on the Packs page.');
     const cd = uc.data || {}; const fx = cd.fx || {}; const cat = await core.catalog();
     let usedOn = ''; let done = ''; let extra = {}; let coupon = null;
@@ -306,19 +323,19 @@ async function useCard(user, cardUid, body) {
       usedOn = id; done = `${id} is open on your dashboard.`; extra = { account: id };
     } else {
       const id = clean(body && body.account, 40); const a = await c.one('SELECT * FROM accounts WHERE id=$1 AND user_id=$2 FOR UPDATE', [id, user.id]);
-      if (!a) bad('Pick one of your accounts'); if (!eligible(cd.on, a)) bad('This card does not work on that account');
+      if (!a) bad('Pick one of your accounts.'); if (!eligible(cd.on, a)) bad('This card does not work on that account.');
       const perks = Object.assign({}, a.perks || {}); const used = perks.cards || [];
       // a card that would change nothing is refused, so it is not burned
       const RU = require('./rules'); const now = RU.rulesFor(cat, a); const plain = RU.rulesFor(cat, Object.assign({}, a, { perks: {} }));
       if (fx.t === 'minDays') { if (!(now.minDays > 0)) bad('This evaluation has no minimum trading days left to cut. Keep the card for another one.'); perks.minDaysOff = (perks.minDaysOff || 0) + num(fx.n, 1); }
-      else if (fx.t === 'evalCons') { if (perks.evalCons) bad('Consistency is already off on this account'); perks.evalCons = true; }
-      else if (fx.t === 'news') { if (!plain.news) bad('This account has no news rule, so the card would change nothing'); perks.newsUntil = new Date(Math.max(Date.now(), perks.newsUntil ? Date.parse(perks.newsUntil) : 0) + num(fx.days, 1) * 864e5).toISOString(); }
-      else if (fx.t === 'idle') { if (!plain.inactivity) bad('This account has no inactivity rule, so the card would change nothing'); perks.idleDays = (perks.idleDays || 0) + num(fx.days, 30); }
-      else if (fx.t === 'payCons') { if (perks.payCons) bad('Your next payout already skips consistency'); perks.payCons = true; }
-      else if (fx.t === 'split') { if (fx.to) { if (perks.splitTo >= fx.to) bad('This account already has that split'); perks.splitTo = num(fx.to, 100); } else { if ((now.split || 0) >= 100) bad('This account already keeps 100% of profits'); perks.splitAdd = (perks.splitAdd || 0) + num(fx.add, 5); } }
+      else if (fx.t === 'evalCons') { if (perks.evalCons) bad('Consistency is already off on this account.'); perks.evalCons = true; }
+      else if (fx.t === 'news') { if (!plain.news) bad('This account has no news rule, so the card would change nothing.'); perks.newsUntil = new Date(Math.max(Date.now(), perks.newsUntil ? Date.parse(perks.newsUntil) : 0) + num(fx.days, 1) * 864e5).toISOString(); }
+      else if (fx.t === 'idle') { if (!plain.inactivity) bad('This account has no inactivity rule, so the card would change nothing.'); perks.idleDays = (perks.idleDays || 0) + num(fx.days, 30); }
+      else if (fx.t === 'payCons') { if (perks.payCons) bad('Your next payout already skips consistency.'); perks.payCons = true; }
+      else if (fx.t === 'split') { if (fx.to) { if (perks.splitTo >= fx.to) bad('This account already has that split.'); perks.splitTo = num(fx.to, 100); } else { if ((now.split || 0) >= 100) bad('This account already keeps 100% of profits.'); perks.splitAdd = (perks.splitAdd || 0) + num(fx.add, 5); } }
       else if (fx.t === 'balance') { await c.q('UPDATE accounts SET balance=balance+$2 WHERE id=$1', [a.id, num(fx.amt)]); }
       else if (fx.t === 'reset') { await core.resetAccount(c, a.id, user.id, 0); }
-      else bad('This card cannot be used yet');
+      else bad('This card cannot be used yet.');
       used.push({ card: cd.id, name: cd.name, at: new Date().toISOString() }); perks.cards = used;
       await c.q('UPDATE accounts SET perks=$2 WHERE id=$1', [a.id, JSON.stringify(perks)]);
       usedOn = a.id; done = `${cd.name} is on ${a.id}.`;
@@ -378,22 +395,22 @@ function customMax(cfg, left) {
 async function createCreditsOrder(user, body) {
   await require('./payments').maintGuard();
   await need(); const cfg = await config(); const R = cfg.rules;
-  if (!body || typeof body !== 'object' || Array.isArray(body)) bad('Pick a bundle or enter an amount');
+  if (!body || typeof body !== 'object' || Array.isArray(body)) bad('Pick a bundle or enter an amount.');
   const hasB = body.bundle !== undefined && body.bundle !== null, hasC = body.custom !== undefined && body.custom !== null;
-  if (hasB && hasC) bad('Pick a bundle or enter an amount, not both'); if (!hasB && !hasC) bad('Pick a bundle or enter an amount');
+  if (hasB && hasC) bad('Pick a bundle or enter an amount, not both.'); if (!hasB && !hasC) bad('Pick a bundle or enter an amount.');
   const left = await capLeft(cfg, user.id); const cmax = customMax(cfg, left);
   const capMsg = () => (left <= 0 ? `You can buy up to ${fmt(R.dailyCap)} credits a day, and you have reached that today. Come back tomorrow.` : `You can buy up to ${fmt(R.dailyCap)} credits a day. You can still buy ${fmt(left)} today${R.custom.on && cmax >= R.custom.min ? `, so the largest custom amount right now is $${fmt(cmax)}` : ''}.`);
   let usd, cr, bonus = 0, label;
   if (hasC) {
-    if (!R.custom.on) bad('Pick one of the bundles');
-    if (typeof body.custom !== 'number' || !Number.isFinite(body.custom)) bad('Enter the amount as a number, like 75');
-    usd = body.custom; if (Math.round(usd * 100) !== usd * 100 && Math.abs(Math.round(usd * 100) - usd * 100) > 1e-6) bad('Enter the amount in dollars and cents, like 75 or 75.50'); usd = round2(usd);
-    if (usd < R.custom.min) bad(`The smallest custom amount is $${fmt(R.custom.min)}`);
-    if (usd > R.custom.max) bad(`The largest custom amount is $${fmt(R.custom.max)}`);
+    if (!R.custom.on) bad('Pick one of the bundles.');
+    if (typeof body.custom !== 'number' || !Number.isFinite(body.custom)) bad('Enter the amount as a number, like 75.');
+    usd = body.custom; if (Math.round(usd * 100) !== usd * 100 && Math.abs(Math.round(usd * 100) - usd * 100) > 1e-6) bad('Enter the amount in dollars and cents, like 75 or 75.50.'); usd = round2(usd);
+    if (usd < R.custom.min) bad(`The smallest custom amount is $${fmt(R.custom.min)}.`);
+    if (usd > R.custom.max) bad(`The largest custom amount is $${fmt(R.custom.max)}.`);
     ({ bonus, cr } = customCredits(cfg, usd)); label = `${fmt(cr)} Credits${bonus ? ` (includes ${bonus}% bonus)` : ''}`;
   } else {
-    if (typeof body.bundle !== 'number' || !Number.isInteger(body.bundle)) bad('Pick a bundle');
-    const b = cfg.bundles.filter((x) => x.on)[body.bundle]; if (!b || body.bundle < 0) bad('Pick a bundle');
+    if (typeof body.bundle !== 'number' || !Number.isInteger(body.bundle)) bad('Pick a bundle.');
+    const b = cfg.bundles.filter((x) => x.on)[body.bundle]; if (!b || body.bundle < 0) bad('Pick a bundle.');
     usd = b.usd; cr = b.cr; bonus = b.bonus; label = `${fmt(cr)} Credits${b.bonus ? ` (includes ${b.bonus}% bonus)` : ''}`;
   }
   if (left != null && cr > left) bad(capMsg());
@@ -526,7 +543,7 @@ async function traderData(userId) {
     waiting: packs.map((p) => { if (p.status !== 'opened') return { uid: p.id, id: p.pack, name: p.name }; const cs = inPart.filter((x) => x.pack_id === p.id); return { uid: p.id, id: p.pack, name: p.name, pending: true, left: cs.filter(hidden).length, cards: cs.map(seen) }; }),
     own: cards.map((c) => Object.assign(pub(Object.assign({ uid: c.id }, c.data || {}, { id: c.card, r: c.rarity })), { st: c.status, usedOn: c.used_on || '', usedAt: c.used_at })),
     hist: log.slice(0, HIST_PAGE).map(histRow), histMore: log.length > HIST_PAGE,
-    accts: accts.map((a) => ({ id: a.id, det: `${ACC_LABEL(a)} · ${a.phase === 'breached' ? 'failed' : a.phase === 'active' ? '$' + fmt(Math.round(a.balance)) : a.phase}`, t: ['eval', 'failed', 'funded', 'any'].filter((on) => eligible(on, a)) }))
+    accts: accts.map((a) => ({ id: a.id, det: `${ACC_LABEL(a)} · ${a.phase === 'breached' ? 'Failed' : a.phase === 'active' ? '$' + fmt(Math.round(a.balance)) : String(a.phase || '').replace(/^./, (c) => c.toUpperCase())}`, t: ['eval', 'failed', 'funded', 'any'].filter((on) => eligible(on, a)) }))
   };
 }
 const HIST_PAGE = 60;
@@ -606,7 +623,7 @@ function cardValue(cfg, cat, cd) {
   return Math.round(usd * cfg.rules.perDollar);
 }
 async function grant(actor, uid, body) {
-  const cfg = await config(); const reason = clean(body.reason, 160); if (!reason) bad('Add a reason');
+  const cfg = await config(); const reason = clean(body.reason, 160); if (!reason) bad('Add a reason.');
   if (rowId(uid) == null) bad('Trader not found', 404);
   const u = await db.one('SELECT id FROM users WHERE id=$1', [rowId(uid)]); if (!u) bad('Trader not found', 404);
   const on = await enabled();
@@ -620,28 +637,28 @@ async function grant(actor, uid, body) {
   return db.tx(async (c) => {
     let value = 0;
     if (body.type === 'credits') {
-      const n = body.credits; if (typeof n !== 'number' || !Number.isInteger(n) || n === 0) bad('Enter a whole number of credits, like 500 or -200');
-      if (Math.abs(n) > 10000000) bad('That is more credits than one grant can hold (10,000,000)');
-      if (Math.abs(n) > GRANT_CAP && actor.role !== 'admin') bad(`Grants over ${fmt(GRANT_CAP)} credits need an admin`, 403);
+      const n = body.credits; if (typeof n !== 'number' || !Number.isInteger(n) || n === 0) bad('Enter a whole number of credits, like 500 or -200.');
+      if (Math.abs(n) > 10000000) bad('That is more credits than one grant can hold (10,000,000).');
+      if (Math.abs(n) > GRANT_CAP && actor.role !== 'admin') bad(`Grants over ${fmt(GRANT_CAP)} credits need an admin.`, 403);
       if (n > 0) { await capCheck(n); value = n; }
       if (n > 0) await credit(c, u.id, n, `Granted by support: ${reason}`, 'grant', '', actor.id); else await credit(c, u.id, n, `Removed by support: ${reason}`, 'grant', '', actor.id);
       await core.notify(c, u.id, n > 0 ? `${fmt(n)} credits added` : `${fmt(-n)} credits removed`, reason, on ? 'packs' : 'rewards');
     } else if (body.type === 'pack') {
       if (!on) bad('Packs are switched off, so traders cannot open them. Switch Packs on before granting one.');
-      const p = cfg.packs.find((x) => x.id === body.pack); if (!p) bad('Pick a pack');
-      const qty = body.qty === undefined ? 1 : body.qty; if (typeof qty !== 'number' || !Number.isInteger(qty) || qty < 1 || qty > 10) bad('Enter how many packs, from 1 to 10');
+      const p = cfg.packs.find((x) => x.id === body.pack); if (!p) bad('Pick a pack.');
+      const qty = body.qty === undefined ? 1 : body.qty; if (typeof qty !== 'number' || !Number.isInteger(qty) || qty < 1 || qty > 10) bad('Enter how many packs, from 1 to 10.');
       value = p.price * qty; await capCheck(value);
       for (let i = 0; i < qty; i++) await c.q("INSERT INTO user_packs(user_id,pack,name,odds,source,note) VALUES($1,$2,$3,$4,'grant',$5)", [u.id, p.id, p.name, JSON.stringify(p.odds), reason]);
       await c.q('INSERT INTO points_log(user_id,label,delta,kind,actor_id) VALUES($1,$2,0,$3,$4)', [u.id, `Granted ${qty} ${p.short} Pack${qty > 1 ? 's' : ''}: ${reason}`, 'grant', actor.id]);
       await core.notify(c, u.id, `${qty === 1 ? 'A' : qty} free ${p.short} Pack${qty > 1 ? 's' : ''} for you`, reason + (qty > 1 ? ' Open them on the Packs page.' : ' Open it on the Packs page.'), 'packs');
     } else if (body.type === 'card') {
       if (!on) bad('Packs are switched off, so traders cannot use cards. Switch Packs on before granting one.');
-      const cd = cfg.cards.find((x) => x.id === body.card); if (!cd) bad('Pick a card');
+      const cd = cfg.cards.find((x) => x.id === body.card); if (!cd) bad('Pick a card.');
       value = cardValue(cfg, await core.catalog(), cd); await capCheck(value);
       await c.q('INSERT INTO user_cards(user_id,card,rarity,data) VALUES($1,$2,$3,$4)', [u.id, cd.id, cd.r, JSON.stringify(cd)]);
       await c.q('INSERT INTO points_log(user_id,label,delta,kind,actor_id) VALUES($1,$2,0,$3,$4)', [u.id, `Granted card ${cd.name}: ${reason}`, 'grant', actor.id]);
       await core.notify(c, u.id, `You got a ${cd.name} card`, reason + ' It is in your collection.', 'packs');
-    } else bad('Pick what to grant');
+    } else bad('Pick what to grant.');
     await c.q('INSERT INTO audit(actor_id,action,target,meta) VALUES($1,$2,$3,$4)', [actor.id, 'packs.grant', String(u.id), { type: body.type, reason, value, credits: body.type === 'credits' ? body.credits : undefined, pack: body.type === 'pack' ? body.pack : undefined, qty: body.type === 'pack' ? (body.qty === undefined ? 1 : body.qty) : undefined, card: body.type === 'card' ? body.card : undefined }]);
     return { ok: true, value };
   });
@@ -649,7 +666,7 @@ async function grant(actor, uid, body) {
 async function revokeCard(actor, cardId, reason) {
   if (rowId(cardId) == null) bad('Card not found', 404);
   const r = await db.one("UPDATE user_cards SET status='revoked', used_on=$2 WHERE id=$1 AND status='ready' RETURNING user_id, data, revealed_at", [rowId(cardId), 'Removed: ' + (clean(reason, 120) || 'by support')]);
-  if (!r) { if (!(await db.one('SELECT 1 FROM user_cards WHERE id=$1', [rowId(cardId)]))) bad('Card not found', 404); bad('Only unused cards can be removed'); }
+  if (!r) { if (!(await db.one('SELECT 1 FROM user_cards WHERE id=$1', [rowId(cardId)]))) bad('Card not found', 404); bad('Only unused cards can be removed.'); }
   // the trader's history never names a card they have not flipped over
   await db.q('INSERT INTO points_log(user_id,label,delta,kind,actor_id) VALUES($1,$2,0,$3,$4)', [r.user_id, r.revealed_at ? `Card removed: ${(r.data || {}).name || ''}` : 'Card removed: a card that was not revealed yet', 'grant', actor.id]);
   await core.audit(actor.id, 'packs.revoke', String(cardId), { card: (r.data || {}).id, user: r.user_id, reason: clean(reason, 120) }); return { ok: true };
@@ -659,8 +676,8 @@ async function revokePack(actor, packId, reason) {
   if (rowId(packId) == null) bad('Pack not found', 404); const why = 'Taken back: ' + (clean(reason, 120) || 'by support');
   return db.tx(async (c) => {
     const p = await c.one('SELECT id, user_id, name, source, status FROM user_packs WHERE id=$1 FOR UPDATE', [rowId(packId)]); if (!p) bad('Pack not found', 404);
-    if (p.source !== 'grant') bad(p.source === 'checkout' ? 'This pack came with an order. Refund the order to take it back.' : 'Only packs granted by staff can be taken back');
-    if (p.status === 'revoked') bad('This pack was already taken back');
+    if (p.source !== 'grant') bad(p.source === 'checkout' ? 'This pack came with an order. Refund the order to take it back.' : 'Only packs granted by staff can be taken back.');
+    if (p.status === 'revoked') bad('This pack was already taken back.');
     let cards = 0; let kept = 0;
     if (p.status === 'opened') {
       const mine = await c.all("SELECT id, status, revealed_at FROM user_cards WHERE pack_id=$1 AND status<>'revoked' FOR UPDATE", [p.id]); const down = mine.filter(hidden); kept = mine.length - down.length;
@@ -675,5 +692,5 @@ async function revokePack(actor, packId, reason) {
   });
 }
 
-module.exports = { RN, DEF, config, saveConfig, normalize, enabled, setEnabled, credit, buy, openOwned, useCard, ladderFor, ladderLine, grantForOrder, createCreditsOrder, fulfilCredits, onRefund, traderData, publicLadder, publicCredits, adminData, findTrader, traderAdmin, grant, revokeCard, eligible, drawOne };
+module.exports = { RN, DEF, migrateDollarNames, config, saveConfig, normalize, enabled, setEnabled, credit, buy, openOwned, useCard, ladderFor, ladderLine, grantForOrder, createCreditsOrder, fulfilCredits, onRefund, traderData, publicLadder, publicCredits, adminData, findTrader, traderAdmin, grant, revokeCard, eligible, drawOne };
 Object.assign(module.exports, { reveal, revokePack, refundInfo, refundPlan, payGuard, history, customMax, capLeft, gText });

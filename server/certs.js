@@ -124,10 +124,11 @@ a{color:#7CC4FF}.cp{max-width:1120px;margin:0 auto;padding:22px 24px 56px}.cp-to
 .cp-ver span{font-weight:500;color:#B9B4B1}.cp-ver .m{font-family:"Geist Mono",ui-monospace,Menlo,monospace;font-size:14.5px;overflow-wrap:anywhere}
 .cp-what{max-width:640px;margin:12px auto 0;text-align:center;color:#B9B4B1;font-size:15px;line-height:1.6}
 .cp-act{display:flex;justify-content:center;flex-wrap:wrap;gap:10px;margin:26px 0 0}
-.cp-sh{display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:2px 6px;margin:18px 0 0;font-size:14.5px;color:#9C9693}.cp-sh a{display:inline-flex;align-items:center;min-height:44px;padding:0 10px;font-weight:600}
+.cp-sh{display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:2px 6px;margin:18px 0 0;font-size:14.5px;color:#9C9693}.cp-sh a{display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;padding:0 10px;font-weight:600}
 .cp-no{max-width:520px;margin:12vh auto 0;text-align:center}.cp-no h1{font-size:28px;letter-spacing:-.02em;margin:0 0 12px}.cp-no p{color:#B9B4B1;font-size:15.5px;line-height:1.6;margin:0 0 24px}.cp-no .m{font-family:"Geist Mono",ui-monospace,Menlo,monospace;font-size:13.5px;color:#9C9693;overflow-wrap:anywhere}
 .cp-foot{margin:44px auto 0;max-width:640px;text-align:center;color:#8F8985;font-size:12.5px;line-height:1.6}
 @media (max-width:600px){.cp{padding:16px 14px 40px}.cp-top{margin-bottom:18px}.cp-cert{min-width:0}.cp-ver{margin-top:24px;font-size:15px}.cp-act .cp-btn{flex:1 1 100%}.cp-top .cp-btn{min-height:40px;padding:0 14px;font-size:13.5px}}
+@media (max-width:380px){.cp-top{gap:8px}.cp-lg{font-size:16px}.cp-top .cp-btn{padding:0 8px;font-size:12px}}
 @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 @page{size:landscape;margin:8mm}
 @media print{html,body{background:#fff!important}body{min-height:0}.cp{max-width:none;padding:0;margin:0}.cp>*:not(.cp-cert){display:none!important}
@@ -143,14 +144,13 @@ async function page(req, res) {
   const asked = clean(req.params.id, 60); const c = await find(asked).then((x) => x || findOld(asked)).catch(() => null); const rev = await revoked();
   if (c) db.q("INSERT INTO kv(k,v) VALUES('certviews', jsonb_build_object($1::text, 1)) ON CONFLICT (k) DO UPDATE SET v = kv.v || jsonb_build_object($1::text, COALESCE((kv.v->>$1)::int,0)+1)", [c.id]).catch(() => {});
   const gone = !!c && rev.includes(c.id); const ok = !!c && !gone; const base = require('./auth').BASE(); const url = base + '/cert/' + encodeURIComponent(c ? c.id : asked);
-  const top = `<div class="cp-top"><a class="cp-lg" href="/" aria-label="Funded Sky home">fundedsky<i>futures</i></a><a class="cp-btn" href="/checkout">Start Your Evaluation</a></div>`;
+  const top = `<div class="cp-top"><a class="cp-lg" href="/" aria-label="Funded Sky home">fundedsky<i>futures</i></a><a class="cp-btn" href="/checkout" aria-label="Start Your Evaluation">Start <span>Your </span>Evaluation</a></div>`;
   const head = (title, desc, extra) => `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>${e(title)}</title><meta name="description" content="${e(desc)}"><meta property="og:title" content="${e(title)}"><meta property="og:description" content="${e(desc)}"><meta property="og:type" content="website"><meta property="og:site_name" content="Funded Sky"><meta name="twitter:card" content="summary">${extra || ''}<link rel="icon" href="/static/favicon.svg" type="image/svg+xml"><meta name="theme-color" content="#050608">${FONTS}`;
   res.setHeader('Cache-Control', 'no-store');
   if (!ok) {
     // Not found: 404. Revoked: 410 (it existed and was taken back). Nothing about the trader is shown either way.
-    return res.status(gone ? 410 : 404).send(`${head('Funded Sky Certificate', gone ? 'This certificate is no longer valid.' : 'Certificate not found.', '<meta name="robots" content="noindex">')}<style>${PAGE_CSS}</style></head>
-<body><main class="cp">${top}<div class="cp-no"><h1>${gone ? 'This certificate is no longer valid.' : 'Certificate not found.'}</h1><p>${gone ? 'Funded Sky took this certificate back, so it no longer confirms a result.' : 'Check the ID on the certificate and try again. IDs start with CF- and are printed at the bottom of every certificate.'}</p><p class="m">${e(asked)}</p><a class="cp-btn pri" href="/checkout">Start Your Evaluation</a></div>
-<p class="cp-foot">Simulated trading. Funded Sky pays performance rewards from simulated accounts.</p></main></body></html>`);
+    const PO = require('./policy');
+    return res.status(gone ? 410 : 404).send(PO.page({ req, title: gone ? 'Certificate No Longer Valid' : 'Certificate Not Found', css: '.m{font-family:"Geist Mono",ui-monospace,Menlo,monospace;font-size:.92em;color:var(--hd);overflow-wrap:anywhere}', body: gone ? '<p>This certificate is no longer valid. Funded Sky took it back, so it no longer confirms a result.</p>' : `<p>No certificate has the ID <span class="m">${e(asked)}</span>. Check the ID and try again.</p>` }).replace('<head>', '<head><meta name="robots" content="noindex">'));
   }
   const ttl = headline(c); const title = `${c.d.name} · ${ttl} · Funded Sky Certificate`; const desc = `${sentence(c)} Verified by Funded Sky, certificate ${c.id}, issued ${c.date}.`;
   const say = `${ttl} at Funded Sky: ${sentence(c)}`; const U = encodeURIComponent(url); const T = encodeURIComponent(say);

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Funded Sky checkout: choose your account</title>
+<title>Funded Sky checkout: Choose Your Account</title>
 <script src="./support.js"></script>
 </head>
 <body>
@@ -35,7 +35,10 @@ a{color:#7CC4FF}a:hover{color:#A9D8FF}
 .fs-g4p{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
 .fs-mprog{display:none}
 button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4FF;outline-offset:2px}
+@media (min-width:761px) and (max-width:1000px){.fs-secure{display:none!important}.fs-steps{gap:8px!important;white-space:nowrap}.fs-sep{width:24px!important}}
+@media (min-width:761px) and (max-width:1180px){.fs-g4p{grid-template-columns:repeat(2,minmax(0,1fr))}.fs-gc{grid-template-columns:auto minmax(0,1fr)!important}.fs-gval{grid-column:1 / -1;flex-direction:row!important;align-items:center!important;justify-content:space-between;border-top:1px solid #26262A;padding-top:14px}.fs-gval>p{display:none}}
 @media (max-width: 760px){
+.fs-hdr>a:first-child{min-height:44px}
 .fs-steps,.fs-secure{display:none!important}
 .fs-g4p{display:flex!important;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;gap:10px!important;margin:0 -20px;padding:0 20px 2px;scroll-padding:0 20px}
 .fs-g4p::-webkit-scrollbar{display:none}
@@ -64,6 +67,12 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 .fs-cta{display:none!important}
 .fs-total{display:none!important}
 .fs-bar{display:flex!important}
+.fs-in{font-size:16px!important}
+.fs-rulehd,.fs-code{min-height:40px!important}
+.fs-qbtn,.fs-more,.fs-lnk,.fs-gval button,.fs-bar a[href="#order"]{position:relative!important}
+.fs-qbtn:after,.fs-more:after,.fs-gval button:after,.fs-bar a[href="#order"]:after{content:'';position:absolute;inset:-5px}
+.fs-lnk:after{content:'';position:absolute;inset:-13px -8px}
+.fs-more:after,.fs-gval button:after,.fs-bar a[href="#order"]:after{inset:-13px -8px}
 }
 </style>
 </helmet>
@@ -98,7 +107,7 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 <div style="display: flex; flex-direction: column; gap: 10px;">
 <p class="fs-steps" style="margin: 0; font-stretch: 125%; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: #9C9693; font-weight: 500;">Step 1 of 3</p>
 <h1 class="fs-h1" style="margin: 0; font-size: 44px; line-height: 48px; font-weight: 600; letter-spacing: -0.03em;">Choose Your Account. <span style="color: #7CC4FF;">Earn Your Funding.</span></h1>
-<p class="fs-lead" style="margin: 0; font-size: 17px; line-height: 26px; color: #D4CFCD;">Pick an account, a size and your platform. Pass the evaluation to trade our capital.</p>
+<p class="fs-lead" style="margin: 0; font-size: 17px; line-height: 26px; color: #D4CFCD;">Pick an account, a size and your platform. Pass the evaluation to get a funded account.</p>
 </div>
 
 <sc-if value="{{ multi }}" hint-placeholder-val="{{ false }}">
@@ -140,7 +149,7 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 <h2 style="margin: 0; font-size: 18px; line-height: 24px; font-weight: 600; letter-spacing: -0.01em;">How Many?</h2>
 <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; background: #111113; border: 1px solid #26262A; border-radius: 8px; padding: 14px 16px;">
 <span style="display: flex; flex-direction: column; gap: 2px;"><span style="font-size: 15px; line-height: 20px; font-weight: 500;">{{ activeLabel }}</span><span style="font-size: 13px; line-height: 18px; color: #9C9693;">Each account gets its own login and rules.</span></span>
-<span style="flex: none; display: flex; align-items: center; gap: 12px;"><button type="button" class="fs-qbtn" aria-label="One fewer account" onClick="{{ dec }}" disabled="{{ atMin }}">−</button><span style="min-width: 20px; text-align: center; font-family: 'Geist Mono', monospace; font-size: 17px; font-weight: 500;" aria-live="polite">{{ activeQty }}</span><button type="button" class="fs-qbtn" aria-label="One more account" onClick="{{ inc }}">+</button></span>
+<span style="flex: none; display: flex; align-items: center; gap: 12px;"><button type="button" class="fs-qbtn" aria-label="One fewer account" onClick="{{ dec }}" disabled="{{ atMin }}">−</button><span style="min-width: 20px; text-align: center; font-family: 'Geist Mono', monospace; font-size: 17px; font-weight: 500;" aria-live="polite">{{ activeQty }}</span><button type="button" class="fs-qbtn" aria-label="One more account" onClick="{{ inc }}" disabled="{{ atMax }}">+</button></span>
 </div>
 <button type="button" onClick="{{ addLine }}" style="align-self: flex-start; min-height: 44px; background: transparent; border: 0; padding: 0; color: #7CC4FF; font: inherit; font-size: 14px; font-weight: 500; cursor: pointer;">+ Add a Different Account</button>
 </div>
@@ -214,10 +223,10 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px;">
 <div style="display: flex; gap: 16px; font-size: 12px;">
 <sc-if value="{{ c.editing }}" hint-placeholder-val="{{ true }}"><span style="color: #7CC4FF; font-weight: 500;">Editing</span></sc-if>
-<sc-if value="{{ c.notEditing }}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{ c.edit }}" style="background: transparent; border: 0; padding: 0; color: #7CC4FF; font: inherit; font-size: 12px; font-weight: 500; cursor: pointer;">Edit</button></sc-if>
-<sc-if value="{{ c.removable }}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{ c.remove }}" style="background: transparent; border: 0; padding: 0; color: #9C9693; font: inherit; font-size: 12px; cursor: pointer;">Remove</button></sc-if>
+<sc-if value="{{ c.notEditing }}" hint-placeholder-val="{{ false }}"><button type="button" class="fs-lnk" onClick="{{ c.edit }}" style="background: transparent; border: 0; padding: 0; color: #7CC4FF; font: inherit; font-size: 12px; font-weight: 500; cursor: pointer;">Edit</button></sc-if>
+<sc-if value="{{ c.removable }}" hint-placeholder-val="{{ false }}"><button type="button" class="fs-lnk" onClick="{{ c.remove }}" style="background: transparent; border: 0; padding: 0; color: #9C9693; font: inherit; font-size: 12px; cursor: pointer;">Remove</button></sc-if>
 </div>
-<span style="flex: none; display: flex; align-items: center; gap: 8px;"><button type="button" class="fs-qbtn" style="width: 30px; height: 30px; font-size: 16px;" aria-label="One fewer" onClick="{{ c.dec }}" disabled="{{ c.atMin }}">−</button><span style="min-width: 16px; text-align: center; font-family: 'Geist Mono', monospace; font-size: 15px;">{{ c.qty }}</span><button type="button" class="fs-qbtn" style="width: 30px; height: 30px; font-size: 16px;" aria-label="One more" onClick="{{ c.inc }}">+</button></span>
+<span style="flex: none; display: flex; align-items: center; gap: 8px;"><button type="button" class="fs-qbtn" style="width: 30px; height: 30px; font-size: 16px;" aria-label="One fewer" onClick="{{ c.dec }}" disabled="{{ c.atMin }}">−</button><span style="min-width: 16px; text-align: center; font-family: 'Geist Mono', monospace; font-size: 15px;">{{ c.qty }}</span><button type="button" class="fs-qbtn" style="width: 30px; height: 30px; font-size: 16px;" aria-label="One more" onClick="{{ c.inc }}" disabled="{{ c.atMax }}">+</button></span>
 </div>
 </div>
 </sc-for>
@@ -225,18 +234,18 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 </div>
 
 <div style="display: flex; flex-direction: column; gap: 12px; border-top: 1px solid #26262A; padding-top: 16px;"><button type="button" class="fs-rulehd" onClick="{{ toggleRules }}" aria-expanded="{{ rulesOpen }}" aria-controls="rulebox" aria-label="{{ rulesAria }}" style="all: unset; box-sizing: border-box; width: 100%; min-height: 28px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 12.5px;"><span style="min-width: 0; display: flex; flex-wrap: wrap; gap: 2px 8px;"><sc-if value="{{ rulesOpen }}" hint-placeholder-val="{{ false }}"><span style="font-size: 13px; color: #9C9693;">{{ rulesHead }}</span></sc-if><sc-for list="{{ rulesSum }}" as="rs" hint-placeholder-count="3"><span style="white-space: nowrap;"><span style="color: #9C9693;">{{ rs.l }}</span> <span style="color: #F4F2F1; font-weight: 500; font-variant-numeric: tabular-nums;">{{ rs.v }}</span></span></sc-for></span><span class="fs-ckv {{ rulesChev }}" aria-hidden="true"><svg viewBox="0 0 12 12"><path d="M3 4.5 6 7.5 9 4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg></span></button>
-<sc-if value="{{ rulesOpen }}" hint-placeholder-val="{{ false }}"><dl id="rulebox" style="margin: 0; display: flex; flex-direction: column; gap: 10px; font-size: 14px;"><sc-for list="{{ rulesAll }}" as="rm" hint-placeholder-count="8"><div style="display: flex; justify-content: space-between; gap: 12px;"><dt style="color: #9C9693;">{{ rm.l }}</dt><dd style="margin: 0; font-family: 'Geist Mono', monospace; text-align: right; color: {{ rm.c }};">{{ rm.v }}</dd></div></sc-for></dl></sc-if>
+<sc-if value="{{ rulesOpen }}" hint-placeholder-val="{{ false }}"><dl id="rulebox" style="margin: 0; display: flex; flex-direction: column; gap: 10px; font-size: 14px;"><sc-for list="{{ rulesAll }}" as="rm" hint-placeholder-count="8"><div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px;"><dt style="color: #9C9693;">{{ rm.l }}</dt><dd style="margin: 0; font-family: 'Geist Mono', monospace; text-align: right; color: {{ rm.c }};">{{ rm.v }}</dd></div></sc-for></dl></sc-if>
 </div>
 
 <div style="display: flex; flex-direction: column; gap: 8px; border-top: 1px solid #26262A; padding-top: 16px;">
 <label for="promo" style="font-size: 13px; color: #9C9693;">Promo or Reward Code</label>
-<div style="display: flex; gap: 8px;"><input id="promo" class="fs-in" type="text" placeholder="Enter Code" value="{{ promoInput }}" onChange="{{ setPromo }}" style="flex: 1; min-width: 0; height: 44px; box-sizing: border-box; background: #111113; border-radius: 4px; padding: 0 12px; color: #F4F2F1; font: inherit; font-size: 15px;"><button type="button" class="fs-opt" onClick="{{ applyPromo }}" style="height: 44px; background: transparent; border: 1px solid #26262A; border-radius: 4px; padding: 0 16px; color: #F4F2F1; font: inherit; font-size: 14px; font-weight: 500; cursor: pointer;">Apply</button></div><sc-if value="{{ promoMsg }}"><p style="margin: 6px 0 0; font-size: 12.5px; line-height: 18px; color: {{ promoColor }};">{{ promoMsg }}</p></sc-if>
-<sc-if value="{{ hasCodes }}"><div style="margin-top: 6px;"><div style="display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 8px;"><span style="font-size: 12.5px; color: #9C9693;">{{ codesTitle }}</span><sc-if value="{{ codesMore }}"><button type="button" onClick="{{ toggleCodes }}" aria-expanded="{{ codesOpen }}" style="all: unset; cursor: pointer; font-size: 12.5px; font-weight: 600; color: #7CC4FF;">{{ codesToggle }}</button></sc-if></div><div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;" aria-label="Your codes"><sc-for list="{{ myCodes }}" as="rc" hint-placeholder-count="2"><button type="button" class="fs-opt" onClick="{{ rc.use }}" title="{{ rc.tip }}" aria-pressed="{{ rc.on }}" style="min-width: 0; min-height: 36px; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; gap: 6px; background: {{ rc.bg }}; border: 1px solid {{ rc.bd }}; border-radius: 8px; padding: 6px 10px; color: #F4F2F1; font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; text-align: left;"><span style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ rc.label }}</span><sc-if value="{{ rc.many }}"><span style="font-size: 11.5px; font-weight: 600; color: #9C9693; background: rgba(254,254,254,.08); border-radius: 999px; padding: 1px 7px;">{{ rc.count }}</span></sc-if></button></sc-for></div></div></sc-if>
+<div style="display: flex; gap: 8px;"><input id="promo" class="fs-in" type="text" placeholder="Enter Code" value="{{ promoInput }}" onChange="{{ setPromo }}" style="flex: 1; min-width: 0; height: 44px; box-sizing: border-box; background: #111113; border-radius: 4px; padding: 0 12px; color: #F4F2F1; font: inherit; font-size: 15px;"><button type="button" class="fs-opt" onClick="{{ applyPromo }}" style="height: 44px; background: transparent; border: 1px solid #26262A; border-radius: 4px; padding: 0 16px; color: #F4F2F1; font: inherit; font-size: 14px; font-weight: 500; cursor: pointer;">Apply</button></div><sc-if value="{{ promoMsg }}"><p style="margin: 6px 0 0; font-size: 12.5px; line-height: 18px; color: {{ promoColor }};">{{ promoMsg }}</p></sc-if><sc-if value="{{ freeOffer }}"><div style="margin-top: 6px; display: flex; flex-direction: column; gap: 8px;"><p style="margin: 0; font-size: 12.5px; line-height: 18px; color: #9C9693;">{{ freeOfferWhy }}</p><button type="button" class="fs-opt" onClick="{{ takeFreeOffer }}" style="min-height: 44px; box-sizing: border-box; background: #13202E; border: 1px solid #7CC4FF; border-radius: 4px; padding: 10px 14px; color: #F4F2F1; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;">{{ freeOfferBtn }}</button></div></sc-if>
+<sc-if value="{{ hasCodes }}"><div style="margin-top: 6px;"><div style="display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 8px;"><span style="font-size: 12.5px; color: #9C9693;">{{ codesTitle }}</span><sc-if value="{{ codesMore }}"><button type="button" onClick="{{ toggleCodes }}" aria-expanded="{{ codesOpen }}" class="fs-more" style="all: unset; cursor: pointer; font-size: 12.5px; font-weight: 600; color: #7CC4FF;">{{ codesToggle }}</button></sc-if></div><div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;" aria-label="Your codes"><sc-for list="{{ myCodes }}" as="rc" hint-placeholder-count="2"><button type="button" class="fs-opt fs-code" onClick="{{ rc.use }}" title="{{ rc.tip }}" aria-pressed="{{ rc.on }}" style="min-width: 0; min-height: 36px; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; gap: 6px; background: {{ rc.bg }}; border: 1px solid {{ rc.bd }}; border-radius: 8px; padding: 6px 10px; color: #F4F2F1; font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; text-align: left;"><span style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ rc.label }}</span><sc-if value="{{ rc.many }}"><span style="font-size: 11.5px; font-weight: 600; color: #9C9693; background: rgba(255,255,255,.08); border-radius: 999px; padding: 1px 7px;">{{ rc.count }}</span></sc-if></button></sc-for></div></div></sc-if>
 </div>
 
 <div style="display: flex; flex-direction: column; gap: 8px; font-size: 14px; border-top: 1px solid #26262A; padding-top: 16px;">
 <sc-for list="{{ lines }}" as="l" hint-placeholder-count="2">
-<div style="display: flex; justify-content: space-between; gap: 12px; color: {{ l.color }};"><span>{{ l.label }}</span><span style="font-family: 'Geist Mono', monospace;">{{ l.amount }}</span></div>
+<div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px; color: {{ l.color }};"><span>{{ l.label }}</span><span style="font-family: 'Geist Mono', monospace;">{{ l.amount }}</span></div>
 </sc-for>
 <div class="fs-total" style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 6px;"><span style="font-size: 16px; font-weight: 600;">Total Today</span><span style="font-family: 'Geist Mono', monospace; font-size: 26px; font-weight: 500;">{{ total }}</span></div>
 </div>
@@ -274,8 +283,10 @@ class Component extends DCLogic {
     if (me) DC.api('/api/checkout/codes').then((r) => this.setState({ codes: (r && r.codes) || [] })).catch(() => {});
   }
   fix(cat, c) { const p = cat.plans.find((x) => x.id === c.plan) || cat.plans.find((x) => x.badge) || cat.plans[0]; const sz = p.sizes.find((z) => z.size === Number(c.size)) ? Number(c.size) : p.sizes[Math.min(1, p.sizes.length - 1)].size; const addons = {}; Object.keys(c.addons || {}).forEach((k) => { if (c.addons[k] && p.addons.includes(k)) addons[k] = true; }); return Object.assign({}, c, { plan: p.id, size: sz, platform: p.platforms.includes(c.platform) ? c.platform : (p.defPlatform && p.platforms.includes(p.defPlatform) ? p.defPlatform : p.platforms[0]), addons }); }
-  updActive(fn) { const cat = this.state.cat; this.setState({ cart: this.state.cart.map((c) => (c.id === this.state.active ? this.fix(cat, Object.assign({}, c, fn(c))) : c)) }); this.reprice(); }
-  setCart(cart, extra) { this.setState(Object.assign({ cart }, extra || {})); this.reprice(); }
+  // a code that was refused for this cart (wrong size, wrong plan) and is still in the box is tried again when the cart changes
+  retryCode() { const st = this.state; const v = this._refused; if (v && !st.promo && (st.promoInput || '').trim() === v) this.setState({ promo: v, promoOk: false }); }
+  updActive(fn) { const cat = this.state.cat; this.setState({ cart: this.state.cart.map((c) => (c.id === this.state.active ? this.fix(cat, Object.assign({}, c, fn(c))) : c)) }); this.retryCode(); this.reprice(); }
+  setCart(cart, extra) { this.setState(Object.assign({ cart }, extra || {})); this.retryCode(); this.reprice(); }
   reprice() {
     clearTimeout(this._t);
     this._t = setTimeout(async () => {
@@ -287,7 +298,8 @@ class Component extends DCLogic {
       try { const priced = await DC.api('/api/cart/price', { items, promo: st.promo || undefined }); this.setState({ priced, promoOk: !!st.promo, promoMsg: st.promo ? ((priced.applied && priced.applied.type === 'promo') || [priced.promo, priced.coupon].some((c) => c && String(c).toUpperCase() === st.promo.trim().toUpperCase()) ? `${st.promo.toUpperCase()} applied.` : priced.applied ? `Your ${priced.applied.label.split(':')[0].toLowerCase()} saves more, so we used that instead.` : '') : why });
         // save again now that the code is confirmed, so the payment page and the order use it
         if (st.promo) FSX.cart.set({ cart: st.cart, promo: st.promo }); }
-      catch (e) { if (st.promo) { this._promoErr = st.promoAuto ? '' : e.message; this.setState(Object.assign({ promo: '', promoOk: false, promoMsg: this._promoErr }, st.promoAuto ? { promoInput: '', promoAuto: false } : {})); this.reprice(); } }
+      catch (e) { const fo = st.promo && (st.codes || []).find((c) => c.kind === 'free_eval' && c.size && String(c.code).toUpperCase() === st.promo.trim().toUpperCase() && !st.cart.some((x) => x.size === c.size)); if (fo) { this._refused = st.promo; this._promoErr = ''; this.setState({ promo: '', promoOk: false, promoMsg: '', freeOffer: { code: fo.code, size: fo.size } }); this.reprice(); return; }
+        if (st.promo) { this._promoErr = st.promoAuto ? '' : e.message; this._refused = st.promoAuto ? '' : st.promo; this.setState(Object.assign({ promo: '', promoOk: false, promoMsg: this._promoErr }, st.promoAuto ? { promoInput: '', promoAuto: false } : {})); this.reprice(); } }
     }, 120);
   }
   renderVals() {
@@ -296,7 +308,7 @@ class Component extends DCLogic {
     const mt = (window.FSPAY && FSPAY.cfg && FSPAY.cfg.maint) || '';
     const on = { bg: '#13202E', bd: '#7CC4FF', sub: '#D4CFCD', fg: '#F4F2F1', ring: '6px solid #7CC4FF' };
     const off = { bg: '#111113', bd: '#26262A', sub: '#9C9693', fg: '#D4CFCD', ring: '1.5px solid #3A3A40' };
-    const empty = { hasCodes: false, myCodes: [], codesTitle: '', codesMore: false, codesOpen: false, codesToggle: '', toggleCodes: () => {}, codeBox: false, toggleCodeBox: () => {}, codeHead: 'Have a Code?', codeChev: '▼', codeSum: '', codeSumColor: '#9C9693', rulesAll: [], rulesSum: [], rulesHead: '', rulesAria: 'Show the full rules', rulesOpen: false, rulesChev: '', toggleRules: () => {}, blockMsg: '', plans: [], sizes: [], platforms: [], addons: [], bundles: [], cart: [], lines: [], rules: {}, total: '…', accountsLabel: 'Loading', activeLabel: '', activeQty: 1, atMin: true, feeTerms: '', ctaOp: '1', ctaOff: 'false', loginHref: '/login?next=/checkout', nextHref: '#', rulesHref: '#', rulesNote: '', loginText: 'Log In', meOut: !st.me, meIn: !!st.me, ini: st.me ? ((st.me.first || '')[0] || '') + ((st.me.last || '')[0] || '') : '', firstName: st.me ? st.me.first : '' };
+    const empty = { hasCodes: false, myCodes: [], codesTitle: '', codesMore: false, codesOpen: false, codesToggle: '', toggleCodes: () => {}, codeBox: false, toggleCodeBox: () => {}, codeHead: 'Have a Code?', codeChev: '▼', codeSum: '', codeSumColor: '#9C9693', rulesAll: [], rulesSum: [], rulesHead: '', rulesAria: 'Show the full rules', rulesOpen: false, rulesChev: '', toggleRules: () => {}, blockMsg: '', plans: [], sizes: [], platforms: [], addons: [], bundles: [], cart: [], lines: [], rules: {}, total: '…', accountsLabel: 'Loading', activeLabel: '', activeQty: 1, atMin: true, atMax: false, feeTerms: '', ctaOp: '1', ctaOff: 'false', loginHref: '/login?next=/checkout', nextHref: '#', rulesHref: '#', rulesNote: '', loginText: 'Log In', meOut: !st.me, meIn: !!st.me, ini: st.me ? ((st.me.first || '')[0] || '') + ((st.me.last || '')[0] || '') : '', firstName: st.me ? st.me.first : '' };
     if (!cat) return empty;
     const cur = st.cart.find((c) => c.id === st.active) || st.cart[0];
     const P = (id) => cat.plans.find((p) => p.id === id);
@@ -315,7 +327,7 @@ class Component extends DCLogic {
     const cart = st.cart.map((c) => {
       const editing = c.id === st.active; const p = P(c.plan);
       const picked = Object.keys(c.addons).filter((k) => c.addons[k]).map((k) => cat.addons[k].name);
-      return { title: p.short + ' · ' + K(c.size), sub: [c.platform].concat(picked).join(' · '), qty: c.qty, bd: editing && many ? '#7CC4FF' : '#26262A', editing: editing && many, notEditing: !editing, removable: many, atMin: c.qty <= 1,
+      return { title: p.short + ' · ' + K(c.size), sub: [c.platform].concat(picked).join(' · '), qty: c.qty, bd: editing && many ? '#7CC4FF' : '#26262A', editing: editing && many, notEditing: !editing, removable: many, atMin: c.qty <= 1, atMax: c.qty >= 5,
         inc: () => this.setCart(st.cart.map((x) => (x.id === c.id ? Object.assign({}, x, { qty: Math.min(5, x.qty + 1) }) : x))),
         dec: () => this.setCart(st.cart.map((x) => (x.id === c.id ? Object.assign({}, x, { qty: Math.max(1, x.qty - 1) }) : x))),
         edit: () => this.setState({ active: c.id }),
@@ -372,25 +384,33 @@ class Component extends DCLogic {
     return {
       plans, sizes, platforms, addons, bundles, cart, lines, rules, hasLadder, ladder, goal, packNudge, ladDots, ladScroll,
       multi: many, lineCount: st.cart.length, activeIndex: st.cart.findIndex((c) => c.id === cur.id) + 1,
-      activeLabel: pc.short + ' · ' + K(cur.size), activeQty: cur.qty, atMin: cur.qty <= 1,
+      activeLabel: pc.short + ' · ' + K(cur.size), activeQty: cur.qty, atMin: cur.qty <= 1, atMax: cur.qty >= 5,
       inc: () => this.updActive((c) => ({ qty: Math.min(5, c.qty + 1) })), dec: () => this.updActive((c) => ({ qty: Math.max(1, c.qty - 1) })),
       addLine: () => this.setCart(st.cart.concat([{ id: st.nextId, plan: cur.plan, size: cur.size, platform: cur.platform, addons: {}, qty: 1 }]), { active: st.nextId, nextId: st.nextId + 1 }),
       accountsLabel: count + (count === 1 ? ' Account' : ' Accounts'),
       total: pr ? M(pr.total) : '…',
       feeTerms: mt || 'One-time payment, no subscription.' + (act ? ' Essential accounts pay a one-time activation fee when they pass.' : ''), ctaOp: mt || (pr && pr.blocked) ? '.45' : '1', ctaOff: mt || (pr && pr.blocked) ? 'true' : 'false',
-      promoInput: st.promoInput, promoMsg: st.promoMsg, blockMsg: pr ? [pr.blocked].concat(pr.notes || []).filter(Boolean).join(' ') : '', promoColor: st.promoOk ? '#5FD39B' : '#F2777F',
-      setPromo: (e) => this.setState({ promoInput: e.target.value }),
+      // a free-account code for a size the cart does not have: one tap adds that account and applies the code (the rest of the cart stays)
+      ...(() => { const fo = st.freeOffer && !st.cart.some((x) => x.size === st.freeOffer.size) ? st.freeOffer : null; if (!fo) return { freeOffer: false, freeOfferWhy: '', freeOfferBtn: '', takeFreeOffer: () => {} };
+        const pl = (pc.kind !== 'funded' ? [pc] : []).concat(cat.plans.filter((p) => p.kind !== 'funded'), cat.plans).find((p) => p.sizes.some((z) => z.size === fo.size));
+        return { freeOffer: !!pl, freeOfferWhy: `This code is for a ${K(fo.size)} account, and your cart has none.`, freeOfferBtn: `Add a ${K(fo.size)} Account for Free`,
+          takeFreeOffer: () => { if (!pl) return; this._promoErr = ''; this._refused = ''; this.setCart(st.cart.concat([this.fix(cat, { id: st.nextId, plan: pl.id, size: fo.size, platform: cur.platform, addons: {}, qty: 1 })]), { nextId: st.nextId + 1, freeOffer: null, codeBox: true, promo: fo.code, promoInput: fo.code, promoOk: false, promoAuto: false, promoMsg: '' }); } }; })(),
+      // a discount card saved for checkout comes off on its own: say so under the code box
+      ...(() => { const on = !st.promo && !st.promoMsg && !!(pr && pr.autoCard && pr.coupon); const pct = on ? ((st.codes.find((c) => String(c.code).toUpperCase() === String(pr.coupon).toUpperCase()) || {}).pct || Number((/(\d+(?:\.\d+)?)\s*%/.exec((pr.lines.find((l) => l.kind === 'coupon') || {}).label || '') || [])[1]) || 0) : 0;
+        return { promoMsg: st.promoMsg || (on ? (pct ? `Your ${pct}% card is applied.` : 'Your discount card is applied.') : ''), promoColor: st.promoOk || on ? '#5FD39B' : '#F2777F' }; })(),
+      promoInput: st.promoInput, blockMsg: pr ? [pr.blocked].concat(pr.notes || []).filter(Boolean).join(' ') : '',
+      setPromo: (e) => this.setState({ promoInput: e.target.value, freeOffer: null }),
       // Codes the trader holds: same offers are shown once with a count, the biggest saving first, and only the top few until "Show All"
-      ...(() => { const cur = st.promoOk ? String(st.promo).toUpperCase() : ''; const G = [];
-        st.codes.forEach((c) => { const label = c.label.replace(/^Reward: /, '').replace(/^Card: /, '').replace(/^Checkout reminder: /i, '').replace(/ Account$/, '').replace(/ Evaluation$/, ' Eval').replace(/\boff$/, 'Off'); let g = G.find((x) => x.label === label); if (!g) { g = { label, codes: [], pct: /free/i.test(label) && !/reset/i.test(label) ? 1000 : /free/i.test(label) ? 500 : Number((/(\d+(?:\.\d+)?)\s*%/.exec(label) || [0, 0])[1]) }; G.push(g); } g.codes.push(c.code); });
-        G.forEach((g) => { g.on = !!cur && g.codes.some((x) => x.toUpperCase() === cur); }); G.sort((a, b) => (b.on - a.on) || (b.pct - a.pct));
+      ...(() => { const cur = st.promoOk ? String(st.promo).toUpperCase() : ''; const autoC = pr && pr.autoCard && pr.coupon ? String(pr.coupon).toUpperCase() : ''; const isOn = (x) => { const X = String(x).toUpperCase(); return (!!cur && X === cur) || (!!autoC && X === autoC); }; const G = [];
+        st.codes.forEach((c) => { const label = c.label.replace(/^Reward: /, '').replace(/^Card: /, '').replace(/^Checkout reminder: /i, '').replace(/ Account$/, '').replace(/ Evaluation$/, ' Eval').replace(/\boff$/, 'Off'); let g = G.find((x) => x.label === label); if (!g) { g = { label, codes: [], kind: c.kind, size: c.size, pct: /free/i.test(label) && !/reset/i.test(label) ? 1000 : /free/i.test(label) ? 500 : Number((/(\d+(?:\.\d+)?)\s*%/.exec(label) || [0, 0])[1]) }; G.push(g); } g.codes.push(c.code); });
+        G.forEach((g) => { g.on = g.codes.some(isOn); }); G.sort((a, b) => (b.on - a.on) || (b.pct - a.pct));
         const LIM = 4; const open = !!st.codesOpen; const shown = open ? G : G.slice(0, LIM);
         const boxOpen = st.codeBox != null ? !!st.codeBox : !!(st.promo || st.promoMsg);
         return { codeBox: boxOpen, toggleCodeBox: () => this.setState({ codeBox: !boxOpen }), codeHead: boxOpen ? 'Promo or Reward Code' : 'Have a Code?', codeChev: boxOpen ? '▲' : '▼',
           codeSum: boxOpen ? '' : st.promoOk && st.promo ? '✓ ' + String(st.promo).toUpperCase() + ' Applied' : G.length ? (st.codes.length === 1 ? '1 Code' : st.codes.length + ' Codes') + ' · ' + G[0].label : '', codeSumColor: !boxOpen && st.promoOk && st.promo ? '#5FD39B' : '#9C9693',
           hasCodes: G.length > 0, codesTitle: st.codes.length === 1 ? 'Your Code' : `Your Codes · ${st.codes.length}`, codesMore: G.length > LIM, codesOpen: open, codesToggle: open ? 'Show Fewer' : `Show All ${G.length}`, toggleCodes: () => this.setState({ codesOpen: !open }),
-          myCodes: shown.map((g) => { const code = g.on ? g.codes.find((x) => x.toUpperCase() === cur) : g.codes[0]; return { code, tip: g.label + ' · ' + code, on: g.on, label: (g.on ? '✓ ' : '') + g.label, many: g.codes.length > 1, count: '×' + g.codes.length, bg: g.on ? '#13202E' : 'transparent', bd: g.on ? '#7CC4FF' : '#26262A', use: () => { this._promoErr = ''; this.setState({ codeBox: true }); this.setState(g.on ? { promo: '', promoInput: '', promoOk: false, promoAuto: false, promoMsg: '' } : { promo: code, promoInput: code, promoOk: false, promoAuto: false, promoMsg: '' }); this.reprice(); } }; }) }; })(),
-      applyPromo: () => { const v = (st.promoInput || '').trim(); this._promoErr = ''; this.setState({ codeBox: true, promo: v, promoOk: false, promoAuto: false, promoMsg: '' }); this.reprice(); },
+          myCodes: shown.map((g) => { const code = g.on ? g.codes.find(isOn) : g.codes[0]; const auto = g.on && !!autoC && code.toUpperCase() === autoC && autoC !== cur; return { code, tip: g.label + ' · ' + code + (auto ? ' · Applied Automatically' : ''), on: g.on, label: (g.on ? '✓ ' : '') + g.label, many: g.codes.length > 1, count: '×' + g.codes.length, bg: g.on ? '#13202E' : 'transparent', bd: g.on ? '#7CC4FF' : '#26262A', use: () => { if (auto) return; this._promoErr = ''; this.setState({ codeBox: true, freeOffer: null }); if (!g.on && g.kind === 'free_eval' && g.size && !st.cart.some((x) => x.size === g.size)) { this._refused = code; this.setState({ promo: '', promoInput: code, promoOk: false, promoAuto: false, promoMsg: '', freeOffer: { code, size: g.size } }); this.reprice(); return; } this.setState(g.on ? { promo: '', promoInput: '', promoOk: false, promoAuto: false, promoMsg: '' } : { promo: code, promoInput: code, promoOk: false, promoAuto: false, promoMsg: '' }); this.reprice(); } }; }) }; })(),
+      applyPromo: () => { const v = (st.promoInput || '').trim().toUpperCase(); this._promoErr = ''; this.setState({ codeBox: true, freeOffer: null, promoInput: v, promo: v, promoOk: false, promoAuto: false, promoMsg: '' }); this.reprice(); },
       rulesFor: P(cur.plan).short + ' · ' + K(cur.size),
       ...(() => { const note = isI ? '' : (() => { const ev = cat.plans.filter((p) => p.kind !== 'funded' && p.sizes.some((z) => z.size === cur.size)).map((p) => JSON.stringify(((cat.rules || {})[p.id] || {})[cur.size] || null)); return ev.length > 1 && ev.every((x) => x === ev[0]) ? 'Same on Every Evaluation' : ''; })(); const W = '#F4F2F1'; const open = !!st.rulesOpen;
         const all = [[rules.targetLabel, rules.target], [rules.maxLossLabel, rules.maxLoss], [rules.dllLabel, rules.dll], ['Max Size', rules.contracts + ' Contracts'], ['Profit Split', rules.split, '#5FD39B']].filter(Boolean).concat(rulesMore.map((x) => [x.l, x.v]), note ? [['Applies To', 'Every Evaluation']] : []);

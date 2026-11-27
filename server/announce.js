@@ -33,12 +33,12 @@ async function deliver(u) {
 // Check and tidy a list saved from the Content board
 // Entries saved unchanged from before (prev) are tidied instead of refused: a bad end date takes them down, a bad link is dropped
 function validate(arr, prev = []) {
-  if (!Array.isArray(arr)) bad('This list is not in the right shape');
+  if (!Array.isArray(arr)) bad('This list is not in the right shape.');
   const old = new Set((prev || []).map((x) => JSON.stringify(x)));
   return arr.map((a, i) => {
-    if (!a || typeof a !== 'object') bad('This list is not in the right shape');
+    if (!a || typeof a !== 'object') bad('This list is not in the right shape.');
     if (old.has(JSON.stringify(a))) { a = Object.assign({}, a); if (a.ends && !okDay(String(a.ends).slice(0, 10))) Object.assign(a, { live: false, ends: null }); if (a.starts && isNaN(new Date(a.starts))) Object.assign(a, { live: false, starts: null }); if (a.link && !/^(https:\/\/[^\s"<>]+|\/(?!\/)[^\s"<>]*)$/.test(a.link)) delete a.link; }
-    const t = clean(a.title, 160); if (!t) bad('Every announcement needs a title');
+    const t = clean(a.title, 160); if (!t) bad('Every announcement needs a title.');
     const o = Object.assign({}, a, { id: clean(a.id, 30) || 'AN-' + (arr.length - i), title: t, body: clean(a.body, 600), who: WHO.includes(a.who) ? a.who : 'Everyone', kind: KINDS.includes(a.kind) ? a.kind : 'Banner', live: !!a.live });
     o.where = WHERE.includes(a.where) ? a.where : a.where === 'dashboard' ? 'Dashboard' : a.where === 'site' ? 'Website' : 'Dashboard and Website';
     if (a.starts != null && a.starts !== '') { if (isNaN(new Date(a.starts))) bad(`"${t}": the start is not a valid date`); o.starts = new Date(a.starts).toISOString(); } else o.starts = null;

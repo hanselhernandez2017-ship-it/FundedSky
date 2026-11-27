@@ -36,7 +36,7 @@ app.use((req, res, next) => { if (!req.path.startsWith('/api')) return next(); c
 // Back office settings such as the catalog version history can be larger than other requests
 app.use('/api/admin/store', express.json({ limit: '2mb' }));
 app.use(express.json({ limit: '200kb' }));
-app.use((err, req, res, next) => (err && (err.type === 'entity.too.large' || err.status === 413) ? res.status(413).json({ error: 'This is too large to save. Remove some entries and try again.' }) : err && err.type === 'entity.parse.failed' ? res.status(400).json({ error: 'The request was not valid JSON' }) : next(err)));
+app.use((err, req, res, next) => (err && (err.type === 'entity.too.large' || err.status === 413) ? res.status(413).json({ error: 'This is too large to save. Remove some entries and try again.' }) : err && err.type === 'entity.parse.failed' ? res.status(400).json({ error: 'The request was not valid JSON.' }) : next(err)));
 app.use((req, res, next) => auth.loadUser(req, res, next).catch(next));
 // Device id: a long-lived cookie, remembered for each trader who signs in on this browser. Used to spot self-referrals (server/affiliates.js).
 const DID_SEEN = new Set();
@@ -53,7 +53,9 @@ setInterval(() => hits.clear(), 10 * 60 * 1000).unref();
 
 const h = (fn) => async (req, res) => {
   try { const out = await fn(req, res); if (!res.headersSent) res.json(out || { ok: true }); }
-  catch (e) { if (e && (e.code === '22021' || e.code === '22P05')) return res.status(400).json({ error: 'That text has characters we cannot save. Remove them and try again.' }); const st = e instanceof HttpError ? e.status : e.status === 402 ? 402 : 500; if (st === 500) { console.error(req.method, req.path, e); db.q('INSERT INTO error_log(path,msg) VALUES($1,$2)', [req.method + ' ' + req.path, String(e.message || e).slice(0, 500)]).catch(() => {}); } res.status(st).json({ error: st === 500 ? 'Something went wrong on our side. Try again.' : e.message, fallback: e.fallback || undefined, repriced: e.repriced || undefined }); }
+  catch (e) { if (e && (e.code === '22021' || e.code === '22P05')) return res.status(400).json({ error: 'That text has characters we cannot save. Remove them and try again.' });
+    // an id or number the database cannot read (not a number, or too large for the column): the request is wrong, not the server
+    if (e && ['22003', '22P02', '22007', '22008'].includes(e.code)) { console.error(req.method, req.path, e.message); return res.status(400).json({ error: 'That value is not valid. Check it and try again.' }); } const st = e instanceof HttpError ? e.status : e.status === 402 ? 402 : 500; if (st === 500) { console.error(req.method, req.path, e); db.q('INSERT INTO error_log(path,msg) VALUES($1,$2)', [req.method + ' ' + req.path, String(e.message || e).slice(0, 500)]).catch(() => {}); } res.status(st).json({ error: st === 500 ? 'Something went wrong on our side. Try again.' : e.message, fallback: e.fallback || undefined, repriced: e.repriced || undefined }); }
 };
 
 // ---------- public ----------
@@ -83,7 +85,7 @@ app.post('/api/auth/verify', limit(10, 60000), h((req) => auth.verifyEmail(req))
 app.post('/api/auth/resend', auth.needUser, limit(4, 60000), h((req) => auth.resendVerify(req)));
 app.post('/api/auth/email', auth.needUser, limit(4, 60000), h((req) => auth.changeEmail(req)));
 // The trader's own unused codes that work at checkout, for the one-tap chips under the code field (nothing when logged out or rewards are off)
-app.get('/api/checkout/codes', h(async (req) => ({ codes: req.user ? (await trader.myCodes(req.user.id, await flagOn('rewards'))).filter((c) => c.co && !c.used).map((c) => ({ code: c.code, label: c.label })) : [] })));
+app.get('/api/checkout/codes', h(async (req) => ({ codes: req.user ? (await trader.myCodes(req.user.id, await flagOn('rewards'))).filter((c) => c.co && !c.used).map((c) => ({ code: c.code, label: c.label, kind: c.kind, pct: c.pct, size: c.kind === 'free_eval' ? c.size || 25000 : undefined })) : [] })));
 app.post('/api/cart/price', h(async (req) => { const out = await core.priceCart(req.body.items, { promo: req.body.promo, coupon: req.body.coupon, userId: req.user && req.user.id, ref: req.user ? null : await auth.refOf(auth.parseCookies(req.headers.cookie).fs_ref) });
   // the same limits the order is checked against (blocked countries, caps), so checkout can say why before payment
   if (req.user) { try { await pay.checkLimits(req.user, out.items); } catch (e) { if (!e.status || e.status >= 500) throw e; out.blocked = e.message; } }
@@ -104,7 +106,7 @@ T.post('/agreements/accept', h(async (req) => require('./legal').accept(req.user
 T.post(['/orders', '/orders/reset', '/orders/activation', '/orders/credits', '/payouts', '/accounts/:id/agreement'], (req, res, next) => require('./legal').guard(req, res, next));
 // Packs and credits (switched by settings.flags.packs)
 const PK = require('./packs');
-T.get('/packs', h(async (req) => { const d = await PK.traderData(req.user.id); if (!d) bad('Packs are switched off right now', 403); return d; }));
+T.get('/packs', h(async (req) => { const d = await PK.traderData(req.user.id); if (!d) bad('Packs are switched off right now.', 403); return d; }));
 T.get('/packs/history', h((req) => PK.history(req.user.id, req.query.before)));
 T.post('/packs/buy', limit(30, 60000), h((req) => PK.buy(req.user, clean(req.body.pack, 30))));
 T.post('/packs/open', limit(30, 60000), h((req) => PK.openOwned(req.user, req.body.id)));
@@ -123,13 +125,13 @@ T.get('/orders/:code/receipt', async (req, res) => { try { res.type('html').send
 T.post('/accounts/:id/agreement', h(async (req) => { const r = await core.signAgreement(req.user.id, req.params.id); if (r.activation) { const o = await pay.createActivationOrder(req.user, { account: req.params.id }); return { checkout: '/checkout/payment?order=' + o.code }; } return r; }));
 T.post('/payouts', h(async (req) => { const sw = ((await db.one("SELECT v FROM kv WHERE k='store.risk.switches'")) || {}).v || {}; if (sw.payouts) bad('Payout requests are paused for a short time. Try again later.', 503); return core.requestPayout(req.user.id, clean(req.body.account, 40), req.body.amount, parseInt(req.body.method, 10)); }));
 T.post('/payout-methods', h(async (req) => {
-  const rail = req.body.rail; if (!['Rise', 'USDC'].includes(rail)) bad('Choose Rise or a USDC wallet as the payout method type'); if (rail === 'USDC' && !(await flagOn('cryptoPayouts'))) bad('USDC payouts are switched off right now. Pick another method.'); const railsOff = ((await db.one("SELECT v FROM kv WHERE k='store.finance.rails'")) || {}).v || {}; if (railsOff[rail.toLowerCase()] === false) bad(rail + ' payouts are not offered right now. Pick another method.'); const raw = clean(req.body.label, 120); if (!raw) bad(rail === 'USDC' ? 'Enter your wallet address' : 'Enter the email of your Rise account');
+  const rail = req.body.rail; if (!['Rise', 'USDC'].includes(rail)) bad('Choose Rise or a USDC wallet as the payout method type.'); if (rail === 'USDC' && !(await flagOn('cryptoPayouts'))) bad('USDC payouts are switched off right now. Pick another method.'); const railsOff = ((await db.one("SELECT v FROM kv WHERE k='store.finance.rails'")) || {}).v || {}; if (railsOff[rail.toLowerCase()] === false) bad(rail + ' payouts are not offered right now. Pick another method.'); const raw = clean(req.body.label, 120); if (!raw) bad(rail === 'USDC' ? 'Enter your wallet address.' : 'Enter the email of your Rise account.');
   // Each type takes one kind of detail: Rise pays to the email of the trader's Rise account, USDC to a wallet address
-  if (rail === 'USDC' && !/^0x[a-fA-F0-9]{40}$/.test(raw)) bad(emailOk(raw) ? 'That is an email. Choose Rise to be paid through your Rise account.' : 'Enter a full wallet address that starts with 0x');
-  if (rail === 'Rise' && !emailOk(raw)) bad(/^0x[a-fA-F0-9]+$/.test(raw) ? 'That is a wallet address. Choose USDC Wallet for a wallet address.' : 'Enter the email of your Rise account');
+  if (rail === 'USDC' && !/^0x[a-fA-F0-9]{40}$/.test(raw)) bad(emailOk(raw) ? 'That is an email. Choose Rise to be paid through your Rise account.' : 'Enter a full wallet address that starts with 0x.');
+  if (rail === 'Rise' && !emailOk(raw)) bad(/^0x[a-fA-F0-9]+$/.test(raw) ? 'That is a wallet address. Choose USDC Wallet for a wallet address.' : 'Enter the email of your Rise account.');
   const label = rail === 'USDC' ? `USDC · Wallet ${raw.slice(0, 6)}…${raw.slice(-4)}` : `Rise · ${raw.toLowerCase().replace(/^(.{1,2})[^@]*@/, '$1•••@')}`;
   const norm = raw.toLowerCase();
-  if (await db.one('SELECT 1 FROM payout_methods WHERE user_id=$1 AND dest_hash=$2', [req.user.id, I.mac(rail + ':' + norm)])) bad('You already added this payout method');
+  if (await db.one('SELECT 1 FROM payout_methods WHERE user_id=$1 AND dest_hash=$2', [req.user.id, I.mac(rail + ':' + norm)])) bad('You already added this payout method.');
   const n = (await db.one('SELECT count(*)::int n FROM payout_methods WHERE user_id=$1', [req.user.id])).n; if (n >= 5) bad('You can keep up to 5 payout methods. Remove one you no longer use first.');
   // The full wallet address or Rise email is stored encrypted for Finance; traders and other staff only see the masked label. The keyed hash finds one destination saved by several traders.
   await db.q("INSERT INTO payout_methods(user_id,rail,label,is_default,unlock_at,dest,dest_hash) VALUES($1,$2,$3,$4, now() + interval '48 hours',$5,$6)", [req.user.id, rail, label, n === 0, I.enc(rail === 'USDC' ? raw : norm), I.mac(rail + ':' + norm)]);
@@ -153,9 +155,9 @@ T.post('/notifications/read', h(async (req) => { if (req.body.all) await db.q('U
 T.use('/tickets/:id', (req, res, next) => (/^\d{1,9}$/.test(req.params.id) ? next() : res.status(404).json({ error: 'Ticket not found' })));
 T.post('/tickets', h(async (req) => {
   const SUP = require('./support');
-  if (req.body.subject != null && typeof req.body.subject !== 'string') bad('Add a subject'); const s = clean(req.body.subject, 160); if (!s) bad('Add a subject');
-  if (req.body.body != null && typeof req.body.body !== 'string') bad('Add a few details so we can help'); const body = clean(req.body.body, 5000); if (!body) bad('Add a few details so we can help');
-  const cat = await SUP.topic(req.body.category); if (!cat) bad('Pick a topic from the list');
+  if (req.body.subject != null && typeof req.body.subject !== 'string') bad('Add a subject.'); const s = clean(req.body.subject, 160); if (!s) bad('Add a subject.');
+  if (req.body.body != null && typeof req.body.body !== 'string') bad('Add a few details so we can help.'); const body = clean(req.body.body, 5000); if (!body) bad('Add a few details so we can help.');
+  const cat = await SUP.topic(req.body.category); if (!cat) bad('Pick a topic from the list.');
   // The ticket and its first message are saved together, so a ticket can never exist without a message
   const t = await db.tx(async (c) => { const x = await c.one('INSERT INTO tickets(user_id,subject,category,channel) VALUES($1,$2,$3,$4) RETURNING id', [req.user.id, s, cat, 'Web']); await c.q('INSERT INTO ticket_msgs(ticket_id,author_id,body) VALUES($1,$2,$3)', [x.id, req.user.id, body]); return x; });
   const r = await SUP.onTraderMessage(t.id, body, { isNew: true }); const ss = await SUP.settings();
@@ -165,14 +167,14 @@ T.post('/tickets', h(async (req) => {
 }));
 T.post('/tickets/:id/reply', h(async (req) => {
   const t = await db.one('SELECT * FROM tickets WHERE id=$1 AND user_id=$2', [+req.params.id, req.user.id]); if (!t) bad('Ticket not found', 404);
-  const body = typeof req.body.body === 'string' ? clean(req.body.body, 5000) : ''; if (!body) bad('Write a reply first');
+  const body = typeof req.body.body === 'string' ? clean(req.body.body, 5000) : ''; if (!body) bad('Write a reply first.');
   await db.q('INSERT INTO ticket_msgs(ticket_id,author_id,body) VALUES($1,$2,$3)', [t.id, req.user.id, body]);
   await db.q("UPDATE tickets SET status='open', updated_at=now() WHERE id=$1", [t.id]);
   await require('./support').onTraderMessage(t.id, body);
 }));
 T.post('/tickets/:id/rate', h(async (req) => {
   const t = await db.one('SELECT * FROM tickets WHERE id=$1 AND user_id=$2', [+req.params.id, req.user.id]); if (!t) bad('Ticket not found', 404);
-  if (t.status !== 'solved') bad('You can rate a ticket once it is solved');
+  if (t.status !== 'solved') bad('You can rate a ticket once it is solved.');
   const good = !!req.body.good; await db.q('UPDATE tickets SET rating=$2, rated_at=now() WHERE id=$1', [t.id, good ? 'good' : 'bad']);
   if (!good) { await db.q('INSERT INTO ticket_msgs(ticket_id,author_id,body) VALUES($1,$2,$3)', [t.id, req.user.id, clean(req.body.body, 2000) || 'This is not solved yet.']); await db.q("UPDATE tickets SET status='open', updated_at=now() WHERE id=$1", [t.id]); }
   return { reopened: !good };
@@ -202,19 +204,23 @@ T.post('/sessions/:id/revoke', h(async (req) => { const p = String(req.params.id
   for (const s of hit) await db.q('DELETE FROM sessions WHERE user_id=$1 AND token=$2', [req.user.id, s.token]); }));
 T.post('/sessions/revoke-all', h(async (req) => { await db.q('DELETE FROM sessions WHERE user_id=$1 AND token<>$2', [req.user.id, req.sess]); }));
 T.post('/journal/note', h(async (req) => {
-  const day = typeof req.body.day === 'string' ? req.body.day.trim() : ''; if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) bad('Pick a day first');
+  const day = typeof req.body.day === 'string' ? req.body.day.trim() : ''; if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) bad('Pick a day first.');
   // a real calendar day (no Feb 30), not in the future and not older than two years
-  const dt = new Date(day + 'T12:00:00Z'); if (isNaN(dt) || dt.toISOString().slice(0, 10) !== day) bad('That is not a real date');
-  if (day > require('./util').tradeDate()) bad('You can only add notes for days up to today');
-  if (dt.getTime() < Date.now() - 731 * 86400000) bad('Notes can be added for the last two years');
-  await db.q("UPDATE users SET settings = jsonb_set(settings, '{notes}', COALESCE(settings->'notes','{}'::jsonb) || jsonb_build_object($2::text, $3::text)) WHERE id=$1", [req.user.id, day, clean(req.body.text, 2000)]);
+  const dt = new Date(day + 'T12:00:00Z'); if (isNaN(dt) || dt.toISOString().slice(0, 10) !== day) bad('That is not a real date.');
+  if (day > require('./util').tradeDate()) bad('You can only add notes for days up to today.');
+  if (dt.getTime() < Date.now() - 731 * 86400000) bad('Notes can be added for the last two years.');
+  // everything is checked before anything is saved, so a refused request changes nothing
+  if (req.body.text != null && typeof req.body.text !== 'string') bad('The note must be text.'); const text = clean(req.body.text, 2000);
   // day review: an optional mood and tags saved next to the note
-  if (req.body.mood !== undefined || req.body.tags !== undefined) {
+  const rev = req.body.mood !== undefined || req.body.tags !== undefined; let mood = ''; let tags = [];
+  if (rev) {
     const MOODS = ['rough', 'okay', 'great']; const TAGS = ['plan', 'over', 'revenge', 'patient', 'tired'];
-    const mood = MOODS.includes(req.body.mood) ? req.body.mood : ''; const tags = Array.isArray(req.body.tags) ? TAGS.filter((t) => req.body.tags.includes(t)) : [];
-    if (req.body.mood && !mood) bad('Pick Rough, Okay or Great');
-    await db.q("UPDATE users SET settings = jsonb_set(settings, '{reviews}', (COALESCE(settings->'reviews','{}'::jsonb) - $2::text) || CASE WHEN $3::text = '' AND $4::jsonb = '[]'::jsonb THEN '{}'::jsonb ELSE jsonb_build_object($2::text, jsonb_build_object('m', $3::text, 't', $4::jsonb)) END) WHERE id=$1", [req.user.id, day, mood, JSON.stringify(tags)]);
+    mood = MOODS.includes(req.body.mood) ? req.body.mood : ''; if (req.body.mood && !mood) bad('Pick Rough, Okay or Great.');
+    if (req.body.tags != null && !Array.isArray(req.body.tags)) bad('Tags must be a list.'); tags = Array.isArray(req.body.tags) ? TAGS.filter((t) => req.body.tags.includes(t)) : [];
   }
+  // one statement for the note and the review; an empty note or an empty review is removed instead of kept as a blank entry
+  await db.q(`UPDATE users SET settings = jsonb_set(jsonb_set(COALESCE(settings,'{}'::jsonb), '{notes}', (COALESCE(settings->'notes','{}'::jsonb) - $2::text) || CASE WHEN $3::text = '' THEN '{}'::jsonb ELSE jsonb_build_object($2::text, $3::text) END),
+    '{reviews}', CASE WHEN NOT $6::boolean THEN COALESCE(settings->'reviews','{}'::jsonb) ELSE (COALESCE(settings->'reviews','{}'::jsonb) - $2::text) || CASE WHEN $4::text = '' AND $5::jsonb = '[]'::jsonb THEN '{}'::jsonb ELSE jsonb_build_object($2::text, jsonb_build_object('m', $4::text, 't', $5::jsonb)) END END) WHERE id=$1`, [req.user.id, day, text, mood, JSON.stringify(tags), rev]);
 }));
 T.post('/courses/:id/lesson', needFlag('education', 'Courses are switched off right now'), h(async (req) => {
   // Only courses traders can see (published, with lessons). Progress and the 100 credits are settled under a lock on the
@@ -242,14 +248,14 @@ T.post('/rewards/:id/redeem', needFlag('rewards', 'Rewards are switched off righ
   // what a reward gives comes from the reward itself (type and value in the catalog); one with no usable effect is not in this list
   const r = (await content.rewards()).find((x) => x.id === req.params.id); if (!r) bad('Reward not found', 404);
   const b = req.body || {}; const uid = req.user.id; let ship = null;
-  if (r.type === 'merch') { const need = (k, n, lab) => { const v = clean(b[k], n); if (!v) bad('Add ' + lab); return v; }; if (!['S', 'M', 'L', 'XL', 'XXL'].includes(b.size)) bad('Pick a size');
+  if (r.type === 'merch') { const need = (k, n, lab) => { const v = clean(b[k], n); if (!v) bad('Add ' + lab); return v; }; if (!['S', 'M', 'L', 'XL', 'XXL'].includes(b.size)) bad('Pick a size.');
     ship = { size: b.size, name: need('name', 80, 'the name for the parcel'), line1: need('line1', 120, 'your street address'), line2: clean(b.line2, 120), city: need('city', 80, 'your city'), region: clean(b.region, 80), postal: need('postal', 20, 'your postal code'), country: need('country', 60, 'your country') }; }
   return db.tx(async (c) => {
-    const u = await c.one('SELECT points FROM users WHERE id=$1 FOR UPDATE', [uid]); if (u.points < r.pts) bad('You need more credits for this reward');
+    const u = await c.one('SELECT points FROM users WHERE id=$1 FOR UPDATE', [uid]); if (u.points < r.pts) bad('You need more credits for this reward.');
     let ref = ''; let out = {};
     if (r.type === 'split') { // a split boost goes on a funded account the trader picks, for its next payout
-      const a = await c.one("SELECT * FROM accounts WHERE id=$1 AND user_id=$2 AND kind='funded' AND phase='active' FOR UPDATE", [clean(b.account, 40), uid]); if (!a) bad('Pick one of your funded accounts');
-      const now = require('./rules').rulesFor(await core.catalog(), a).split; if (now >= r.value) bad(`${a.id} already pays you ${now}% on its next payout`);
+      const a = await c.one("SELECT * FROM accounts WHERE id=$1 AND user_id=$2 AND kind='funded' AND phase='active' FOR UPDATE", [clean(b.account, 40), uid]); if (!a) bad('Pick one of your funded accounts.');
+      const now = require('./rules').rulesFor(await core.catalog(), a).split; if (now >= r.value) bad(`${a.id} already pays you ${now}% on its next payout.`);
       await c.q('UPDATE accounts SET perks=$2 WHERE id=$1', [a.id, JSON.stringify(Object.assign({}, a.perks || {}, { splitOnce: r.value }))]);
       await core.notify(c, uid, `${r.value}% split on your next payout`, `Your next payout from ${a.id} is paid at a ${r.value}% split.`, 'account?acct=' + a.id); ref = 'acct:' + a.id; out = { account: a.id, split: r.value };
     } else if (r.type === 'merch') { // merchandise: a support ticket the trader can see, with the size and where to ship
@@ -268,16 +274,18 @@ T.post('/rewards/:id/redeem', needFlag('rewards', 'Rewards are switched off righ
 }));
 // Credits History, a page at a time (the first page and the all-time totals come with the dashboard data)
 T.get('/points', h(async (req) => trader.pointsPage(req.user.id, req.query.page)));
-T.post('/competitions/:id/join', h(async (req) => { const fl = ((await db.one("SELECT v FROM kv WHERE k='settings.flags'")) || {}).v || {}; if (fl.competitions === false) bad('Competitions are not open right now', 403); const acct = await require('./comps').join(clean(req.params.id, 30), req.user.id); return { account: acct }; }));
+T.post('/competitions/:id/join', h(async (req) => { const fl = ((await db.one("SELECT v FROM kv WHERE k='settings.flags'")) || {}).v || {}; if (fl.competitions === false) bad('Competitions are not open right now.', 403); const acct = await require('./comps').join(clean(req.params.id, 30), req.user.id); return { account: acct }; }));
 // Certificates: found by their public ID in server/certs.js
 const findCert = (id) => require('./certs').find(id);
 // Sharing a certificate earns 50 credits, at most once a week
 T.post('/certs/:id/share', h(async (req) => {
   const c = await findCert(req.params.id); if (!c || c.user !== req.user.id) bad('Certificate not found', 404);
-  const rev = ((await db.one("SELECT v FROM kv WHERE k='store.rewards.revoked'")) || {}).v || []; if (rev.includes(c.id)) bad('This certificate is no longer valid');
-  const recent = await db.one("SELECT 1 FROM points_log WHERE user_id=$1 AND label LIKE 'Shared certificate%' AND created_at > now() - interval '7 days'", [req.user.id]);
-  if (!recent) await core.points(null, req.user.id, 50, 'Shared certificate ' + c.id);
-  return { url: require('./auth').BASE() + '/cert/' + c.id, points: recent ? 0 : 50 };
+  const rev = ((await db.one("SELECT v FROM kv WHERE k='store.rewards.revoked'")) || {}).v || []; if (rev.includes(c.id)) bad('This certificate is no longer valid.');
+  // the weekly check and the credits happen under a lock on the trader's row, so two taps at once pay once
+  const paid = await db.tx(async (t) => { await t.one('SELECT id FROM users WHERE id=$1 FOR UPDATE', [req.user.id]);
+    if (await t.one("SELECT 1 FROM points_log WHERE user_id=$1 AND label LIKE 'Shared certificate%' AND created_at > now() - interval '7 days'", [req.user.id])) return false;
+    await core.points(t, req.user.id, 50, 'Shared certificate ' + c.id); return true; });
+  return { url: require('./auth').BASE() + '/cert/' + c.id, points: paid ? 50 : 0 };
 }));
 T.post('/kyc/sumsub', h((req) => flows.sumsubToken(req.user)));
 T.post('/tax/form', h((req) => flows.taxForm(req.user, req.body || {})));
@@ -286,14 +294,14 @@ const ID_TYPES = ['Passport', "Driver's License", 'National ID Card'];
 T.post('/kyc', h(async (req) => {
   const b = req.body || {}; if (req.user.kyc_status === 'verified') bad('Your identity is already verified. Nothing more to send.');
   if (req.user.kyc_status === 'submitted') bad('Your details are in review. Contact support if something needs to change.');
-  const name = clean(b.name, 120); if (name.length < 3 || !/\s/.test(name)) bad('Enter your full legal name, first and last, as it is on your ID');
+  const name = clean(b.name, 120); if (name.length < 3 || !/\s/.test(name)) bad('Enter your full legal name, first and last, as it is on your ID.');
   const dob = clean(b.dob, 12); const dm = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dob); const dd = dm && new Date(Date.UTC(+dm[1], +dm[2] - 1, +dm[3]));
-  if (!dd || dd.getUTCMonth() !== +dm[2] - 1 || dd.getUTCDate() !== +dm[3]) bad('Enter your date of birth');
+  if (!dd || dd.getUTCMonth() !== +dm[2] - 1 || dd.getUTCDate() !== +dm[3]) bad('Enter your date of birth.');
   const now = new Date(); const age = now.getUTCFullYear() - +dm[1] - ((now.getUTCMonth() + 1) * 100 + now.getUTCDate() < +dm[2] * 100 + +dm[3] ? 1 : 0);
-  if (dd > now) bad('Your date of birth cannot be in the future'); if (age < 18) bad('You must be 18 or older to trade with Funded Sky'); if (age > 120) bad('Check the year of your date of birth');
-  const crow = require('./phone').DIAL.find((x) => x[0].toLowerCase() === clean(b.country, 60).toLowerCase()); if (!crow) bad('Choose your country of residence from the list');
-  const idType = ID_TYPES.find((x) => x === clean(b.idType, 40)); if (!idType) bad('Choose your ID type');
-  const idn = clean(b.idNumber, 40).replace(/[\s-]/g, ''); if (!/^[A-Za-z0-9]{5,20}$/.test(idn) || !/\d/.test(idn)) bad('Enter the ID number exactly as it is on the document (5 to 20 letters and numbers)');
+  if (dd > now) bad('Your date of birth cannot be in the future.'); if (age < 18) bad('You must be 18 or older to trade with Funded Sky.'); if (age > 120) bad('Check the year of your date of birth.');
+  const crow = require('./phone').DIAL.find((x) => x[0].toLowerCase() === clean(b.country, 60).toLowerCase()); if (!crow) bad('Choose your country of residence from the list.');
+  const idType = ID_TYPES.find((x) => x === clean(b.idType, 40)); if (!idType) bad('Choose your ID type.');
+  const idn = clean(b.idNumber, 40).replace(/[\s-]/g, ''); if (!/^[A-Za-z0-9]{5,20}$/.test(idn) || !/\d/.test(idn)) bad('Enter the ID number exactly as it is on the document (5 to 20 letters and numbers).');
   const k = { name, dob, country: crow[0], idType, idLast4: idn.slice(-4), at: new Date().toISOString() };
   await db.q("UPDATE users SET kyc=$2, kyc_status='submitted' WHERE id=$1 AND kyc_status NOT IN ('verified','submitted')", [req.user.id, k]);
 }));
@@ -310,6 +318,8 @@ app.use('/api/admin', (req, res, next) => (req.user && req.user.id === 0 ? next(
 // ---------- pages ----------
 const DIST = path.join(__dirname, '..', 'web', 'dist');
 const page = (f) => (req, res) => res.sendFile(path.join(DIST, f));
+// Page handlers that wait on the database: a failure goes to the error page at the end of this file instead of stopping the server
+const safe = (fn) => (req, res, next) => Promise.resolve().then(() => fn(req, res, next)).catch(next);
 const needPage = (staff) => (req, res, next) => { if (!req.user) return res.redirect('/login?next=' + encodeURIComponent(req.originalUrl)); if (staff && !auth.STAFF.includes(req.user.role)) return res.redirect('/app'); if (staff && req.user.netBlocked) return res.status(403).send(blockedPage(req)); if (staff && !auth.staffOk(req.user)) return res.redirect('/admin-2fa?next=' + encodeURIComponent(req.originalUrl)); next(); };
 app.get('/admin-2fa', (req, res) => { if (!req.user) return res.redirect('/login?next=/admin'); if (!auth.STAFF.includes(req.user.role)) return res.redirect('/app'); if (auth.staffOk(req.user)) return res.redirect('/admin'); if (req.user.netBlocked && req.user.mfa_on && req.user.sess_mfa) return res.status(403).send(blockedPage(req)); res.setHeader('Vary', 'Cookie'); if (!/(?:^|;\s*)fs_theme=light/.test(req.headers.cookie || '')) return res.sendFile(path.join(__dirname, 'mfa-setup.html')); res.type('html').send(MFA_LIGHT || (MFA_LIGHT = require('../scripts/lighten').lighten(require('fs').readFileSync(path.join(__dirname, 'mfa-setup.html'), 'utf8')))); });
 let MFA_LIGHT = null; // light-theme copy of the two-step setup page, made once
@@ -343,7 +353,7 @@ app.use((req, res, next) => {
   } catch (e) { /* never block a page for counting */ }
   next();
 });
-app.get('/', async (req, res) => {
+app.get('/', safe(async (req, res) => {
   if (req.query.ref) {
     const code = clean(req.query.ref, 40); res.append('Set-Cookie', `fs_ref=${encodeURIComponent(code)}; Path=/; Max-Age=${30 * 86400}; SameSite=Lax`);
     const d = new Date().toISOString().slice(0, 10);
@@ -353,47 +363,47 @@ app.get('/', async (req, res) => {
     return res.redirect(req.user ? '/app' : '/signup?ref=' + encodeURIComponent(code));
   }
   res.redirect(req.user ? '/app' : '/checkout');
-});
+}));
 const themed = (f) => (req, res) => { const lt = /(?:^|;\s*)fs_theme=light/.test(req.headers.cookie || ''); const ff = typeof f === 'function' ? f(req) : f; res.setHeader('Vary', 'Cookie'); res.sendFile(path.join(DIST, lt ? ff.replace('.html', '-light.html') : ff)); };
 app.get('/checkout', themed('checkout.html'));
 app.get('/checkout/payment', themed((req) => (req.user ? 'payment-member.html' : 'payment.html')));
 app.get('/checkout/confirmed', themed('confirmed.html'));
-app.get('/checkout/credits', needPage(false), async (req, res, next) => { if (!(await require('./packs').enabled())) return res.redirect('/app'); themed('credits.html')(req, res, next); });
+app.get('/checkout/credits', needPage(false), safe(async (req, res, next) => { if (!(await require('./packs').enabled())) return res.redirect('/app'); themed('credits.html')(req, res, next); }));
 app.get('/login', (req, res, next) => (req.user && !req.query.next ? res.redirect(auth.STAFF.includes(req.user.role) && req.query.admin ? '/admin' : '/app') : next()), themed('login.html'));
 app.get('/signup', (req, res) => themed('signup.html')(req, res));
 // Policy pages: the text published in Content > Website Pages, otherwise the built-in summary (FAQ has none: it is a 404 until one is published)
 const PO = require('./policy');
-const editable = (slug) => async (req, res) => {
+const editable = (slug) => safe(async (req, res) => {
   const pg = ((await db.one("SELECT v FROM kv WHERE k='content.pages'").catch(() => null)) || {}).v || {}; const p = pg[slug]; res.setHeader('Vary', 'Cookie');
   if (p && p.status === 'Published' && p.txt) { const d = p.at && new Date(p.at); return res.send(PO.page({ req, title: p.title || slug, note: d && !isNaN(d) ? 'Last updated ' + PO.esc(d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'America/New_York' })) : '', body: PO.fromText(p.txt) })); }
   const bi = PO.builtIn(slug, (await require('./mail').company()).support);
   if (bi) return res.send(PO.page(Object.assign({ req }, bi)));
   res.status(404).sendFile(path.join(DIST, '404.html'), (e) => e && res.status(404).send('Not found'));
-};
+});
 // One-click unsubscribe from marketing emails (signed link in every marketing email)
 async function unsub(req, res) {
-  const uid = parseInt(req.query.u, 10); const ok = uid && (await require('./mail').unsubCheck(uid, String(req.query.t || '')));
+  const uid = /^\d{1,9}$/.test(String(req.query.u || '')) ? parseInt(req.query.u, 10) : 0; const ok = uid && (await require('./mail').unsubCheck(uid, String(req.query.t || '')));
   if (ok) await db.q('UPDATE users SET settings = settings || $2::jsonb WHERE id=$1', [uid, JSON.stringify({ nMkt: false })]);
   if (req.method === 'POST') return res.status(ok ? 200 : 400).end();
-  res.setHeader('Vary', 'Cookie'); res.status(ok ? 200 : 400).send(`<!doctype html><html lang="en"${PO.light(req) ? ' class="lt"' : ''}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Email Preferences · Funded Sky</title><style>${PO.VARS}body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--bg);color:var(--hd);font:15px/1.55 "Mona Sans",system-ui,sans-serif;padding:24px;box-sizing:border-box}.c{max-width:440px;background:var(--cd);border:1px solid var(--ln);border-radius:12px;padding:32px}h1{margin:0 0 10px;font-size:24px}p{margin:0 0 14px;color:var(--tx)}a{color:var(--lk)}</style></head><body><div class="c"><h1>${ok ? 'You Are Unsubscribed.' : 'This Link Is Not Valid.'}</h1><p>${ok ? 'You will not get offers or sales emails any more. Receipts, payout updates and security emails still come, because they are about your account.' : 'Open the latest email from us and use its link, or change your emails in Settings.'}</p><p><a href="/app#settings?tab=notif">Manage All Emails</a></p></div></body></html>`);
+  res.setHeader('Vary', 'Cookie'); res.status(ok ? 200 : 400).send(`<!doctype html><html lang="en"${PO.light(req) ? ' class="lt"' : ''}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Funded Sky: Email Preferences</title><style>${PO.VARS}body{margin:0;background:var(--bg);color:var(--hd);font:15px/1.55 "Mona Sans",system-ui,sans-serif}main{max-width:720px;margin:0 auto;padding:56px 24px}${PO.TOP_CSS}.c{max-width:440px;margin:28px 0 0;background:var(--cd);border:1px solid var(--ln);border-radius:12px;padding:32px}h1{margin:0 0 10px;font-size:24px}p{margin:0 0 14px;color:var(--tx)}a{color:var(--lk)}</style></head><body><main>${PO.TOP}<div class="c"><h1>${ok ? 'You Are Unsubscribed.' : 'This Link Is Not Valid.'}</h1><p>${ok ? 'You will not get offers or sales emails any more. Receipts, payout updates and security emails still come, because they are about your account.' : 'Open the latest email from us and use its link, or change your emails in Settings.'}</p><p><a href="/app#settings?tab=notif">Manage All Emails</a></p></div></main></body></html>`);
 }
-app.get('/unsubscribe', unsub); app.post('/unsubscribe', express.urlencoded({ extended: false }), unsub);
+app.get('/unsubscribe', safe(unsub)); app.post('/unsubscribe', express.urlencoded({ extended: false }), safe(unsub));
 // Public certificate page: the real certificate, proof it is genuine, and ways to share or print it
 app.get('/cert/:id', (req, res, next) => require('./certs').page(req, res).catch(next));
-app.get('/status', async (req, res) => {
+app.get('/status', safe(async (req, res) => {
   const e = (x) => String(x || '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const inc = (((await db.one("SELECT v FROM kv WHERE k='list.incidents'").catch(() => null)) || {}).v || []).filter((x) => x.pub !== false).slice(0, 10);
   const list = (await require('./integrations').list()).filter((x) => x.enabled);
   const open = inc.filter((x) => x.st !== 'resolved');
   const rows = [['Website and Checkout', 'ok'], ['Trader Dashboard', 'ok']].concat(list.filter((x) => ['tailoredpay', 'stripe', 'confirmo', 'rise', 'sumsub', 'resend'].includes(x.id)).map((x) => [x.name, x.status === 'live' ? 'ok' : 'w']));
   res.setHeader('Vary', 'Cookie');
-  res.send(`<!doctype html><html lang="en"${PO.light(req) ? ' class="lt"' : ''}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Funded Sky Status</title><meta http-equiv="refresh" content="60"><style>${PO.VARS}body{margin:0;background:var(--bg);color:var(--tx);font-family:"Mona Sans",system-ui;line-height:1.5}main{max-width:720px;margin:0 auto;padding:56px 24px}h1{color:var(--hd);font-size:28px;margin:0 0 18px}.bar{padding:14px 18px;border-radius:12px;background:${open.length ? 'var(--wnb)' : 'var(--okb)'};color:${open.length ? 'var(--wn)' : 'var(--ok)'};font-weight:600;margin-bottom:22px}.r{display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--ln)}.ok{color:var(--ok)}.w{color:var(--wn)}h2{color:var(--hd);font-size:17px;margin:30px 0 8px}.i{padding:12px 0;border-bottom:1px solid var(--ln)}.i b{color:var(--hd)}.n{color:var(--mu);font-size:13px}a{color:var(--lk)}</style></head><body><main><p><a href="/">← Funded Sky</a></p><h1>System Status</h1><div class="bar">${open.length ? e(open[0].t) : 'Everything is working'}</div>${rows.map(([n, st]) => `<div class="r"><span>${e(n)}</span><span class="${st}">${st === 'ok' ? 'Normal' : 'Slower than usual'}</span></div>`).join('')}<h2>Recent Incidents</h2>${inc.map((x) => `<div class="i"><b>${e(x.t)}</b> <span class="n">· ${x.st === 'resolved' ? 'Resolved' : 'Ongoing'} · ${e(new Date(x.at).toUTCString().slice(0, 22))} UTC</span>${(x.upd || []).slice(-1).map((u) => `<div class="n">${e(typeof u === 'string' ? u : u.text)}</div>`).join('')}</div>`).join('') || '<p class="n">No incidents reported.</p>'}</main></body></html>`);
-});
+  res.send(`<!doctype html><html lang="en"${PO.light(req) ? ' class="lt"' : ''}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Funded Sky: System Status</title><meta http-equiv="refresh" content="60"><style>${PO.VARS}body{margin:0;background:var(--bg);color:var(--tx);font-family:"Mona Sans",system-ui;line-height:1.5}main{max-width:720px;margin:0 auto;padding:56px 24px}h1{color:var(--hd);font-size:28px;margin:28px 0 18px}${PO.TOP_CSS}.bar{padding:14px 18px;border-radius:12px;background:${open.length ? 'var(--wnb)' : 'var(--okb)'};color:${open.length ? 'var(--wn)' : 'var(--ok)'};font-weight:600;margin-bottom:22px}.r{display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--ln)}.ok{color:var(--ok)}.w{color:var(--wn)}h2{color:var(--hd);font-size:17px;margin:30px 0 8px}.i{padding:12px 0;border-bottom:1px solid var(--ln)}.i b{color:var(--hd)}.n{color:var(--mu);font-size:13px}a{color:var(--lk)}</style></head><body><main>${PO.TOP}<h1>System Status</h1><div class="bar">${open.length ? e(open[0].t) : 'Everything is working'}</div>${rows.map(([n, st]) => `<div class="r"><span>${e(n)}</span><span class="${st}">${st === 'ok' ? 'Normal' : 'Slower than usual'}</span></div>`).join('')}<h2>Recent Incidents</h2>${inc.map((x) => `<div class="i"><b>${e(x.t)}</b> <span class="n">· ${x.st === 'resolved' ? 'Resolved' : 'Ongoing'} · ${e(new Date(x.at).toUTCString().slice(0, 22))} UTC</span>${(x.upd || []).slice(-1).map((u) => `<div class="n">${e(typeof u === 'string' ? u : u.text)}</div>`).join('')}</div>`).join('') || '<p class="n">No incidents reported.</p>'}</main></body></html>`);
+}));
 app.get('/terms', editable('terms'));
 app.get('/privacy', editable('privacy'));
 app.get('/refund-policy', editable('refund-policy'));
 // Rules page: staff-written text if published in Content, otherwise the live rules for every plan and size from the catalog
-app.get('/rules', async (req, res, next) => {
+app.get('/rules', safe(async (req, res, next) => {
   const pg = ((await db.one("SELECT v FROM kv WHERE k='content.pages'").catch(() => null)) || {}).v || {}; if (pg.rules && pg.rules.status === 'Published' && pg.rules.txt) return editable('rules')(req, res, next);
   try { const c = await core.catalog(); const RR = require('./rules'); const e = (x) => String(x == null ? '' : x).replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch])); const m = (v) => '$' + Number(v || 0).toLocaleString('en-US');
     const RT = require('./ruletable');
@@ -402,7 +412,7 @@ app.get('/rules', async (req, res, next) => {
       return `<h2>${e(p.name || p.short)}</h2><p>${e(p.desc || '')}</p><div class="rs">${t.sizes.map((z, i) => `<input type="radio" name="rs${pi}" id="rs${pi}_${i}"${i ? '' : ' checked'}><label for="rs${pi}_${i}">$${z / 1000}K</label>`).join('')}<div class="tw"><table><thead><tr><th></th>${t.sizes.map((z) => `<th>$${z / 1000}K</th>`).join('')}</tr></thead><tbody>${t.rows.map((r) => (r.length === 1 ? `<tr class="g"><th colspan="${t.sizes.length + 1}">${e(r[0])}</th></tr>` : `<tr><th>${e(r[0])}</th>${r.slice(1).map((v) => `<td>${e(v)}</td>`).join('')}</tr>`)).join('')}</tbody></table></div></div>`; }).join('');
     const sup = e((await require('./mail').company()).support); res.setHeader('Vary', 'Cookie');
     res.send(PO.page({ req, wide: true, title: 'Trading Rules', note: `The rules every new account starts with, straight from our live catalog. Your own accounts show their rules in the dashboard. Questions: <a href="mailto:${sup}">${sup}</a>`, css: 'h2{font-size:21px;margin:36px 0 4px}.tw{overflow-x:auto;border:1px solid var(--ln);border-radius:10px;margin-top:12px}table{border-collapse:collapse;width:100%;font-size:14px;min-width:560px}th,td{padding:10px 14px;border-bottom:1px solid var(--ln2);text-align:right;white-space:nowrap}tbody th{text-align:left;color:var(--mu);font-weight:500}thead th{color:var(--hd)}tr:last-child th,tr:last-child td{border-bottom:0}tr.g th{color:var(--hd);font-weight:600;padding-top:18px;text-align:left}td{white-space:normal;min-width:120px}.rs>input{position:absolute;opacity:0;pointer-events:none}.rs>label{display:none}@media (max-width:700px){main{padding:40px 16px}.rs{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}.rs>label{display:block;flex:1;text-align:center;padding:9px 0;border:1px solid var(--ln);border-radius:8px;font-size:14px;font-weight:500;color:var(--mu);cursor:pointer}.rs>input:checked+label{color:var(--hd);border-color:var(--lk);box-shadow:inset 0 0 0 1px var(--lk)}.rs>input:focus-visible+label{outline:2px solid var(--lk);outline-offset:2px}.rs .tw{flex:1 0 100%;margin-top:6px;overflow:visible}table,tbody{display:block;min-width:0}thead{display:none}tr{display:flex;gap:14px;border-bottom:1px solid var(--ln2)}tr:last-child{border-bottom:0}th,td{border-bottom:0;display:block;flex:1 1 0;white-space:normal;min-width:0;overflow-wrap:break-word}tbody th{flex:1.4 1 0}' + [1, 2, 3, 4, 5, 6].map((i) => `.rs>input:nth-of-type(${i}):checked~.tw td:not(:nth-child(${i + 1}))`).join(',') + '{display:none}}', body: `${tables}<p style="margin-top:32px"><a href="/checkout">Choose an Account</a> · <a href="/terms">Terms of Service</a></p>` })); } catch (err) { next(err); }
-});
+}));
 app.get('/faq', editable('faq'));
 // Public competition leaderboard (Back Office > Competitions > Leaderboard > Settings switches it on and off)
 app.get('/leaderboard', async (req, res, next) => {
@@ -414,15 +424,23 @@ app.get('/leaderboard', async (req, res, next) => {
     const L = d.comps.filter((c) => c.st === 'live').concat(d.comps.filter((c) => c.st === 'upcoming'), d.comps.filter((c) => c.st === 'ended').slice(0, 5)); res.setHeader('Vary', 'Cookie');
     res.send(PO.page({ req, wide: true, title: 'Competition Leaderboard', note: 'Free trading competitions on practice accounts. Ranked by profit, updated every minute.', css: 'h2{font-size:21px;margin:36px 0 4px}.n{color:var(--mu);font-size:14px;margin:4px 0 0}.tw{overflow-x:auto;border:1px solid var(--ln);border-radius:10px;margin-top:12px}table{border-collapse:collapse;width:100%;font-size:14px;min-width:480px}th,td{padding:10px 14px;border-bottom:1px solid var(--ln2);text-align:right;white-space:nowrap}th:nth-child(-n+3),td:nth-child(-n+3){text-align:left}tbody th{font-weight:500;color:var(--hd)}thead th{color:var(--mu);font-weight:500}tr:last-child th,tr:last-child td{border-bottom:0}', body: `${L.length ? L.map(sec).join('') : '<p>No competitions right now.</p>'}<h2>How Ranking Works</h2><ul>${d.rules.map((x) => `<li>${e(x)}</li>`).join('')}</ul><p style="margin-top:32px"><a href="/app/competitions">Join a Competition</a></p>` })); } catch (err) { next(err); }
 });
-app.get('/logout', async (req, res) => { await auth.logout(req, res); const n = String(req.query.next || '/login'); res.redirect(/^\/(?![\/\\])/.test(n) && !/[\u0000-\u001f\\]/.test(n) ? n : '/login'); });
+app.get('/logout', safe(async (req, res) => { await auth.logout(req, res); const n = String(req.query.next || '/login'); res.redirect(/^\/(?![\/\\])/.test(n) && !/[\u0000-\u001f\\]/.test(n) ? n : '/login'); }));
 app.get('/forgot-password', (req, res) => themed('forgot.html')(req, res));
 app.get('/reset-password', (req, res) => themed('reset-password.html')(req, res));
 app.get('/verify-email', (req, res) => themed('verify.html')(req, res));
 app.get('/reset', needPage(false), (req, res, next) => themed('reset.html')(req, res, next));
-app.get('/app/packs', async (req, res, next) => { if (!(await require('./packs').enabled())) return res.redirect('/app'); next(); });
+app.get('/app/packs', safe(async (req, res, next) => { if (!(await require('./packs').enabled())) return res.redirect('/app'); next(); }));
 app.get(['/app', '/app/*'], needPage(false), page('app.html'));
 app.get(['/admin', '/admin/*'], needPage(true), (req, res) => { const dc = /^Admin([A-Za-z]+?)(?:Light)?\.dc\.html$/.exec((req.params[0] || '').split('/')[0]); if (dc) return res.redirect('/admin/' + dc[1].toLowerCase()); const b = ((req.params[0] || 'home').split('/')[0] || 'home').replace(/[^a-z]/g, ''); const f = path.join(DIST, 'admin', b + '.html'); if (fs.existsSync(f)) return res.sendFile(f); res.redirect('/admin/home'); });
 app.use((req, res) => res.status(404).sendFile(path.join(DIST, '404.html'), (e) => e && res.status(404).send('Not found')));
+// Last stop for anything a page or middleware threw: a short answer with no stack trace, and a line in the log and in System Health for real faults
+app.use((err, req, res, next) => { const st = err && err.status >= 400 && err.status < 500 ? err.status : 500;
+  if (st === 500) { console.error(req.method, req.path, err); db.q('INSERT INTO error_log(path,msg) VALUES($1,$2)', [req.method + ' ' + String(req.path).slice(0, 200), String((err && err.message) || err).slice(0, 500)]).catch(() => {}); }
+  if (res.headersSent) return next(err);
+  if (req.path.startsWith('/api/')) return res.status(st).json({ error: st === 500 ? 'Something went wrong on our side. Try again.' : 'That request is not valid.' });
+  res.status(st).type('text').send(st === 500 ? 'Something went wrong on our side. Try again.' : st === 404 ? 'Not found' : 'That address is not valid'); });
+// A promise nobody waited for must never stop the server: log it and carry on
+process.on('unhandledRejection', (e) => { console.error('unhandledRejection', e); db.q('INSERT INTO error_log(path,msg) VALUES($1,$2)', ['unhandledRejection', String((e && e.message) || e).slice(0, 500)]).catch(() => {}); });
 
 const PORT = process.env.PORT || 3000;
 migrate().then(async () => {

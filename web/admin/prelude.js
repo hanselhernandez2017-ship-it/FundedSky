@@ -9,7 +9,7 @@
     async api(path, body, method) {
       const r = await fetch('/api/admin' + path, { method: method || (body === undefined ? 'GET' : 'POST'), headers: { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body), credentials: 'same-origin' });
       let j = {}; try { j = await r.json(); } catch (e) { /* empty */ }
-      if (r.status === 401) { location.href = '/login?next=' + encodeURIComponent(location.pathname); throw new Error('Log in again'); }
+      if (r.status === 401) { location.href = '/login?next=' + encodeURIComponent(location.pathname); throw new Error('Log in again.'); }
       if (!r.ok) throw new Error(j.error || 'Something went wrong');
       return j;
     },

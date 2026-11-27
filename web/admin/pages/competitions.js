@@ -163,7 +163,7 @@ function startBoard(root) {
       case 'newComp': S.nc = newC(); S.drawer = { id: 'new' }; return 1;
       case 'addPrize': { const last = S.nc.prizes[S.nc.prizes.length - 1]; if (S.nc.prizes.length < 50) S.nc.prizes.push(last ? Object.assign({}, last) : { type: 'funded', size: SIZES[0] }); return 1; }
       case 'rmPrize': S.nc.prizes.splice(+k, 1); return 1;
-      case 'saveComp': { const c = S.nc; if (!String(c.n || '').trim()) { toast('Give it a name'); return 0; } if (!c.startAt || !c.endAt) { toast('Pick the start and end dates'); return 0; } if (c.endAt < c.startAt) { toast('The end date is before the start date'); return 0; } if (!c.prizes.length) { toast('Add at least one prize'); return 0; }
+      case 'saveComp': { const c = S.nc; if (!String(c.n || '').trim()) { toast('Give it a name.'); return 0; } if (!c.startAt || !c.endAt) { toast('Pick the start and end dates.'); return 0; } if (c.endAt < c.startAt) { toast('The end date is before the start date.'); return 0; } if (!c.prizes.length) { toast('Add at least one prize.'); return 0; }
         F.api('/competitions', { n: c.n, startAt: c.startAt, endAt: c.endAt, size: K(+c.size) + ' practice account', entry: c.entry, rule: c.rule, prizes: c.prizes.map((p) => (p.type === 'funded' || p.type === 'eval' ? { type: p.type, size: +p.size || SIZES[0] } : p.type === 'credits' ? { type: p.type, amount: +p.amount } : { type: 'cash', note: p.note })) }).then(() => { S.drawer = null; done('Competition created. Sign-ups open now.')(); }).catch(fail); return 0; }
       case 'startC': F.api('/competitions/' + encodeURIComponent(S.drawer.id) + '/start', {}).then(done('Competition started')).catch(fail); return 0;
       case 'lbOf': S.cid = S.drawer.id; S.drawer = null; S.view = 'lb'; return 1;

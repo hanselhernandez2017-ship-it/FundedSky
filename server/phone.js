@@ -4,15 +4,15 @@ const BY = new Map(DIAL.map((r) => [r[1], r]));
 // iso: two-letter country code from the picker; num: the number as typed
 function parse(iso, num) {
   const row = BY.get(String(iso || '').toUpperCase());
-  if (!row) return { err: 'Choose your country code' };
+  if (!row) return { err: 'Choose your country code.' };
   let d = String(num || '').replace(/[\s().\-\/]/g, '');
-  if (!d) return { err: 'Enter your phone number' };
-  if (!/^\+?\d+$/.test(d)) return { err: 'Use digits only for your phone number' };
-  if (d.startsWith('+')) { d = d.slice(1); if (d.startsWith(row[2])) d = d.slice(row[2].length); else return { err: 'That number does not match the country code you picked' }; }
+  if (!d) return { err: 'Enter your phone number.' };
+  if (!/^\+?\d+$/.test(d)) return { err: 'Use digits only for your phone number.' };
+  if (d.startsWith('+')) { d = d.slice(1); if (d.startsWith(row[2])) d = d.slice(row[2].length); else return { err: 'That number does not match the country code you picked.' }; }
   else if (d.startsWith('00' + row[2])) d = d.slice(2 + row[2].length);
   if (d.length > 6 && d.startsWith('0') && !['IT', 'SM', 'VA'].includes(row[1])) d = d.replace(/^0+/, '');
-  if (d.length < 6 || d.length + row[2].length > 15) return { err: `Enter a valid phone number for ${row[0]}` };
-  if (row[2] === '1' && d.length !== 10) return { err: `Enter a 10-digit phone number for ${row[0]}, area code first` };
+  if (d.length < 6 || d.length + row[2].length > 15) return { err: `Enter a valid phone number for ${row[0]}.` };
+  if (row[2] === '1' && d.length !== 10) return { err: `Enter a 10-digit phone number for ${row[0]}, area code first.` };
   return { iso: row[1], code: row[2], national: d, phone: `+${row[2]} ${d}` };
 }
 // Splits a stored "+44 7700900123" back into country and number; hint picks between countries that share a code

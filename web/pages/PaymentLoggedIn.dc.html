@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Funded Sky checkout: payment, logged in</title>
+<title>Funded Sky checkout: Payment</title>
 <script src="./support.js"></script>
 </head>
 <body>
@@ -30,7 +30,9 @@ a{color:#7CC4FF}a:hover{color:#A9D8FF}
 .fs-bar{display:none}
 .fs-mprog{display:none}
 button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4FF;outline-offset:2px}
+@media (min-width:761px) and (max-width:1000px){.fs-secure{display:none!important}.fs-steps{gap:8px!important;white-space:nowrap}.fs-sep{width:24px!important}}
 @media (max-width: 760px){
+.fs-hdr>a:first-child{min-height:44px}
 .fs-steps,.fs-secure{display:none!important}
 .fs-hdr{padding:0 20px!important;height:64px;box-sizing:border-box}
 .fs-mprog{display:flex!important}
@@ -42,6 +44,7 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 .fs-cta{display:none!important}
 .fs-total{display:none!important}
 .fs-bar{display:flex!important}
+.fs-bar a,.fs-aside a{position:relative}.fs-bar a:after,.fs-aside a:after{content:'';position:absolute;inset:-13px -8px}
 .fs-in{font-size:16px!important}
 .fs-main{flex-direction:column!important;flex-wrap:nowrap!important;align-items:stretch!important}
 .fs-col{display:contents!important}
@@ -63,7 +66,7 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 <li style="display: flex; align-items: center; gap: 8px;"><span style="width: 22px; height: 22px; border-radius: 11px; border: 1px solid #3A3A40; font-size: 12px; display: flex; align-items: center; justify-content: center;">3</span>{{ step3 }}</li>
 </ol>
 <div style="display: flex; align-items: center; gap: 20px;">
-<span style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #D4CFCD;"><span style="width: 32px; height: 32px; border-radius: 16px; background: #26262A; color: #F4F2F1; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center;">{{ ini }}</span><span class="fs-secure">{{ firstName }}</span></span>
+<span style="display: flex; align-items: center; gap: 8px; min-height: 44px; font-size: 13px; color: #D4CFCD;"><span style="width: 32px; height: 32px; border-radius: 16px; background: #26262A; color: #F4F2F1; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center;">{{ ini }}</span><span class="fs-secure">{{ firstName }}</span></span>
 <span style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: #9C9693;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg><span class="fs-secure">Secure Checkout</span></span>
 </div>
 </div>
@@ -84,15 +87,17 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 </div>
 
 <fieldset style="border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; min-width: 0;">
-<legend style="font-size: 18px; line-height: 24px; font-weight: 600; letter-spacing: -0.01em; margin-bottom: 14px; padding: 0;">Signed In As</legend>
+<legend style="font-size: 18px; line-height: 24px; font-weight: 600; letter-spacing: -0.01em; margin-bottom: 14px; padding: 0;">Logged In As</legend>
 <div style="min-height: 72px; box-sizing: border-box; background: #111113; border: 1px solid #26262A; border-radius: 8px; padding: 14px 16px; display: flex; align-items: center; gap: 14px;">
 <span style="flex: none; width: 44px; height: 44px; border-radius: 22px; background: #26262A; color: #F4F2F1; font-size: 15px; font-weight: 600; display: flex; align-items: center; justify-content: center;">{{ ini }}</span>
-<span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px;"><span style="font-size: 15px; line-height: 20px; font-weight: 600;">{{ fullName }}</span><span style="font-size: 13px; line-height: 18px; color: #9C9693;">{{ emailLine }}</span></span>
+<span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px;"><span style="font-size: 15px; line-height: 20px; font-weight: 600; overflow-wrap: anywhere;">{{ fullName }}</span><span style="font-size: 13px; line-height: 18px; color: #9C9693;">{{ emailLine }}</span></span>
 <a href="{{ guestHref }}" style="flex: none; min-height: 44px; display: flex; align-items: center; font-size: 13px; font-weight: 500;">Not You?</a>
 </div>
 <p style="margin: 0; font-size: 13px; line-height: 18px; color: #9C9693;">{{ activeNote }}</p>
 </fieldset>
 
+<sc-if value="{{ isFree }}" hint-placeholder-val="{{ false }}"><div style="display: flex; flex-direction: column; gap: 6px;"><h2 style="margin: 0; font-size: 18px; line-height: 24px; font-weight: 600; letter-spacing: -0.01em;">No Payment Needed</h2><p style="margin: 0; font-size: 14px; line-height: 20px; color: #D4CFCD;">This order is covered in full, so there is nothing to pay today. Agree to the rules and terms, then confirm.</p></div></sc-if>
+<sc-if value="{{ needPay }}" hint-placeholder-val="{{ true }}">
 <fieldset style="border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; min-width: 0;">
 <legend style="font-size: 18px; line-height: 24px; font-weight: 600; letter-spacing: -0.01em; margin-bottom: 14px; padding: 0;">Payment Method</legend>
 <sc-for list="{{ methods }}" as="m" hint-placeholder-count="4">
@@ -109,8 +114,9 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 </div>
 </sc-if>
 </fieldset>
+</sc-if>
 
-<label class="fs-agree" style="display: flex; gap: 12px; align-items: flex-start; font-size: 14px; line-height: 20px; color: #D4CFCD; cursor: pointer;"><input type="checkbox" class="fs-check" checked="{{ agreed }}" onChange="{{ toggleAgree }}"><span>I've read the <a href="/checkout#order">Trading Rules</a> and agree to the <a href="/terms" target="_blank">Terms</a> and <a href="/refund-policy" target="_blank">Refund Policy</a>.</span></label>
+<label class="fs-agree" style="display: flex; gap: 12px; align-items: flex-start; font-size: 14px; line-height: 20px; color: #D4CFCD; cursor: pointer;"><input type="checkbox" class="fs-check" checked="{{ agreed }}" onChange="{{ toggleAgree }}"><span>I've read the <a href="/rules" target="_blank">Trading Rules</a> and agree to the <a href="/terms" target="_blank">Terms</a> and <a href="/refund-policy" target="_blank">Refund Policy</a>.</span></label>
 </form>
 
 <aside class="fs-aside" style="flex: 1 1 340px; min-width: 0; position: sticky; top: 24px; background: #18181A; border: 1px solid #26262A; border-radius: 8px; padding: 24px; box-sizing: border-box; display: flex; flex-direction: column; gap: 18px;">
@@ -123,12 +129,12 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 <a href="{{ backHref }}" style="font-size: 13px;">{{ editLabel }}</a>
 </div>
 <div style="display: flex; flex-direction: column; gap: 8px; font-size: 14px; border-top: 1px solid #26262A; padding-top: 16px;">
-<sc-for list="{{ lines }}" as="l"><div style="display: flex; justify-content: space-between; gap: 12px; color: {{ l.color }};"><span>{{ l.label }}</span><span style="font-family: 'Geist Mono', monospace; white-space: nowrap;">{{ l.amount }}</span></div></sc-for>
+<sc-for list="{{ lines }}" as="l"><div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px; color: {{ l.color }};"><span>{{ l.label }}</span><span style="font-family: 'Geist Mono', monospace; white-space: nowrap;">{{ l.amount }}</span></div></sc-for>
 <div class="fs-total" style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 6px;"><span style="font-size: 16px; font-weight: 600;">Total Today</span><span style="font-family: 'Geist Mono', monospace; font-size: 26px; font-weight: 500;">{{ total }}</span></div>
 </div>
 <div class="fs-cta" style="display: flex; flex-direction: column; gap: 8px;">
 <sc-if value="{{ agreed }}" hint-placeholder-val="{{ true }}"><button type="button" onClick="{{ submit }}" disabled="{{ busy }}" style="width: 100%; border: 0; cursor: pointer; font: inherit; text-align: center; background: #FFFFFF; color: #111113; border-radius: 4px; padding: 14px; font-size: 15px; font-weight: 600; font-stretch: 112%; text-decoration: none;">{{ payLabel }}</button></sc-if>
-<sc-if value="{{ notAgreed }}" hint-placeholder-val="{{ false }}"><button type="button" disabled style="width: 100%; background: #26262A; color: #9C9693; border: 0; border-radius: 4px; padding: 14px; font: inherit; font-size: 15px; font-weight: 600; font-stretch: 112%;">{{ payLabel0 }}</button><p style="margin: 0; font-size: 12px; color: #9C9693; text-align: center;">Tick the box to agree to the rules and terms first.</p></sc-if>
+<sc-if value="{{ notAgreed }}" hint-placeholder-val="{{ false }}"><button type="button" disabled style="width: 100%; background: #26262A; color: #9C9693; border: 0; border-radius: 4px; padding: 14px; font: inherit; font-size: 15px; font-weight: 600; font-stretch: 112%;">{{ payLabel0 }}</button><p style="margin: 0; font-size: 12px; color: #9C9693; text-align: center;">Check the box to agree to the rules and terms first.</p></sc-if>
 <sc-if value="{{ err }}"><p role="alert" style="margin: 10px 0 0; font-size: 13.5px; line-height: 19px; color: #F2777F;">{{ err }}</p></sc-if><sc-if value="{{ fallback }}"><button type="button" onClick="{{ payBackup }}" style="width: 100%; margin-top: 10px; background: transparent; color: #F4F2F1; border: 1px solid #3A3A40; border-radius: 4px; padding: 13px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;">Pay With Backup Processor</button></sc-if></div>
 <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; font-size: 13px; color: #9C9693; border-top: 1px solid #26262A; padding-top: 16px;">
 <li style="display: flex; gap: 10px; align-items: flex-start; line-height: 18px;"><svg style="flex: none; margin-top: 1px;" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7CC4FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"></path></svg>{{ kindTrust }}</li>
@@ -143,9 +149,9 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 <div style="display: flex; align-items: center; gap: 16px;">
 <div style="flex: 1; display: flex; flex-direction: column; gap: 2px;"><span style="font-size: 11px; line-height: 14px; color: #9C9693;">Total Today</span><span style="font-family: 'Geist Mono', monospace; font-size: 22px; line-height: 26px; font-weight: 500;">{{ total }}</span></div>
 <sc-if value="{{ agreed }}" hint-placeholder-val="{{ true }}"><button type="button" onClick="{{ submit }}" disabled="{{ busy }}" style="border: 0; cursor: pointer; font: inherit; height: 48px; padding: 0 28px; display: flex; align-items: center; background: #FFFFFF; color: #111113; border-radius: 4px; font-size: 15px; font-weight: 600; font-stretch: 112%; text-decoration: none;">{{ payShort }}</button></sc-if>
-<sc-if value="{{ notAgreed }}" hint-placeholder-val="{{ false }}"><button type="button" disabled style="height: 48px; padding: 0 28px; background: #26262A; color: #9C9693; border: 0; border-radius: 4px; font: inherit; font-size: 15px; font-weight: 600; font-stretch: 112%;">Pay</button></sc-if>
+<sc-if value="{{ notAgreed }}" hint-placeholder-val="{{ false }}"><button type="button" disabled style="height: 48px; padding: 0 28px; background: #26262A; color: #9C9693; border: 0; border-radius: 4px; font: inherit; font-size: 15px; font-weight: 600; font-stretch: 112%;">{{ payShort0 }}</button></sc-if>
 </div>
-<sc-if value="{{ notAgreed }}" hint-placeholder-val="{{ false }}"><p style="margin: 0; font-size: 12px; line-height: 16px; color: #9C9693;">Agree to the rules and terms to pay.</p></sc-if>
+<sc-if value="{{ notAgreed }}" hint-placeholder-val="{{ false }}"><p style="margin: 0; font-size: 12px; line-height: 16px; color: #9C9693;">{{ agreeHint }}</p></sc-if>
 <sc-if value="{{ err }}"><p role="alert" style="margin: 0; font-size: 13px; line-height: 18px; color: #F2777F;">{{ err }}</p></sc-if>
 </div>
 </div>
@@ -172,7 +178,7 @@ class Component extends DCLogic {
     if (st.method === 'crypto' && !(st.cfg && st.cfg.crypto)) return this.setState({ err: 'Crypto checkout is not available yet. Use a card.' });
     if (st.method === 'apple' && st.sum.cat.payments === 'test') return this.setState({ err: 'Apple Pay is not available in test mode. Use the test card.' });
     this.setState({ busy: true, err: '', fallback: false }); st.backup = !!backup;
-    try { location.href = await FSX.checkout.pay(st.sum, st); } catch (e) { this.setState({ busy: false, err: e.message, fallback: !!e.fallback }); }
+    try { location.href = await FSX.checkout.pay(st.sum, st); } catch (e) { if (e.status === 401) { location.replace('/login?next=' + encodeURIComponent('/checkout/payment' + location.search)); return; } /* logged out meanwhile: log in again and come back to this payment, nothing was charged */ this.setState({ busy: false, err: e.message, fallback: !!e.fallback }); }
   }
   renderVals() {
     const st = this.state; const sum = st.sum; const me = st.me || {}; const cfg = st.cfg || { card: 'test' }; const test = cfg.card === 'test' && !cfg.live; const tp = cfg.card === 'tailoredpay'; const sx = cfg.card === 'stripe' && !!cfg.stripePk; if (sx) FSPAY.watchCard();
@@ -187,7 +193,7 @@ class Component extends DCLogic {
     const FMT = { card: (v) => v.replace(/\D/g, '').slice(0, 19).replace(/(.{4})(?=.)/g, '$1 '), cvc: (v) => v.replace(/\D/g, '').slice(0, 4),
       exp: (v, old) => { let d = v.replace(/\D/g, '').slice(0, 4); if (d.length === 1 && (d > '1' || (/\//.test(v) && d !== '0'))) d = '0' + d; if (d.length >= 2 && (+d.slice(0, 2) > 12 || d.slice(0, 2) === '00')) d = d.slice(0, 1); const grow = v.length > String(old || '').length; return d.length > 2 ? d.slice(0, 2) + ' / ' + d.slice(2) : d.length === 2 && grow ? d + ' / ' : d; } };
     const setF = (k) => (e) => { const v = FMT[k](String(e.target.value || ''), (this.state || {})[k]); if (e.target.value !== v) e.target.value = v; this.setState({ [k]: v, err: '' }); };
-    const total = sum ? FSX.money(sum.total) : '…'; const act = !!sum && sum.kind === 'activation';
+    const total = sum ? FSX.money(sum.total) : '…'; const act = !!sum && sum.kind === 'activation'; const free = !!sum && Number(sum.total) === 0; // nothing to pay (a free-account code, a free reset): no payment method is asked for
     return {
       methods, isNew: st.method === 'card' && (test || sx), testMode: test, sx,
       cardNote: sx ? 'Card details go straight to Stripe. Funded Sky never sees your card number.' : 'Test mode: use 4242 4242 4242 4242, any future date and any CVC. No real charge.',
@@ -195,7 +201,7 @@ class Component extends DCLogic {
       card: st.card, exp: st.exp, cvc: st.cvc, set_card: setF('card'), set_exp: setF('exp'), set_cvc: setF('cvc'),
       ini: ((me.first || '')[0] || '') + ((me.last || '')[0] || ''), firstName: me.first || '', fullName: `${me.first || ''} ${me.last || ''}`, emailLine: `${me.email || ''}${me.country ? ' · ' + me.country : ''}`,
       sumTitle: sum ? sum.title : st.err ? 'Order Not Available' : 'Loading…', sumSub: sum ? sum.sub : '', lines: sum ? sum.lines : [], total,
-      payLabel: st.busy ? 'Working…' : !sum && st.err ? 'Pay' : 'Pay ' + total, payLabel0: !sum && st.err ? 'Pay' : 'Pay ' + total, payShort: st.busy ? '…' : 'Pay', busy: st.busy, err: st.err, submit: () => this.submit(), fallback: !!st.fallback, payBackup: () => this.submit(true),
+      payLabel: st.busy ? 'Working…' : free ? 'Confirm Order' : !sum && st.err ? 'Pay' : 'Pay ' + total, payLabel0: free ? 'Confirm Order' : !sum && st.err ? 'Pay' : 'Pay ' + total, payShort: st.busy ? '…' : free ? 'Confirm' : 'Pay', payShort0: free ? 'Confirm' : 'Pay', agreeHint: free ? 'Agree to the rules and terms to confirm.' : 'Agree to the rules and terms to pay.', isFree: free, needPay: !free, busy: st.busy, err: st.err, submit: () => this.submit(), fallback: !!st.fallback, payBackup: () => this.submit(true),
       secureNote: tp ? 'Press Pay and enter your card in the secure payment window. Funded Sky never sees your card number.' : 'You enter your card on our payment processor\'s secure page after you press Pay.',
       cryptoNote: cfg.crypto ? 'Pay with USDC, USDT or other coins on Confirmo\'s secure page. Crypto payments are final.' : 'Crypto checkout is not available yet. Use a card.',
       // An activation fee is not a new purchase: it opens the funded account for an evaluation the trader already passed, so it has its own copy
@@ -210,7 +216,7 @@ class Component extends DCLogic {
       ...(() => { const k = sum && sum.source === 'order' ? sum.kind : 'cart'; const nNew = sum && sum.items ? sum.items.reduce((s, i) => s + i.qty, 0) : 1; const have = st.n ? `You have ${st.n} active ${st.n === 1 ? 'account' : 'accounts'}. ` : '';
         if (k === 'activation') return { kindTrust: 'Your funded account opens as soon as payment clears', activeNote: have + 'Your funded account takes the place of the passed evaluation in your dashboard.' };
         const what = k === 'credits' ? 'the credits are added to your balance' : k === 'reset' ? 'your account is reset' : nNew > 1 ? 'the new accounts are added to your dashboard' : 'the new account is added to your dashboard';
-        return { lead: `Your details are saved. Confirm how you want to pay and ${what}.`, kindTrust: k === 'credits' ? 'Your credits are added as soon as payment clears' : k === 'reset' ? 'Your account is reset as soon as payment clears' : 'Your accounts appear in your dashboard as soon as payment clears',
+        return { lead: free ? `Your details are saved. Confirm the order and ${what}.` : `Your details are saved. Confirm how you want to pay and ${what}.`, kindTrust: free ? (k === 'reset' ? 'Your account is reset as soon as you confirm' : 'Your accounts appear in your dashboard as soon as you confirm') : k === 'credits' ? 'Your credits are added as soon as payment clears' : k === 'reset' ? 'Your account is reset as soon as payment clears' : 'Your accounts appear in your dashboard as soon as payment clears',
           activeNote: k === 'credits' ? 'Credits never expire.' : k === 'reset' ? `${have}The reset keeps the same plan, rules and login.` : st.n ? `${have}${nNew > 1 ? 'The new ones' : 'This one'} will appear alongside ${st.n === 1 ? 'it' : 'them'} in your dashboard.` : (nNew > 1 ? 'Your new accounts' : 'Your new account') + ' will appear in your dashboard.' }; })()
     };
   }

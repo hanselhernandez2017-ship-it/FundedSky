@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Funded Sky: verify email</title>
+<title>Funded Sky: Verify Email</title>
 <script src="./support.js"></script>
 </head>
 <body>
@@ -24,16 +24,18 @@ a{color:#7CC4FF}a:hover{color:#A9D8FF}
 .fs-check:checked::before{transform:scale(1)}
 button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4FF;outline-offset:2px}
 @media (max-width: 760px){
+.fs-hdr>a:first-child{min-height:44px}
+.fs-tap{position:relative}.fs-tap:after{content:'';position:absolute;inset:-12px -6px}
 .fs-hdr{padding:0 20px!important;height:64px;box-sizing:border-box}
 .fs-hide-m{display:none!important}
-.fs-main{padding:32px 20px 40px!important;align-items:stretch!important}
+.fs-main{padding:32px 20px 40px!important;align-items:stretch!important;justify-content:flex-start!important}
 .fs-card{background:transparent!important;border:0!important;padding:0!important;max-width:none!important}
 .fs-h1{font-size:28px!important;line-height:32px!important}
 .fs-in{font-size:16px!important}
 }
 </style>
 </helmet>
-<div style="min-height: 860px; background: #08080A; color: #F4F2F1; font-family: 'Mona Sans', system-ui, sans-serif; display: flex; flex-direction: column;">
+<div style="min-height: 100vh; background: #08080A; color: #F4F2F1; font-family: 'Mona Sans', system-ui, sans-serif; display: flex; flex-direction: column;">
 
 <header style="border-bottom: 1px solid #26262A;">
 <div class="fs-hdr" style="max-width: 1200px; margin: 0 auto; padding: 18px 32px; display: flex; align-items: center; justify-content: space-between; gap: 24px;">
@@ -59,9 +61,9 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 </div>
 <button type="button" onClick="{{ submit }}" style="height: 48px; background: #FFFFFF; color: #111113; border: 0; border-radius: 4px; font: inherit; font-size: 15px; font-weight: 600; font-stretch: 112%; cursor: pointer;">Verify Email</button>
 <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 14px; color: #9C9693;">
-<sc-if value="{{ notResent }}" hint-placeholder-val="{{ true }}"><span>Didn't get it? <button type="button" onClick="{{ resend }}" style="background: transparent; border: 0; padding: 0; color: #7CC4FF; font: inherit; font-size: 14px; font-weight: 500; cursor: pointer;">Resend Code</button></span></sc-if>
+<sc-if value="{{ notResent }}" hint-placeholder-val="{{ true }}"><span>Didn't get it? <button type="button" class="fs-tap" onClick="{{ resend }}" style="background: transparent; border: 0; padding: 0; color: #7CC4FF; font: inherit; font-size: 14px; font-weight: 500; cursor: pointer;">Resend Code</button></span></sc-if>
 <sc-if value="{{ resent }}" hint-placeholder-val="{{ false }}"><span role="status" style="color: #5FD39B;">New code sent. Check spam too.</span></sc-if>
-<button type="button" onClick="{{ openEdit }}" style="background: transparent; border: 0; padding: 0; color: #7CC4FF; font: inherit; font-size: 14px; font-weight: 500; cursor: pointer;">Change Email</button>
+<button type="button" class="fs-tap" onClick="{{ openEdit }}" style="background: transparent; border: 0; padding: 0; color: #7CC4FF; font: inherit; font-size: 14px; font-weight: 500; cursor: pointer;">Change Email</button>
 </div>
 <sc-if value="{{ editing }}" hint-placeholder-val="{{ false }}">
 <div style="display: flex; flex-direction: column; gap: 10px; border-top: 1px solid #26262A; padding-top: 20px;">

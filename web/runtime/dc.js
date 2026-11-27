@@ -89,7 +89,7 @@
   async function api(path, body, method) {
     const r = await fetch(path, { method: method || (body ? 'POST' : 'GET'), headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined, credentials: 'same-origin' });
     let j = {}; try { j = await r.json(); } catch (e) { /* empty */ }
-    if (!r.ok) { const e = new Error(j.error || 'Something went wrong. Try again.'); e.status = r.status; e.fallback = !!j.fallback; e.repriced = !!j.repriced; throw e; }
+    if (!r.ok) { let m = String(j.error || 'Something went wrong. Try again.'); if (!/^\/api\/admin/.test(path) && /[A-Za-z0-9)%]$/.test(m)) m += '.'; const e = new Error(m); e.status = r.status; e.fallback = !!j.fallback; e.repriced = !!j.repriced; throw e; }
     return j;
   }
   const qs = (k) => new URLSearchParams(location.search).get(k);

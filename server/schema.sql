@@ -366,3 +366,17 @@ CREATE UNIQUE INDEX IF NOT EXISTS points_log_course_once ON points_log(user_id, 
 ALTER TABLE coupons ADD COLUMN IF NOT EXISTS size INTEGER;
 -- A trade above the max position size keeps the limit it broke (NULL: within the limit)
 ALTER TABLE trades ADD COLUMN IF NOT EXISTS over_limit INTEGER;
+
+-- Lookups by trader. Every dashboard load reads these tables by user_id (and tickets' messages by ticket_id); without an index
+-- each read scans the whole table, which gets slower with every trader who signs up.
+CREATE INDEX IF NOT EXISTS orders_user ON orders(user_id);
+CREATE INDEX IF NOT EXISTS payouts_user ON payouts(user_id);
+CREATE INDEX IF NOT EXISTS payouts_account ON payouts(account_id);
+CREATE INDEX IF NOT EXISTS notifications_user ON notifications(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS points_log_user ON points_log(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS tickets_user ON tickets(user_id);
+CREATE INDEX IF NOT EXISTS ticket_msgs_ticket ON ticket_msgs(ticket_id);
+CREATE INDEX IF NOT EXISTS sessions_user ON sessions(user_id);
+CREATE INDEX IF NOT EXISTS coupons_user ON coupons(user_id);
+CREATE INDEX IF NOT EXISTS payout_methods_user ON payout_methods(user_id);
+CREATE INDEX IF NOT EXISTS user_cards_status ON user_cards(user_id, status);

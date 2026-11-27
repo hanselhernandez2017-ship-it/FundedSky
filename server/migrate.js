@@ -7,6 +7,7 @@ async function migrate() {
   if (!c) await db.q('INSERT INTO catalog(id,data) VALUES(1,$1)', [DEFAULT_CATALOG]);
   const seed = require('./seed');
   await seed.run();
+  await require('./mig_e').run(); // stored copy that still has old wording (Nov 27 decisions: test card label, news casing, refund days, paired approval switches)
   // Tickets saved without a first message (possible before the ticket and message were saved together) get a placeholder
   { const n = await require('./support').fixEmptyTickets(); if (n) console.log(`Support: added a placeholder message to ${n} ticket${n === 1 ? '' : 's'} that had none`); }
   // One-time: every plan counts toward free packs at checkout (Instant was left out at first)
@@ -14,6 +15,10 @@ async function migrate() {
     await db.q("UPDATE kv SET v = jsonb_set(v, '{ladder,plans,instant}', 'true'::jsonb, true) WHERE k='packs.config' AND v ? 'ladder'");
     await db.q("INSERT INTO kv(k,v) VALUES('mig.packs.instant','true'::jsonb) ON CONFLICT (k) DO NOTHING");
   }
+  // One-time: free-account card names read "Free $25K Essential" (was "Free 25K Essential"), in the settings and in what traders hold
+  await require('./packs').migrateDollarNames();
+  // One-time: order names read size, plan, then what was bought ("$25K Essential · Reset"), on orders saved before too
+  await require('./trader').migrateOrderNames();
   // Lesson text for the built-in courses, for sites that saved their own copy of the lessons before it existed
   await require('./content').migrateLessons();
   // One-time: remember which courses each trader was already paid for, so the 100 credits can never be paid twice.

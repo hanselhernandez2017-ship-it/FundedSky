@@ -58,21 +58,21 @@ const liveOn = (p, d) => p.active && !(p.starts && d < p.starts) && !(p.ends && 
 // Price a cart. items: [{plan,size,platform,addons:[...],qty}]. Same rules as the back office Live Preview.
 async function priceCart(items, { promo, coupon, userId, country, kind, ref, noCard, anyUse } = {}) {
   const cat = await catalog(); const today = new Date().toISOString().slice(0, 10);
-  if (!Array.isArray(items) || !items.length) bad('Your cart is empty');
-  if (items.length > 10) bad('Too many accounts in one order');
+  if (!Array.isArray(items) || !items.length) bad('Your cart is empty.');
+  if (items.length > 10) bad('Too many accounts in one order.');
   const comps = []; const accts = []; const norm = []; const notes = []; let count = 0;
   items.forEach((it, li) => {
     if (!it || typeof it !== 'object') bad('Your cart could not be read. Start again from the plans page.');
     it = Object.assign({}, it, { addons: [...new Set(Array.isArray(it.addons) ? it.addons : [])] }); // each add-on once per line
     const p = planDef(cat, it.plan); if (!p || !p.active) bad('Unknown plan');
-    const s = sizeDef(cat, it.plan, it.size); if (!s) bad('That size is not offered on the ' + p.name);
+    const s = sizeDef(cat, it.plan, it.size); if (!s) bad('That size is not offered on the ' + p.name + '.');
     const qty = Math.max(1, Math.min(5, parseInt(it.qty, 10) || 1));
-    if (it.platform && !p.platforms.includes(it.platform)) bad(`${it.platform} is not offered on the ${p.name}`);
+    if (it.platform && !p.platforms.includes(it.platform)) bad(`${it.platform} is not offered on the ${p.name}.`);
     const platform = it.platform || p.defPlatform || p.platforms[0];
     const addons = (it.addons || []).filter((x) => p.addons.includes(x) && cat.addons[x]);
     (it.addons || []).filter((x) => !addons.includes(x)).forEach((x) => notes.push(`${(cat.addons[x] || {}).name || 'An add-on'} is not offered on the ${p.name}, so it was taken out of your cart.`));
     const unit = priceOf(s); count += qty;
-    comps.push({ li, type: 'base', plan: p.id, size: s.size, label: `${p.short} ${kLabel(s.size)}${qty > 1 ? ' × ' + qty : ''}`, amt: unit * qty, rem: unit * qty, floor: Number(s.floor || 0) * qty });
+    comps.push({ li, type: 'base', plan: p.id, size: s.size, label: `${kLabel(s.size)} ${p.short} · ${p.kind === 'funded' ? 'Funded Account' : 'Evaluation'}${qty > 1 ? ' × ' + qty : ''}`, amt: unit * qty, rem: unit * qty, floor: Number(s.floor || 0) * qty });
     for (let i = 0; i < qty; i++) accts.push({ li, plan: p.id, size: s.size, price: unit });
     for (const ad of addons) { const a = cat.addons[ad]; const amt = round2((a.flat != null && Number(a.flat) > 0 ? Number(a.flat) : Math.round(unit * a.pct / 100)) * qty);
       comps.push({ li, type: 'addon', aid: ad, plan: p.id, size: s.size, label: `${a.name}${qty > 1 ? ' × ' + qty : ''}`, amt, rem: amt, floor: 0, discountable: a.discountable !== false }); }
@@ -85,7 +85,11 @@ async function priceCart(items, { promo, coupon, userId, country, kind, ref, noC
   const elig = (pid, bid) => { const pl = planDef(cat, pid); return !(pl && pl.bundleOff && pl.bundleOff[bid]); };
   const bundleDefs = (cat.bundles || []).length ? [{ id: 'tier', type: 'tier', name: (cat.bundleName || 'Multi-Account Savings'), samePlan: !!cat.bundleSamePlan, tiers: cat.bundles.map((b) => ({ min: b.min, pct: b.pct, buy: b.buy })) }] : [];
   (cat.bundleRules || []).forEach((b) => bundleDefs.push(b));
-  const bestBundle = () => { let best = null;
+  // a free account from a reward code doesn't count toward a bundle (owner decision Nov 27): one account of the reward's size is left out
+  let bAccts = accts;
+  if (coupon && userId) { const c0 = await db.one("SELECT kind, size, meta FROM coupons WHERE upper(code)=upper($1) AND user_id=$2", [String(coupon).trim(), userId]);
+    if (c0 && c0.kind === 'free_eval') { const fz = Number(c0.size) || Number((c0.meta || {}).size) || 25000; const k = accts.findIndex((x) => x.size === fz); if (k >= 0) bAccts = accts.filter((x, i) => i !== k); } }
+  const bestBundle = () => { let best = null; const accts = bAccts;
     bundleDefs.forEach((b) => { let off = 0; let hit = [];
       if (b.type === 'tier') { const by = {}; accts.forEach((a) => { if (elig(a.plan, b.id)) (by[b.samePlan ? a.plan : 'all'] = by[b.samePlan ? a.plan : 'all'] || []).push(a); });
         Object.values(by).forEach((arr) => { const t = b.tiers.filter((x) => arr.length >= x.min).sort((x, y) => y.min - x.min)[0]; if (t) { off += arr.reduce((n, a) => n + a.price, 0) * t.pct / 100; hit.push(...new Set(arr.map((a) => a.li))); b._label = t.buy ? `${t.buy}: ${t.pct}% off` : `${b.name}: ${t.pct}% off`; } }); }
@@ -110,22 +114,22 @@ async function priceCart(items, { promo, coupon, userId, country, kind, ref, noC
   // one code field at checkout: a promo code, an affiliate's code, or one of the trader's own reward or card codes. Work out which it is here.
   if (promo && !coupon && !(cat.promos || []).some((x) => String(x.code).toUpperCase() === String(promo).trim().toUpperCase())) {
     const own = await db.one('SELECT code FROM coupons WHERE upper(code)=upper($1)', [String(promo).trim()]);
-    if (own) { if (!userId) bad('Log in to use your reward code'); coupon = own.code; promo = null; }
+    if (own) { if (!userId) bad('Log in to use your reward code.'); coupon = own.code; promo = null; }
   }
   if (promo) {
     promoRow = (cat.promos || []).find((x) => String(x.code).toUpperCase() === String(promo).toUpperCase());
     if (promoRow) { const pr = normPromo(promoRow);
-      if (!pr.active) bad('That promo code is not valid');
-      if (pr.starts && today < pr.starts) bad('That code is not active yet');
-      if (pr.ends && today > pr.ends) bad('That code has expired');
-      if (pr.first && !firstBuy) bad('That code is for your first purchase only');
-      if (pr.minCart && sub < pr.minCart) bad(`That code needs a cart of at least ${money(pr.minCart)}`);
-      if (pr.countries.length && ctry && !pr.countries.includes(ctry)) bad('That code is not available in your country');
-      if (pr.total) { const used = (await db.one("SELECT count(*)::int n FROM orders WHERE upper(promo)=$1 AND status='paid'", [pr.code])).n; if (used >= pr.total) bad('That code has been fully used'); }
-      if (pr.perTrader && userId) { const mine = (await db.one("SELECT count(*)::int n FROM orders WHERE user_id=$1 AND upper(promo)=$2 AND status='paid'", [userId, pr.code])).n; if (mine >= pr.perTrader) bad(pr.perTrader === 1 ? 'You have already used this code' : 'You have used this code the maximum number of times'); }
+      if (!pr.active) bad('That promo code is not valid.');
+      if (pr.starts && today < pr.starts) bad('That code is not active yet.');
+      if (pr.ends && today > pr.ends) bad('That code has expired.');
+      if (pr.first && !firstBuy) bad('That code is for your first purchase only.');
+      if (pr.minCart && sub < pr.minCart) bad(`That code needs a cart of at least ${money(pr.minCart)}.`);
+      if (pr.countries.length && ctry && !pr.countries.includes(ctry)) bad('That code is not available in your country.');
+      if (pr.total) { const used = (await db.one("SELECT count(*)::int n FROM orders WHERE upper(promo)=$1 AND status='paid'", [pr.code])).n; if (used >= pr.total) bad('That code has been fully used.'); }
+      if (pr.perTrader && userId) { const mine = (await db.one("SELECT count(*)::int n FROM orders WHERE user_id=$1 AND upper(promo)=$2 AND status='paid'", [userId, pr.code])).n; if (mine >= pr.perTrader) bad(pr.perTrader === 1 ? 'You have already used this code.' : 'You have used this code the maximum number of times.'); }
       codeP = pr;
-    } else { affRow = await AFF.byCode(promo); if (!affRow) bad('That promo code is not valid'); if (userId && affRow.user === userId) bad('You cannot use your own affiliate code');
-      const t = await AFF.tierOf(affRow); if (!t.disc) bad('That code has no discount right now'); affRow = Object.assign({}, affRow, { code: AFF.up(affRow.code) }); codeP = Object.assign(normPromo({ code: affRow.code, pct: t.disc, name: 'Code ' + affRow.code }), { aff: affRow.user }); }
+    } else { affRow = await AFF.byCode(promo); if (!affRow) bad('That promo code is not valid.'); if (userId && affRow.user === userId) bad('You cannot use your own affiliate code.');
+      const t = await AFF.tierOf(affRow); if (!t.disc) bad('That code has no discount right now.'); affRow = Object.assign({}, affRow, { code: AFF.up(affRow.code) }); codeP = Object.assign(normPromo({ code: affRow.code, pct: t.disc, name: 'Code ' + affRow.code }), { aff: affRow.user }); }
   }
   // no code: a referred trader's first order gets the referral discount
   let refP = null; const RS = await referralSettings();
@@ -141,11 +145,11 @@ async function priceCart(items, { promo, coupon, userId, country, kind, ref, noC
     if (useBundle) { bun = bestBundle(); if (bun) { let left = bun.off; C.filter((c) => c.type === 'base' && bun.hit.includes(c.li)).forEach((c) => { const take = Math.min(left, Math.max(0, c.rem - c.floor)); c.rem = round2(c.rem - take); left = round2(left - take); c.bundled = true; }); sav.push({ label: bun.b._label, amount: round2(bun.off - left), type: 'bundle' }); } }
     let excl = false; autos.forEach((pr) => { const got = applyPromo(C, pr); if (got) { sav.push({ label: `${pr.name}`, amount: got, type: 'auto' }); if (pr.exclusive) excl = true; } });
     let codeGot = 0; let why = '';
-    if (one) { if (excl && codeP) why = 'That code can\'t be combined with the current sale'; else { codeGot = applyPromo(C, one); if (codeGot) sav.push({ label: one.label || (one.aff ? `Code ${one.code}: ${one.value}% off` : `${one.name}${one.vtype === 'percent' ? `: ${Math.min(one.value, cat.maxPromoPct || 100)}% off` : one.vtype === 'fixed' ? `: ${money(one.value)} off` : ''}`), amount: codeGot, type: one.ref ? 'referral' : one.aff ? 'affiliate' : 'promo' }); } }
+    if (one) { if (excl && codeP) why = 'That code can\'t be combined with the current sale.'; else { codeGot = applyPromo(C, one); if (codeGot) sav.push({ label: one.label || (one.aff ? `Code ${one.code}: ${one.value}% off` : `${one.name}${one.vtype === 'percent' ? `: ${Math.min(one.value, cat.maxPromoPct || 100)}% off` : one.vtype === 'fixed' ? `: ${money(one.value)} off` : ''}`), amount: codeGot, type: one.ref ? 'referral' : one.aff ? 'affiliate' : 'promo' }); } }
     return { C, sav, bun, codeGot, why, total: round2(C.reduce((n, c) => n + c.rem, 0)) }; };
   let R = run(true);
   if (one && !R.codeGot) { const R2 = run(false); if (R2.codeGot && R2.total < R.total) R = R2; }
-  if (codeP && !R.codeGot) bad(R.why || 'That code does not apply to the plans in your cart');
+  if (codeP && !R.codeGot) bad(R.why || 'That code does not apply to the plans in your cart.');
   const lines = comps.map((c) => ({ label: c.label, amount: c.amt, kind: c.type === 'base' ? 'plan' : 'addon' })).concat(R.sav.map((x) => ({ label: x.label, amount: -x.amount, kind: 'discount' })));
   let discount = round2(R.sav.reduce((n, x) => n + x.amount, 0)); let applied = R.sav.length ? { type: R.sav[R.sav.length - 1].type, label: R.sav.map((x) => x.label).join(' + ') } : null;
   if (codeP && codeP.aff) applied = Object.assign(applied || {}, { type: 'affiliate', code: affRow.code, affiliate: affRow.user });
@@ -153,15 +157,15 @@ async function priceCart(items, { promo, coupon, userId, country, kind, ref, noC
   let autoCard = false;
   if (coupon) {
     const c = await db.one("SELECT * FROM coupons WHERE upper(code)=upper($1) AND user_id=$2 AND (used=false OR $3)", [String(coupon).trim(), userId || 0, !!anyUse]); // anyUse: the caller already checked this order may use the code (payments.js repriceCart)
-    if (!c) bad('That reward code is not valid'); coupon = c.code;
-    if (c.expires_at ? new Date(c.expires_at) < new Date() : new Date(c.created_at) < new Date(Date.now() - 90 * 86400000)) bad(c.expires_at ? 'That code has expired' : 'That reward code has expired (codes last 90 days)');
+    if (!c) bad('That reward code is not valid.'); coupon = c.code;
+    if (c.expires_at ? new Date(c.expires_at) < new Date() : new Date(c.created_at) < new Date(Date.now() - 90 * 86400000)) bad(c.expires_at ? 'That code has expired.' : 'That reward code has expired (codes last 90 days).');
     const left = round2(sub - discount);
     if (c.kind === 'discount') { const d = round2(left * Number(c.pct) / 100); discount += d; lines.push({ label: c.label, amount: -d, kind: 'coupon' }); }
     else if (c.kind === 'free_eval') { // one free account of the reward's size, on whichever cart line has that size
       const size = Number(c.size) || Number((c.meta || {}).size) || 25000; const li = norm.findIndex((x) => x.size === size); if (li < 0) bad(`This reward is for a ${kLabel(size)} account. Add one to your cart to use it.`);
       const b = R.C.find((x) => x.type === 'base' && x.li === li); const d = Math.min(left, round2(b.rem / norm[li].qty)); discount += d; lines.push({ label: c.label, amount: -d, kind: 'coupon' }); }
     else if (c.kind === 'free_reset' || c.kind === 'reset_discount') bad('This code is for a reset. Use it when you reset an account.');
-    else bad('This reward can\'t be used at checkout');
+    else bad('This reward can\'t be used at checkout.');
     applied = { ...(applied || {}), coupon: c.code };
   } else if (userId && !noCard && (await require('./packs').enabled())) {
     // a discount card the trader saved for checkout comes off automatically, best one first
@@ -221,8 +225,9 @@ async function fulfilOrder(orderId) {
       for (const it of o.items) for (let i = 0; i < it.qty; i++) {
         made.push(await createAccount(c, { userId: o.user_id, orderId: o.id, plan: it.plan, size: it.size, platform: it.platform, addons: it.addons, fees: it.unit != null && it.activation != null ? { price: Number(it.unit), activation: Number(it.activation), reset: Number(it.reset) } : undefined }));
       }
-      for (const id of made) await notify(c, o.user_id, `Your account ${id} is ready`, 'Log in to your platform and place your first trade. Your rules are on the account page.', 'account?acct=' + id);
-      for (const id of made) { const ac = await c.one('SELECT plan, size, platform FROM accounts WHERE id=$1', [id]); M('ready', o.user_id, { account: id, plan: await pName(ac.plan), size: kLabel(ac.size), platform: ac.platform, login: id, server: 'Funded Sky Simulated Feed', url: require('./auth').BASE() + '/app#account?acct=' + id }); }
+      for (const id of made) { const ac = await c.one('SELECT plan, size, platform, kind FROM accounts WHERE id=$1', [id]); const lv = await require('./fills').loginVars(ac.platform); // while the platform connection is not live, the login comes later by email
+        await notify(c, o.user_id, `Your account ${id} is ready`, `${lv.platform_live ? 'Log in to your platform and place your first trade.' : lv.login_note} Your rules are on the account page.`, 'account?acct=' + id);
+        M('ready', o.user_id, Object.assign({ acct_kind: ac.kind === 'funded' ? 'Instant account' : 'evaluation', rules_line: ac.kind === 'funded' ? 'Your rules are on your dashboard.' : 'Your rules are on your dashboard and stay the same until you pass.', account: id, plan: await pName(ac.plan), size: kLabel(ac.size), platform: ac.platform, login: id, server: 'Funded Sky Simulated Feed', url: require('./auth').BASE() + '/app#account?acct=' + id }, lv)); }
     } else if (o.kind === 'reset') {
       await resetAccount(c, o.meta.account, o.user_id, o.total, o.meta.addons);
       made.push(o.meta.account);
@@ -239,7 +244,7 @@ async function fulfilOrder(orderId) {
     // the order's one-use code is used up now (it was held for this order when the order was created)
     if (o.meta && o.meta.coupon) await c.q('UPDATE coupons SET used=true, order_id=$2 WHERE code=$1 AND used=false AND (order_id IS NULL OR order_id=$2)', [o.meta.coupon, o.id]);
     const pts = Math.floor(Number(o.total));
-    await points(c, o.user_id, pts, o.kind === 'reset' ? 'Reset ' + o.meta.account : o.kind === 'activation' ? 'Activation fee' : 'Bought ' + o.items.map((x) => kLabel(x.size)).join(', ') + ' account' + (made.length > 1 ? 's' : ''));
+    await points(c, o.user_id, pts, o.kind === 'reset' ? 'Reset ' + o.meta.account : o.kind === 'activation' ? 'Activation Fee' : 'Bought ' + o.items.map((x) => kLabel(x.size)).join(', ') + ' account' + (made.length > 1 ? 's' : ''));
     // who earns from this order: an affiliate's commission or the referrer's one-time reward (server/affiliates.js)
     await require('./affiliates').onPaid(c, o, module.exports);
     await c.q("UPDATE orders SET meta = meta || $2 WHERE id=$1", [o.id, JSON.stringify({ fulfilled: true, accounts: made })]);
@@ -251,7 +256,7 @@ async function fulfilOrder(orderId) {
 async function resetAccount(c, accountId, userId, paid = 0, addons = []) {
   const a = await c.one('SELECT * FROM accounts WHERE id=$1 AND user_id=$2 FOR UPDATE', [accountId, userId]);
   if (!a) bad('Account not found', 404);
-  if (a.kind !== 'evaluation') bad('Only evaluations can be reset');
+  if (a.kind !== 'evaluation') bad('Only evaluations can be reset.');
   const cat = await catalog(); const st = R.initialState(cat, a);
   await c.q(`UPDATE accounts SET phase='active', balance=$2, peak_eod=$3, floor=$4, today_pnl=0, halted_today=false, days_traded=0, best_day=0, breach_reason=NULL, breached_at=NULL, reset_count=reset_count+1, scalp_profit=0, cycle_scalp=0, last_trade_at=now(), today_date=$5, steps='{}' WHERE id=$1`,
     [a.id, st.balance, st.peak_eod, st.floor, tradeDate()]);
@@ -269,15 +274,16 @@ async function activateFunded(c, accountId, userId, orderId) {
   const cat0 = await catalog();
   const a = await c.one('SELECT * FROM accounts WHERE id=$1 AND user_id=$2 FOR UPDATE', [accountId, userId]);
   if (!a) bad('Account not found', 404);
-  if (a.phase !== 'passed') bad('This account has not passed yet');
+  if (a.phase !== 'passed') bad('This account has not passed yet.');
   const existing = await c.one('SELECT id FROM accounts WHERE parent_id=$1', [a.id]);
   if (existing) return existing.id;
   const id = await createAccount(c, { userId, orderId, plan: a.plan, size: a.size, platform: a.platform, addons: (a.addons || []).filter((x) => x === 'daily'), kind: 'funded', parentId: a.id, rs: a.rs || undefined, fees: a.fees || feesOf(cat0, a) });
   const steps = { ...(a.steps || {}), funded: new Date().toISOString(), ...(orderId ? { activation: new Date().toISOString() } : {}) };
   await c.q("UPDATE accounts SET phase='closed', closed_at=now(), steps=$2 WHERE id=$1", [a.id, steps]);
   await c.q('UPDATE accounts SET steps=$2 WHERE id=$1', [id, steps]);
-  M('funded', userId, { account: id, plan: await pName(a.plan), size: kLabel(a.size), platform: a.platform, login: id, split: (R.rulesFor(await catalog(), a).split || 90) + '%', url: require('./auth').BASE() + '/app#account?acct=' + id });
-  await notify(c, userId, `You're funded: ${id}`, `Your ${kLabel(a.size)} funded account is live. Payouts start after ${(await catalog()).fundedCommon.winDays} winning days.`, 'account?acct=' + id);
+  const lv = await require('./fills').loginVars(a.platform);
+  M('funded', userId, Object.assign({ account: id, plan: await pName(a.plan), size: kLabel(a.size), platform: a.platform, login: id, split: (R.rulesFor(await catalog(), a).split || 90) + '%', url: require('./auth').BASE() + '/app#account?acct=' + id }, lv));
+  await notify(c, userId, `You're funded: ${id}`, `Your ${kLabel(a.size)} funded account is live. Payouts start after ${(await catalog()).fundedCommon.winDays} winning days.${lv.platform_live ? '' : ' ' + lv.login_note}`, 'account?acct=' + id);
   return id;
 }
 
@@ -289,7 +295,7 @@ async function agreementReady(c, a) {
 async function signAgreement(userId, accountId) {
   return db.tx(async (c) => {
     const a = await c.one('SELECT * FROM accounts WHERE id=$1 AND user_id=$2 FOR UPDATE', [accountId, userId]);
-    if (!a || a.phase !== 'passed') bad('This account is not waiting for an agreement');
+    if (!a || a.phase !== 'passed') bad('This account is not waiting for an agreement.');
     const steps = { ...(a.steps || {}), agreement: new Date().toISOString() };
     await c.q('UPDATE accounts SET steps=$2 WHERE id=$1', [a.id, steps]);
     await c.q("UPDATE users SET agreements = agreements || $2 WHERE id=$1", [userId, JSON.stringify({ funded: new Date().toISOString() })]);
@@ -319,7 +325,7 @@ async function leaveCheck(a, p) {
 }
 // Checks before money is sent (Mark Sent, a batch, Rise): status, account, the Pause Payouts switch and Finance's daily limit
 async function sendCheck(c, p, a) {
-  if (p.status !== 'approved') bad('Approve the payout first');
+  if (p.status !== 'approved') bad('Approve the payout first.');
   const st = await payStop(c, a); if (st) bad(st);
   await leaveCheck(a, p);
   if (((await kvv(c, 'store.risk.switches')) || {}).payouts) bad('Payouts are paused in Risk, Platform Health. Turn Pause Payouts off to send.');
@@ -349,16 +355,20 @@ async function requestPayout(userId, accountId, amount, methodId) {
     const qd = R.payoutQuote(cat, a, { pending: open.some((x) => x.status !== 'failed'), failed: open.some((x) => x.status === 'failed'), held: open.reduce((s, x) => s + Number(x.gross), 0), stop: R.payoutStop(a, R.cbFor(a, os)) });
     if (!qd.ok) bad(qd.reasons[0]);
     const given = amount != null && amount !== '';
-    if (given && !Number.isFinite(Number(amount))) bad('Enter the amount as a number');
+    if (given && !Number.isFinite(Number(amount))) bad('Enter the amount as a number.');
     const net = Math.floor(given ? Number(amount) : qd.max);
-    if (net < qd.payoutMin) bad(`The minimum payout is $${qd.payoutMin}`);
-    if (net > qd.max) bad(`The most you can request right now is ${money(qd.max)}`);
+    if (net < qd.payoutMin) bad(`The minimum payout is $${qd.payoutMin}.`);
+    if (net > qd.max) bad(`The most you can request right now is ${money(qd.max)}.`);
     const m = await c.one('SELECT * FROM payout_methods WHERE id=$1 AND user_id=$2', [methodId, userId]);
-    if (!m) bad('Add a payout method first');
-    if (new Date(m.unlock_at) > new Date()) bad('This payout method is still in its 48-hour safety hold');
+    if (!m) bad('Add a payout method first.');
+    if (new Date(m.unlock_at) > new Date()) bad('This payout method is still in its 48-hour safety hold.');
     if (/usdc/i.test(m.rail) && (((await c.one("SELECT v FROM kv WHERE k='settings.flags'")) || {}).v || {}).cryptoPayouts === false) bad('USDC payouts are switched off right now. Pick another payout method.');
     const gross = round2(net / (qd.split / 100));
     const code = 'PO-' + (await c.one("SELECT nextval('seq_payout') n")).n;
+    // a payout can only be requested once the email and the identity are verified, so nothing waits in review for them (checked last, after the eligibility rules)
+    const who = await c.one('SELECT verified, kyc_status FROM users WHERE id=$1', [userId]);
+    if (!who || !who.verified) bad('Verify your email address before requesting a payout. Check your inbox or send a new link from Settings.', 403);
+    if (who.kyc_status !== 'verified') bad(who.kyc_status === 'submitted' ? 'Your identity check is in review. You can request a payout once it is approved.' : 'Verify your identity before requesting a payout.', 403);
     await c.q(`INSERT INTO payouts(code,account_id,user_id,number,gross,split,amount,method,rail,dest) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
       [code, a.id, userId, qd.number, gross, qd.split, net, m.label, m.rail, m.dest || null]);
     // Hold the gross amount out of the account while in review. Until it is paid the held money still counts as in the account for
@@ -379,9 +389,9 @@ async function reviewPayout(actorId, code, action, note, batchId, opt = {}) {
     const a = await c.one('SELECT * FROM accounts WHERE id=$1 FOR UPDATE', [p.account_id]);
     const cat = await catalog(); const url = require('./auth').BASE() + '/app#payouts';
     if (action === 'approve') {
-      if (p.status !== 'requested') bad('Only requested payouts can be approved');
+      if (p.status !== 'requested') bad('Only requested payouts can be approved.');
       const u = await c.one('SELECT kyc_status FROM users WHERE id=$1', [p.user_id]);
-      if (u.kyc_status !== 'verified') bad('Verify this trader\'s identity before approving');
+      if (u.kyc_status !== 'verified') bad('Verify this trader\'s identity before approving.');
       const st = await payStop(c, a); if (st) bad(st);
       await leaveCheck(a, p);
       const who = await c.one('SELECT first, last FROM users WHERE id=$1', [actorId]);
@@ -391,7 +401,7 @@ async function reviewPayout(actorId, code, action, note, batchId, opt = {}) {
       M('payok', p.user_id, { amount: money(p.amount), method: p.method, url });
       await notify(c, p.user_id, `Payout ${p.code} approved`, `${money(p.amount)} is being sent to ${p.method}.`, 'payouts');
     } else if (action === 'pay') {
-      if (!opt.sent) await sendCheck(c, p, a); else if (p.status !== 'approved') bad('Approve the payout first');
+      if (!opt.sent) await sendCheck(c, p, a); else if (p.status !== 'approved') bad('Approve the payout first.');
       const tx = opt.tx || null;
       await c.q("UPDATE payouts SET status='paid', paid_at=now(), batch=COALESCE($2, batch), tx_hash=COALESCE($3, tx_hash), provider_ref=COALESCE(provider_ref, $3) WHERE id=$1", [p.id, batchId || null, tx]);
       const bt = await syncBatches(c, p.code); if (bt && !batchId) await c.q('UPDATE payouts SET batch=$2 WHERE id=$1', [p.id, bt.id]);
@@ -404,7 +414,7 @@ async function reviewPayout(actorId, code, action, note, batchId, opt = {}) {
       await notify(c, p.user_id, `Payout ${p.code} sent`, `${money(p.amount)} sent to ${p.method}.`, 'payouts');
       const I2 = require('./integrations'); { const wu = await c.one('SELECT tid, email FROM users WHERE id=$1', [p.user_id]); I2.alert('payout', `:white_check_mark: Payout ${p.code} sent: ${money(p.amount)}`, { payout: p.code, status: 'paid', account: a.id, number: p.number, gross: Number(p.gross), split: p.split, amount: Number(p.amount), currency: 'USD', rail: p.rail, method: p.method, ref: p.provider_ref || null, user: wu ? { id: wu.tid, email: wu.email } : null }); } I2.announce(`Another payout sent: ${money(p.amount)} to a ${a.size / 1000}K ${a.plan === 'instant' ? 'Instant' : 'funded'} trader. Congrats!`);
     } else if (action === 'fail') {
-      if (p.status !== 'approved') bad('Only payouts ready to send can be marked failed');
+      if (p.status !== 'approved') bad('Only payouts ready to send can be marked failed.');
       const why = note || 'Sending failed';
       // The gross stays held: the payout is retried or denied (which returns it). New requests on the account wait until then.
       await c.q("UPDATE payouts SET status='failed', note=$2, tries=tries+1, failed_at=now() WHERE id=$1", [p.id, why]);
@@ -412,7 +422,7 @@ async function reviewPayout(actorId, code, action, note, batchId, opt = {}) {
       M('payfail', p.user_id, { amount: money(p.amount), method: p.method, reason: why, url });
       await notify(c, p.user_id, `Payout ${p.code} could not be sent`, why + '. Check your payout details, then contact support.', 'payouts');
     } else if (action === 'retry') {
-      if (p.status !== 'failed') bad('Only failed payouts can be retried');
+      if (p.status !== 'failed') bad('Only failed payouts can be retried.');
       const st = await payStop(c, a); if (st) bad(st);
       await leaveCheck(a, p);
       await c.q("UPDATE payouts SET status='approved' WHERE id=$1", [p.id]);
@@ -420,7 +430,7 @@ async function reviewPayout(actorId, code, action, note, batchId, opt = {}) {
       M('payretry', p.user_id, { amount: money(p.amount), method: p.method, url });
       await notify(c, p.user_id, `Payout ${p.code} is being sent again`, `${money(p.amount)} to ${p.method}.`, 'payouts');
     } else if (action === 'deny') {
-      if (!OPEN_PAY.includes(p.status)) bad('This payout can no longer be denied');
+      if (!OPEN_PAY.includes(p.status)) bad('This payout can no longer be denied.');
       await c.q("UPDATE payouts SET status='denied', denied_at=now(), reviewed_by=$2, note=$3 WHERE id=$1", [p.id, actorId, note || '']);
       await c.q('UPDATE accounts SET balance=balance+$2 WHERE id=$1', [a.id, p.gross]);
       await syncBatches(c, p.code);

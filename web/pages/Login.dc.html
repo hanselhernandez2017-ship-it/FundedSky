@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Funded Sky: log in</title>
+<title>Funded Sky: Log In</title>
 <script src="./support.js"></script>
 </head>
 <body>
@@ -24,16 +24,18 @@ a{color:#7CC4FF}a:hover{color:#A9D8FF}
 .fs-check:checked::before{transform:scale(1)}
 button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4FF;outline-offset:2px}
 @media (max-width: 760px){
+.fs-hdr>a:first-child{min-height:44px}
+.fs-tap{position:relative}.fs-tap:after{content:'';position:absolute;inset:-12px -6px}
 .fs-hdr{padding:0 20px!important;height:64px;box-sizing:border-box}
 .fs-hide-m{display:none!important}
-.fs-main{padding:32px 20px 40px!important;align-items:stretch!important}
+.fs-main{padding:32px 20px 40px!important;align-items:stretch!important;justify-content:flex-start!important}
 .fs-card{background:transparent!important;border:0!important;padding:0!important;max-width:none!important}
 .fs-h1{font-size:28px!important;line-height:32px!important}
 .fs-in{font-size:16px!important}
 }
 </style>
 </helmet>
-<div style="min-height: 900px; background: #08080A; color: #F4F2F1; font-family: 'Mona Sans', system-ui, sans-serif; display: flex; flex-direction: column;">
+<div style="min-height: 100vh; background: #08080A; color: #F4F2F1; font-family: 'Mona Sans', system-ui, sans-serif; display: flex; flex-direction: column;">
 
 <header style="border-bottom: 1px solid #26262A;">
 <div class="fs-hdr" style="max-width: 1200px; margin: 0 auto; padding: 18px 32px; display: flex; align-items: center; justify-content: space-between; gap: 24px;">
@@ -85,7 +87,7 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 <sc-if value="{{ emailBad }}" hint-placeholder-val="{{ false }}"><span id="email-err" style="font-size: 13px; color: #F2777F;">Enter a valid email address.</span></sc-if>
 </div>
 <div style="display: flex; flex-direction: column; gap: 6px;">
-<div style="display: flex; justify-content: space-between; align-items: baseline;"><label for="pw" style="font-size: 13px; color: #9C9693;">Password</label><a href="{{ forgotHref }}" style="font-size: 13px;">Forgot Password?</a></div>
+<div style="display: flex; justify-content: space-between; align-items: baseline;"><label for="pw" style="font-size: 13px; color: #9C9693;">Password</label><a href="{{ forgotHref }}" class="fs-tap" style="font-size: 13px;">Forgot Password?</a></div>
 <div style="position: relative;">
 <input id="pw" class="fs-in" type="{{ pwType }}" autocomplete="current-password" value="{{ pw }}" onChange="{{ setPw }}" aria-invalid="{{ pwBad }}" aria-describedby="pw-err" style="width: 100%; height: 48px; box-sizing: border-box; background: #111113; border-radius: 4px; padding: 0 64px 0 14px; color: #F4F2F1; font: inherit; font-size: 15px; border-color: {{ pwBd }};">
 <button type="button" onClick="{{ toggleShow }}" aria-label="{{ showLabel }}" style="position: absolute; right: 4px; top: 4px; height: 40px; padding: 0 12px; background: transparent; border: 0; color: #9C9693; font: inherit; font-size: 13px; font-weight: 500; cursor: pointer;">{{ showText }}</button>

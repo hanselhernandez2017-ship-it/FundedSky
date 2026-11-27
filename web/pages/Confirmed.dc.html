@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Funded Sky checkout: you're in</title>
+<title>Funded Sky checkout: You're In</title>
 <script src="./support.js"></script>
 </head>
 <body>
@@ -14,7 +14,9 @@ body{margin:0;background:#08080A}
 a{color:#7CC4FF}a:hover{color:#A9D8FF}
 .fs-mprog{display:none}
 a:focus-visible{outline:2px solid #7CC4FF;outline-offset:2px}
+@media (min-width:761px) and (max-width:1000px){.fs-secure{display:none!important}.fs-steps{gap:8px!important;white-space:nowrap}.fs-sep{width:24px!important}}
 @media (max-width: 760px){
+.fs-hdr>a:first-child{min-height:44px}
 .fs-steps,.fs-secure{display:none!important}
 .fs-hdr{padding:0 20px!important;height:64px;box-sizing:border-box}
 .fs-mprog{display:flex!important}
@@ -27,24 +29,24 @@ a:focus-visible{outline:2px solid #7CC4FF;outline-offset:2px}
 }
 </style>
 </helmet>
-<div style="min-height: 900px; background: #08080A; color: #F4F2F1; font-family: 'Mona Sans', system-ui, sans-serif;">
+<div style="min-height: 100vh; background: #08080A; color: #F4F2F1; font-family: 'Mona Sans', system-ui, sans-serif;">
 
 <header style="border-bottom: 1px solid #26262A;">
 <div class="fs-hdr" style="max-width: 1200px; width: 100%; box-sizing: border-box; margin: 0 auto; padding: 18px 32px; display: flex; align-items: center; justify-content: space-between; gap: 24px;">
 <a href="{{ homeHref }}" style="display: flex; align-items: center; gap: 6px; text-decoration: none;"><span style="font-weight: 700; font-size: 22px; letter-spacing: -0.045em; color: #F4F2F1; line-height: 1;">fundedsky</span><span style="background: #7CC4FF; color: #08080A; font-weight: 600; font-size: 15px; letter-spacing: -0.01em; padding: 2px 6px 3px; border-radius: 4px; line-height: 1;">futures</span></a>
 <ol class="fs-steps" style="display: flex; gap: 14px; align-items: center; list-style: none; margin: 0; padding: 0; font-size: 13px; color: #9C9693;" aria-label="Checkout steps">
 <li style="display: flex; align-items: center; gap: 8px; color: #D4CFCD;"><span style="width: 22px; height: 22px; border-radius: 11px; background: #26262A; color: #7CC4FF; display: flex; align-items: center; justify-content: center;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"></path></svg></span>{{ stepA }}</li>
+<sc-if value="{{ threeSteps }}" hint-placeholder-val="{{ true }}"><li class="fs-sep" aria-hidden="true" style="width: 64px; height: 3px; border-radius: 2px; background: #26262A; overflow: hidden; align-self: center;"><i style="display: block; height: 100%; width: 100%; background: #7CC4FF; border-radius: 2px;"></i></li>
+<li style="display: flex; align-items: center; gap: 8px; color: #D4CFCD;"><span style="width: 22px; height: 22px; border-radius: 11px; background: #26262A; color: #7CC4FF; display: flex; align-items: center; justify-content: center;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"></path></svg></span>Payment</li></sc-if>
 <li class="fs-sep" aria-hidden="true" style="width: 64px; height: 3px; border-radius: 2px; background: #26262A; overflow: hidden; align-self: center;"><i style="display: block; height: 100%; width: 100%; background: #7CC4FF; border-radius: 2px;"></i></li>
-<li style="display: flex; align-items: center; gap: 8px; color: #D4CFCD;"><span style="width: 22px; height: 22px; border-radius: 11px; background: #26262A; color: #7CC4FF; display: flex; align-items: center; justify-content: center;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"></path></svg></span>Payment</li>
-<li class="fs-sep" aria-hidden="true" style="width: 64px; height: 3px; border-radius: 2px; background: #26262A; overflow: hidden; align-self: center;"><i style="display: block; height: 100%; width: 100%; background: #7CC4FF; border-radius: 2px;"></i></li>
-<li style="display: flex; align-items: center; gap: 8px; color: #F4F2F1;" aria-current="step"><span style="width: 22px; height: 22px; border-radius: 11px; background: #7CC4FF; color: #08080A; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center;">3</span>{{ stepC }}</li>
+<li style="display: flex; align-items: center; gap: 8px; color: #F4F2F1;" aria-current="step"><span style="width: 22px; height: 22px; border-radius: 11px; background: #7CC4FF; color: #08080A; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center;">{{ stepN }}</span>{{ stepC }}</li>
 </ol>
 <div style="display: flex; align-items: center; gap: 20px;"><sc-if value="{{ meIn }}"><a href="/app" aria-label="Your dashboard" style="display: flex; align-items: center; gap: 8px; min-height: 44px; font-size: 13px; color: #D4CFCD; text-decoration: none;"><span style="width: 32px; height: 32px; border-radius: 16px; background: #26262A; color: #F4F2F1; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center;">{{ ini }}</span><span class="fs-secure">{{ firstName }}</span></a></sc-if><span style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: #9C9693;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg><span class="fs-secure">Secure Checkout</span></span></div>
 </div>
 </header>
 
 <div class="fs-mprog" style="padding: 12px 20px 0; flex-direction: column; gap: 8px;">
-<div style="display: flex; justify-content: space-between; font-size: 12px; line-height: 16px; color: #9C9693;"><span>{{ stepC }}</span><span style="font-family: 'Geist Mono', monospace;">3 / 3</span></div>
+<div style="display: flex; justify-content: space-between; font-size: 12px; line-height: 16px; color: #9C9693;"><span>{{ stepC }}</span><span style="font-family: 'Geist Mono', monospace;">{{ stepN }} / {{ stepN }}</span></div>
 <div style="height: 4px; border-radius: 2px; background: #7CC4FF;"></div>
 </div>
 
@@ -65,7 +67,7 @@ a:focus-visible{outline:2px solid #7CC4FF;outline-offset:2px}
 </sc-if>
 
 <div class="fs-btns" style="display: flex; flex-wrap: wrap; gap: 12px;">
-<a href="{{ dashHref }}" style="background: #FFFFFF; color: #111113; border-radius: 4px; padding: 14px 22px; font-size: 15px; font-weight: 600; font-stretch: 112%; text-decoration: none;">{{ cta1 }}</a>
+<a href="{{ dashHref }}" style="background: #FFFFFF; color: #111113; border: 1px solid #FFFFFF; border-radius: 4px; padding: 14px 22px; font-size: 15px; font-weight: 600; font-stretch: 112%; text-decoration: none;">{{ cta1 }}</a>
 <a href="{{ rulesHref }}" style="border: 1px solid #26262A; color: #F4F2F1; border-radius: 4px; padding: 14px 22px; font-size: 15px; font-weight: 500; font-stretch: 112%; text-decoration: none;">{{ cta2 }}</a>
 </div>
 <p style="margin: 0; font-size: 13px; line-height: 18px; color: #9C9693;">Receipt sent to {{ email }} · Need help? <a href="/app/support">Contact Support</a></p>
@@ -89,16 +91,16 @@ class Component extends DCLogic {
     const n = o ? o.accounts.length : 0; const first = o && o.lines.find((l) => l.kind === 'plan');
     const isReset = o && o.kind === 'reset', isAct = o && o.kind === 'activation', isCred = o && o.kind === 'credits';
     const fmt = (v) => Math.round(Number(v) || 0).toLocaleString('en-US');
-    const packsLine = o && o.packs ? ` Plus ${o.packs} free with this order, waiting on your Packs page.` : '';
+    const packsLine = o && o.packs ? ` Plus ${/^\d/.test(o.packs) ? '' : /^[AEIOU]/i.test(o.packs) ? 'an ' : 'a '}${o.packs} free with this order, waiting on your Packs page.` : '';
     // Not a paid order (still checking, not found, unpaid, cancelled): say so plainly, with the right next step, instead of the success page
-    const blank = { showSteps: false, stepA: isCred ? 'Choose Credits' : 'Choose Account', stepC: isCred ? 'Open Packs' : 'Start Trading', homeHref: '/', s1t: '', s1d: '', s2t: '', s2d: '', s3t: '', s3d: '', email: o ? o.email : 'your email' };
+    const blank = { showSteps: false, stepA: isCred ? 'Credits & Payment' : 'Choose Account', stepC: isCred ? 'Done' : 'Start Trading', threeSteps: !isCred, stepN: isCred ? '2' : '3', homeHref: '/', s1t: '', s1d: '', s2t: '', s2d: '', s3t: '', s3d: '', email: o ? o.email : 'your email' };
     if (!o && !this.state.err) return { ...ME, ...blank, eyebrow: 'Checking Your Payment…', h1a: 'One Moment.', h1b: '', lead: '', cta1: 'Go to Dashboard', dashHref: '/app', cta2: 'Contact Support', rulesHref: '/app/support' };
     if (!o) return { ...ME, ...blank, eyebrow: 'Order Not Found', h1a: 'We Could Not Find ', h1b: 'That Order.', lead: 'This order is not on your account. Your orders are listed in Billing.', cta1: 'Go to Billing', dashHref: '/app/billing', cta2: 'Contact Support', rulesHref: '/app/support' };
     if (o.status === 'pending') return { ...ME, ...blank, eyebrow: 'Waiting for Payment · Order ' + o.code, h1a: 'Payment ', h1b: 'Not Received Yet.', lead: this.state.stopped ? 'We have not received a payment for this order, so nothing has been added to your account. A crypto payment can take a few minutes: refresh this page to check again. Otherwise, finish the payment.' : 'We have not received the payment yet. Checking again…', cta1: 'Finish Payment', dashHref: '/checkout/payment?order=' + encodeURIComponent(o.code), cta2: 'Go to Dashboard', rulesHref: '/app' };
     if (!paid) return { ...ME, ...blank, eyebrow: (o.status === 'refunded' ? 'Refunded' : 'Order Cancelled') + ' · Order ' + o.code, h1a: 'This Order Was ', h1b: o.status === 'refunded' ? 'Refunded.' : 'Cancelled.', lead: o.status === 'refunded' ? 'This order was refunded.' : `You have not been charged for it.${o.canceledWhy ? ' Reason: ' + o.canceledWhy + '.' : ''}`, cta1: 'Go to Dashboard', dashHref: '/app', cta2: 'Go to Billing', rulesHref: '/app/billing' };
     const isInst = o.kind === 'instant', isMixed = o.kind === 'mixed';
     if (isCred) return { ...ME, showSteps: true,
-      homeHref: '/', dashHref: '/app/packs', rulesHref: '/app/packs?tab=col', h1a: 'Credits Added. ', h1b: 'Open a Pack.', cta1: 'Go to Packs', cta2: 'See My Cards', stepA: 'Choose Credits', stepC: 'Open Packs',
+      homeHref: '/', dashHref: '/app/packs', rulesHref: '/app/packs?tab=col', h1a: 'Credits Added. ', h1b: 'Open a Pack.', cta1: 'Go to Packs', cta2: 'See My Cards', stepA: 'Credits & Payment', stepC: 'Done', threeSteps: false, stepN: '2',
       eyebrow: paid ? 'Payment Received · Order ' + o.code : 'Waiting for payment · Order ' + o.code,
       lead: !paid ? 'We have not received the payment yet. This page updates on its own.' : `${fmt(o.credits)} credits are in your account. Your balance is now ${fmt(o.balance)} credits.`,
       s1t: 'Pick a Pack', s1d: 'Five packs, each with its own odds. Every pack holds three cards.',
@@ -107,7 +109,7 @@ class Component extends DCLogic {
       email: o.email
     };
     return { ...ME, showSteps: true,
-      h1a: "You're In. ", h1b: "Let's Trade.", cta1: 'Go to Dashboard', cta2: 'Read the Rules', stepA: 'Choose Account', stepC: 'Start Trading', rulesHref: '/app/resources?tab=rules',
+      h1a: "You're In. ", h1b: "Let's Trade.", cta1: 'Go to Dashboard', cta2: 'Read the Rules', stepA: 'Choose Account', stepC: 'Start Trading', threeSteps: true, stepN: '3', rulesHref: '/app/resources?tab=rules',
       homeHref: '/', dashHref: n === 1 && !isReset ? '/app/account?acct=' + encodeURIComponent(o.accounts[0]) : '/app',
       eyebrow: !o ? (this.state.err || 'Checking your payment…') : paid ? 'Payment Received · Order ' + o.code : 'Waiting for payment · Order ' + o.code,
       lead: !o ? '' : !paid ? 'We have not received the payment yet. This page updates on its own.' : isAct ? `Your funded account ${o.accounts[0] || ''} is ready in your dashboard.` : isReset ? `${o.account} is back to its starting balance.` : `${n === 1 ? 'Your ' + (first ? first.label : '') + ' account is' : n + ' accounts are'} ready in your dashboard: ${o.accounts.join(', ')}.${packsLine}`,

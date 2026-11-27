@@ -317,7 +317,7 @@
    },
    {
     "t": "The Trading Day and Sessions",
-    "x": "Futures trade almost around the clock from Sunday evening to Friday afternoon. The trading day runs from 6:00 PM to 5:00 PM Eastern Time, with a one-hour break from 5:00 to 6:00 PM.\n\nYour daily loss limit and your trading day follow the same clock. They reset at 5:00 PM ET, not at midnight.\n\nActivity changes through the day. The evening and overnight hours are usually quieter. The New York session, from 9:30 AM to 4:00 PM ET, has the most volume. The hours for each session and the market holidays are in Resources, Hours."
+    "x": "Futures trade almost around the clock from Sunday evening to Friday afternoon. The trading day runs from 6:00 PM to 5:00 PM Eastern Time, with a one-hour break from 5:00 to 6:00 PM.\n\nYour daily loss limit and your trading day follow the same clock. They reset at 6:00 PM ET, when the next session opens, not at midnight.\n\nActivity changes through the day. The evening and overnight hours are usually quieter. The New York session, from 9:30 AM to 4:00 PM ET, has the most volume. The hours for each session and the market holidays are in Resources, Hours."
    },
    {
     "t": "Order Types",
@@ -463,7 +463,7 @@
   [
    "Payouts",
    "Setting Up Rise",
-   "Rise pays you in your local currency by bank transfer. Add your bank account under Settings, Payout Methods. New payout methods are held for 48 hours as a safety check."
+   "Rise pays you in your local currency by bank transfer. Add the email of your Rise account under Settings, Payout Methods. New payout methods are held for 48 hours as a safety check."
   ],
   [
    "Platforms",
@@ -478,7 +478,7 @@
   [
    "Billing",
    "Refund Policy",
-   "Evaluations with no trades can be refunded within 14 days of purchase. Resets, activation fees and accounts that have traded cannot be refunded. Refunds go back to your original payment method in 3 to 5 business days."
+   "Evaluations with no trades can be refunded within 14 days of purchase. Resets, activation fees and accounts that have traded cannot be refunded. Refunds go back to your original payment method in 5 to 10 business days."
   ],
   [
    "Billing",
@@ -534,14 +534,14 @@
   ],
   [
    "Thu Nov 26",
-   "All day",
+   "All Day",
    "Thanksgiving Day",
    "Holiday"
   ],
   [
    "Fri Nov 27",
    "1:15 PM",
-   "CME early close",
+   "CME Early Close",
    "Holiday"
   ]
  ],

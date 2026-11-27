@@ -9,7 +9,7 @@
   const HOLO = { plat: 1, silver: 1 };
   const KIND = {
     passed: { tone: 'sky', over: 'Certificate of Achievement', title: 'Evaluation Passed', line: (d) => `passed the ${d.what} by reaching the profit target inside every trading rule.`, icon: 'check' },
-    funded: { tone: 'green', over: 'Certificate of Funding', title: 'Funded Trader', line: (d) => `earned a ${d.what} and now trades it for a share of the profits.`, icon: 'wing' },
+    funded: { tone: 'green', over: 'Certificate of Funding', title: 'Funded Trader', line: (d) => `earned a ${d.what} and now earns performance rewards from a simulated funded account.`, icon: 'wing' },
     payout: { tone: 'gold', over: 'Payout Certificate', title: 'Paid Out', line: (d) => `was paid ${d.amount} from a ${d.what}.`, icon: 'coin' },
     lifetime: { tone: 'gold', over: 'Lifetime Payouts', title: (d) => `${d.amount} Club`, line: (d) => `has been paid more than ${d.amount} in total across funded accounts.`, icon: 'star' },
     comp: { tone: 'gold', over: 'Competition Result', title: (d) => `${d.place} Place`, line: (d) => `finished ${String(d.place || '').toLowerCase()} of ${d.of} ${String(d.of) === '1' ? 'trader' : 'traders'} in ${d.what}.`, icon: 'cup' }

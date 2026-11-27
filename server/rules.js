@@ -224,8 +224,8 @@ function payoutQuote(cat, a, opts = {}) {
   const lastPay = opts.lastPayoutAt || a.last_payout_at; if (r.daysBetween > 0 && lastPay) { const d = (Date.now() - new Date(lastPay)) / 864e5; checks.push({ k: 'gap', label: `${r.daysBetween} day${r.daysBetween > 1 ? 's' : ''} since the last payout`, ok: d >= r.daysBetween, have: Math.floor(d), need: r.daysBetween }); }
   if (r.scalp && cycleProfit > 0) { const sp = Math.round(Number(a.cycle_scalp || 0) / cycleProfit * 100); checks.push({ k: 'scalp', label: `Profit from trades held under ${r.scalp.hold} seconds at or under ${r.scalp.pct}%`, ok: sp <= r.scalp.pct, have: sp, need: r.scalp.pct }); }
   if (r.instant && !(a.payout_count > 0)) {
-    const goalOk = bal - start >= r.goal;
-    checks.push({ k: 'goal', label: `Profit goal of $${r.goal.toLocaleString('en-US')} before the first payout`, ok: goalOk, have: round2(bal - start), need: r.goal });
+    const goalOk = bal + Number(opts.held || 0) - start >= r.goal; // money held by a payout in review still counts toward the goal it was requested on
+    checks.push({ k: 'goal', label: `Profit goal of $${r.goal.toLocaleString('en-US')} before the first payout`, ok: goalOk, have: round2(bal + Number(opts.held || 0) - start), need: r.goal });
   }
   const withdrawable = Math.max(0, round2(bal - start - (r.buffer != null ? r.buffer : r.cushion)));
   const lifetimeLeft = Math.max(0, r.lifetime - Number(a.paid_total || 0));
