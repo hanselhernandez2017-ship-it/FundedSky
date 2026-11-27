@@ -55,7 +55,8 @@ ${js}
     startTrader(root);
     var l = document.getElementById('fsload'); if (l) l.remove();
   }
-  window.__FSrefresh = async function (keep) { var d = await load(); if (!d) return; window.__FS = d; mount(keep); };
+  // a refresh after saving keeps the reader where they were on the page
+  window.__FSrefresh = async function (keep) { var d = await load(); if (!d) return; var y = window.scrollY, pg = pageOf(); window.__FS = d; mount(keep); if (pageOf() === pg && y > 0) { window.scrollTo(0, y); requestAnimationFrame(function () { window.scrollTo(0, y); }); } };
   load().then(function (d) { if (!d) return; window.__FS = d; mount({}); FSPAY.boot({ email: d.ME.email, first: d.ME.first, last: d.ME.lastFull }); }).catch(function (e) { console.error(e); var l = document.getElementById('fsload'); if (l) l.innerHTML = 'Could not load your dashboard. <a href="" style="color:#7CC4FF">Try again</a>'; });
   var rt; addEventListener('resize', function () { clearTimeout(rt); rt = setTimeout(function () { if (window.__FS && (innerWidth <= MOB) !== mobileNow) mount(window.__FS_LAST_KEEP ? window.__FS_LAST_KEEP() : {}); }, 200); });
   // live data: refresh balances every 60 seconds while the tab is visible
