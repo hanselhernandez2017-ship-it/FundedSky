@@ -20,7 +20,7 @@
     { g: 'Learn', items: [['education', 'Education', () => { const n = COURSES.filter((c) => c.done < c.l).length; return n ? String(n) : null; }], ['affiliates', 'Affiliates'], ['resources', 'Resources']] },
     { g: 'You', items: [['packs', 'Packs', () => (FS.PACKS && FS.PACKS.waiting.length ? FS.PACKS.waiting.length + ' New' : null), 'n'], ['rewards', 'Rewards'], ['competitions', 'Competitions', () => (COMPS.some((c) => c.st === 'running' || c.st === 'live') ? 'Live' : null), 'n'], ['support', 'Support', () => { const n = TICKETS.filter((t) => t.st !== 'solved').length; return n ? String(n) : null; }], ['settings', 'Settings']] }
   ];
-  const TITLES = { packs: 'Packs', empty: 'Accounts', accounts: 'Accounts', journal: 'Journal', payouts: 'Payouts', billing: 'Billing', education: 'Education', affiliates: 'Affiliates', resources: 'Resources', rewards: 'Rewards', competitions: 'Competitions', support: 'Support', settings: 'Settings', account: 'Account' };
+  const TITLES = { empty: 'Accounts', accounts: 'Accounts', journal: 'Journal', payouts: 'Payouts', billing: 'Billing', education: 'Education', affiliates: 'Affiliates', resources: 'Resources', rewards: 'Rewards', packs: 'Packs', competitions: 'Competitions', support: 'Support', settings: 'Settings', account: 'Account' };
   const LIGHT = () => S.theme === 'light';
   const homeHref = () => '/app';
   const buyHref = () => '/checkout' + (PROMO && PROMO.live && PROMO.code ? '?promo=' + encodeURIComponent(PROMO.code) : '');
@@ -75,7 +75,7 @@
     const pal = S.pal ? palette() : '';
     return `${side}<div class="mainw">${top}${mtop}<main class="content">${MOBILE || window.innerWidth <= 860 ? (FS.PACKS ? `<div class="mtrow"><h1 class="mt">${title}</h1>${credChip()}</div>` : `<h1 class="mt">${title}</h1>`) : ''}${body}</main></div>${bn}${S.bell || S.prof ? '<div class="scrim" data-act="closeAll"></div>' : ''}${bell}${pmenu}${pal}${more}${S.drawer ? drawer() : ''}${S.toast ? `<div class="toast" role="status">${esc(S.toast)}</div>` : ''}`; }
   function palIndex() { const out = [];
-    Object.keys(TITLES).filter((k) => k !== 'account').forEach((k) => out.push(['Pages', TITLES[k], k === 'accounts' ? 'Your Accounts and Today' : 'Go to ' + TITLES[k], '#' + k, k === 'accounts' ? 'accounts' : k]));
+    Object.keys(TITLES).filter((k) => k !== 'account' && k !== 'empty').forEach((k) => out.push(['Pages', TITLES[k], k === 'accounts' ? 'Your Accounts and Today' : 'Go to ' + TITLES[k], '#' + k, k === 'accounts' ? 'accounts' : k]));
     ACC.forEach((x) => out.push(['Accounts', `$${x.size} ${x.kind === 'funded' ? 'Funded' : x.kind === 'breached' ? 'Breached' : 'Evaluation'} · ${x.id}`, `${x.plan} · ${money(x.bal)} · ${x.status}`, `#account?acct=${x.id}`, 'accounts']));
     PAYOUTS.forEach((p) => out.push(['Payouts', `${p.id} · ${money(p.amt)}`, `${p.st === 'paid' ? 'Sent ' + p.paid : p.st === 'denied' ? 'Not approved, requested ' + p.req : p.st === 'failed' ? 'Could not be sent, requested ' + p.req : (p.stage === 'approved' ? 'Approved' : 'In review') + ', requested ' + p.req} · ${p.method}`, '#payouts', 'payouts']));
     ORDERS.forEach((o) => out.push(['Orders', `${o.id} · ${o.what}`, `${o.d} · ${o.st}`, '#billing', 'billing']));
