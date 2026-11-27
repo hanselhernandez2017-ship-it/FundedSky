@@ -116,6 +116,13 @@
 .fsbo .swh i{width:6px;height:6px;border-radius:3px;background:var(--ln)}
 .fsbo .swh i{transition:width .2s,background .2s}
 .fsbo .swh i.on{width:18px;background:var(--sky)}
+.fsbo .vzchips button em{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;box-sizing:border-box;padding:0 5px;margin-left:7px;border-radius:9px;background:var(--p3);border:1px solid var(--ln);color:var(--t2);font-size:11px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1;opacity:1}
+.fsbo .vzchips button:has(em){padding-right:7px}
+.fsbo .vzchips button.on em{background:color-mix(in srgb,var(--bg) 18%,transparent);border-color:transparent;color:inherit;opacity:1}
+.fsbo.light .vzchips button em{background:#fff;color:#4A4F57}
+.fsbo.light .vzchips button.on em{background:rgba(255,255,255,.2);color:#fff}
+.fsbo .seg button.on{background:var(--tx);color:var(--bg);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.25)}
+@media (max-width:860px){.fsbo .vzchips{gap:5px}.fsbo .vzchips button:has(em){padding:0 6px 0 10px;font-size:12px}.fsbo .vzchips button em{min-width:16px;height:17px;padding:0 4px;margin-left:5px}}
 .fsbo .bset .wb{display:none}
 @media (max-width:860px){
   .fsbo .ftl.bset{grid-template-columns:minmax(0,1fr)!important;gap:0!important}
