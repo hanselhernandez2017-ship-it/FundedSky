@@ -40,7 +40,7 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 .fs-g4p{display:flex!important;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;gap:10px!important;margin:0 -20px;padding:0 20px 2px;scroll-padding:0 20px}
 .fs-g4p::-webkit-scrollbar{display:none}
 .fs-dots{display:flex;justify-content:center;gap:6px;margin-top:-2px}.fs-dots i{display:block;height:6px;border-radius:3px;transition:width .2s,background .2s}
-.fs-lt{flex:0 0 152px;scroll-snap-align:start;min-height:0!important;padding:12px!important}
+.fs-lt{flex:0 0 152px;scroll-snap-align:start;scroll-snap-stop:always;min-height:0!important;padding:12px!important}
 .fs-fph{flex-direction:column;align-items:flex-start!important}
 .fs-gc{display:grid!important;grid-template-columns:minmax(0,1fr);gap:12px 14px!important;padding:16px!important;align-items:start!important}
 .fs-gcv{grid-column:1 / -1;margin:0 auto}
@@ -167,7 +167,7 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 </div>
 </sc-for>
 </div>
-<div class="fs-dots" role="tablist" aria-label="Free pack steps"><sc-for list="{{ ladDots }}" as="d" hint-placeholder-count="4"><i style="width: {{ d.w }}; background: {{ d.c }};"></i></sc-for></div>
+<div class="fs-dots" aria-hidden="true"><sc-for list="{{ ladDots }}" as="d" hint-placeholder-count="4"><i style="width: {{ d.w }}; background: {{ d.c }};"></i></sc-for></div>
 <div class="fs-gc" style="display: flex; flex-wrap: wrap; align-items: center; gap: 18px 28px; padding: 20px 22px; border: 1px dashed {{ goal.line }}; border-radius: 8px; background: {{ goal.bg }};">
 <div class="fs-gcv" aria-hidden="true" style="position: relative; width: 276px; height: 76px; flex: none;">
 <sc-for list="{{ goal.stack }}" as="c" hint-placeholder-count="5"><span style="position: absolute; top: 2px; left: {{ c.x }}; width: 52px; z-index: {{ c.z }}; filter: {{ goal.fx }};"><dc-import name="PackCover" pack="{{ c.id }}" size="xs" hint-size="52px,73px"></dc-import></span></sc-for>
@@ -364,9 +364,9 @@ class Component extends DCLogic {
         act: () => { if (gotTop || !curOk) return; let need = leftN; const cart = st.cart.map((c) => { if (c.id !== cur.id || !need) return c; const add = Math.min(need, 5 - c.qty); need -= add; return Object.assign({}, c, { qty: c.qty + add }); }); let nid = st.nextId; while (need > 0) { const q = Math.min(5, need); cart.push({ id: nid++, plan: cur.plan, size: cur.size, platform: cur.platform, addons: {}, qty: q }); need -= q; } this.setCart(cart, { nextId: nid }); },
         line: gotTop ? '#7CC4FF' : '#3A3A40', bg: gotTop ? '#13202E' : '#111113', fx: gotTop ? 'none' : 'saturate(.35) brightness(.7)' };
       packNudge = !curOk && !nAcc ? `Free packs come with ${okTxt} accounts` : !curOk && nextT ? `${okTxt} accounts count toward free packs` : nextT ? `Add ${nextT.n - nAcc} more for ${title(nextT)}` : 'Top reward unlocked';
-      const li = st.ladIdx || 0; ladDots = LAD.map((t, i) => ({ w: i === li ? '18px' : '6px', c: i === li ? '#7CC4FF' : '#3A3A40' }));
+      const li = st.ladIdx || 0; const ladN = st.ladN || (typeof window !== 'undefined' ? Math.max(1, Math.min(LAD.length, Math.ceil((LAD.length * 162 + 30 - window.innerWidth) / 162 - 0.2) + 1)) : LAD.length); ladDots = ladN < 2 ? [] : Array.from({ length: ladN }, (t, i) => ({ w: i === Math.min(li, ladN - 1) ? '18px' : '6px', c: i === Math.min(li, ladN - 1) ? '#7CC4FF' : '#3A3A40' }));
     }
-    const ladScroll = (e) => { const el = e.target; const max = el.scrollWidth - el.clientWidth; const i = max <= 0 ? 0 : Math.round(el.scrollLeft / max * (ladder.length - 1)); if (i !== (st.ladIdx || 0)) this.setState({ ladIdx: i }); };
+    const ladScroll = (e) => { const el = e.target && e.target.classList && e.target.classList.contains('fs-g4p') ? e.target : e.currentTarget; if (!el || !el.children) return; const max = el.scrollWidth - el.clientWidth; const k = el.children; const step = k.length > 1 ? k[1].offsetLeft - k[0].offsetLeft : 162; const n = max <= 0 ? 1 : Math.ceil(max / step - 0.2) + 1; const i = max <= 0 ? 0 : el.scrollLeft >= max - 4 ? n - 1 : Math.min(n - 1, Math.round(el.scrollLeft / step)); if (i !== (st.ladIdx || 0) || n !== st.ladN) this.setState({ ladIdx: i, ladN: n }); };
     const act = st.cart.some((c) => (P(c.plan).sizes.find((z) => z.size === c.size) || {}).activation);
     const next = st.me ? '/checkout/payment' : '/checkout/payment';
     return {
