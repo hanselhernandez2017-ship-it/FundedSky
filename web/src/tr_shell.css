@@ -105,7 +105,7 @@
   /* swipeable account cards */
   .fsbo .acards{grid-auto-flow:column;grid-template-columns:none;grid-auto-columns:86%;overflow-x:auto;scroll-snap-type:x mandatory;margin:0 -16px;padding:4px 16px 8px;gap:12px;scrollbar-width:none}
   .fsbo .acards::-webkit-scrollbar{display:none}
-  .fsbo .acard{scroll-snap-align:center}
+  .fsbo .acard{scroll-snap-align:center;scroll-snap-stop:always}
   .fsbo .acard.add{min-height:auto}
   .fsbo .swh{display:flex!important}
   .fsbo .content.enter>*{animation-duration:.3s}
@@ -113,7 +113,8 @@
 @keyframes sheetUp{from{transform:translateY(40px);opacity:.3}to{transform:none;opacity:1}}
 .fsbo .swh{display:none;align-items:center;justify-content:center;gap:6px;margin-top:12px}
 .fsbo .swh i{width:6px;height:6px;border-radius:3px;background:var(--ln)}
-.fsbo .swh i:first-child{width:18px;background:var(--sky)}
+.fsbo .swh i{transition:width .2s,background .2s}
+.fsbo .swh i.on{width:18px;background:var(--sky)}
 .fsbo .scrim{display:none}
 @media (max-width:860px){.fsbo .scrim{display:block;position:fixed;inset:0;z-index:70;background:rgba(8,8,10,.55)}.fsbo.light .scrim{background:rgba(16,18,22,.3)}}
 
