@@ -208,6 +208,13 @@ T.post('/journal/note', h(async (req) => {
   if (day > require('./util').tradeDate()) bad('You can only add notes for days up to today');
   if (dt.getTime() < Date.now() - 731 * 86400000) bad('Notes can be added for the last two years');
   await db.q("UPDATE users SET settings = jsonb_set(settings, '{notes}', COALESCE(settings->'notes','{}'::jsonb) || jsonb_build_object($2::text, $3::text)) WHERE id=$1", [req.user.id, day, clean(req.body.text, 2000)]);
+  // day review: an optional mood and tags saved next to the note
+  if (req.body.mood !== undefined || req.body.tags !== undefined) {
+    const MOODS = ['rough', 'okay', 'great']; const TAGS = ['plan', 'over', 'revenge', 'patient', 'tired'];
+    const mood = MOODS.includes(req.body.mood) ? req.body.mood : ''; const tags = Array.isArray(req.body.tags) ? TAGS.filter((t) => req.body.tags.includes(t)) : [];
+    if (req.body.mood && !mood) bad('Pick Rough, Okay or Great');
+    await db.q("UPDATE users SET settings = jsonb_set(settings, '{reviews}', (COALESCE(settings->'reviews','{}'::jsonb) - $2::text) || CASE WHEN $3::text = '' AND $4::jsonb = '[]'::jsonb THEN '{}'::jsonb ELSE jsonb_build_object($2::text, jsonb_build_object('m', $3::text, 't', $4::jsonb)) END) WHERE id=$1", [req.user.id, day, mood, JSON.stringify(tags)]);
+  }
 }));
 T.post('/courses/:id/lesson', needFlag('education', 'Courses are switched off right now'), h(async (req) => {
   // Only courses traders can see (published, with lessons). Progress and the 100 credits are settled under a lock on the

@@ -177,8 +177,13 @@
       case 'affApply': S.drawer = { k: 'affApply' }; break;
       case 'affSend': { const w = ((root.querySelector('#afw') || {}).value || '').trim(), au = ((root.querySelector('#afa') || {}).value || '').trim(); if (w.length < 4) { toast('Add a link to your channel, page or community'); break; } if (au.length < 20) { toast('Tell us about your audience in a sentence or two'); break; } S.busy = true; API('/api/affiliate/apply', { where: w, audience: au }).then((r) => { S.busy = false; window.__FSrefresh(keep({ toast: r && r.approved ? `You're approved. Your code is ${r.code}` : 'Application sent. We reply within 3 business days' })); }).catch((e) => { S.busy = false; toast(e.message); render(); }); return; }
       case 'jm': S.jYM = +k; S.jDay = null; break;
-      case 'jday': S.jDay = k; { const dd = new Date(k + 'T12:00:00'); S.jYM = dd.getFullYear() * 12 + dd.getMonth(); } break;
-      case 'saveNote': { const v = (root.querySelector('#jn') || {}).value || ''; run('/api/journal/note', { day: S.jDay || isoOf((DAYS.filter((d) => d.n).slice(-1)[0] || {}).d || new Date()), text: v }, 'Note saved to your journal'); return; }
+      case 'jday': S.jDay = k; S.jPg = 0; S.jEdit = false; { const dd = new Date(k + 'T12:00:00'); S.jYM = dd.getFullYear() * 12 + dd.getMonth(); } break;
+      case 'saveNote': { const v = (root.querySelector('#jn') || {}).value || ''; const mo = root.querySelector('.rvm button.on'); const tg = [...root.querySelectorAll('.rvt button.on')].map((n) => n.dataset.k); S.jEdit = false; run('/api/journal/note', { day: S.jDay || isoOf((DAYS.filter((d) => d.n).slice(-1)[0] || {}).d || new Date()), text: v, mood: mo ? mo.dataset.k : '', tags: tg }, 'Day review saved'); return; }
+      case 'rvMood': { const was = el.classList.contains('on'); el.parentNode.querySelectorAll('button').forEach((n) => { n.classList.remove('on'); n.setAttribute('aria-checked', 'false'); }); if (!was) { el.classList.add('on'); el.setAttribute('aria-checked', 'true'); } return; }
+      case 'rvTag': { const on = el.classList.toggle('on'); el.setAttribute('aria-pressed', String(on)); return; }
+      case 'rvEdit': S.jEdit = true; break;
+      case 'rvCancel': S.jEdit = false; break;
+      case 'jpg': S.jPg = Math.max(0, Number(k) || 0); break;
       case 'reqPay': S.drawer = { k: 'pay', id, m: 0 }; break;
       case 'payM': S.drawer.m = +k; break;
       case 'sendPay': { const ac = acc(S.drawer.id); const amt = Math.min(ac.avail, S.drawer.amt == null ? ac.avail : +S.drawer.amt); const m = METHODS[Math.min(S.drawer.m || 0, METHODS.length - 1)]; S.busy = true; render(); run('/api/payouts', { account: ac.id, amount: amt, method: m.id }, `${money(amt)} requested. We review payouts in 1 to 2 business days`, () => { S.busy = false; }); return; }
