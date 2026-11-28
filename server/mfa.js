@@ -72,6 +72,7 @@ async function turnOff(user, password, code) {
 async function regen(user, code) {
   const u = await db.one('SELECT * FROM users WHERE id=$1', [user.id]); if (!u.mfa_on) bad('Turn on Two-Step Login first.'); tooMany(u.id);
   if (!(await verify(u, code))) { bump('u' + u.id); bad('That code is not right. Check the time on your phone and try again.'); }
+  await db.q('UPDATE sessions SET bknote=false WHERE user_id=$1', [u.id]); // new codes: the "You used a backup code" notice has done its job
   return { codes: await newCodes(u.id, u.role === 'trader' ? 10 : 8) };
 }
 // Back office reset for a trader who lost their phone: off, logged out everywhere, told by email

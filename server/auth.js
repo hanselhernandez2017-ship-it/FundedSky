@@ -28,7 +28,7 @@ async function startSession(req, res, user, opt = {}) {
   if (opt.login) await seenDevice(req, user).catch(() => {});
   const token = rid(32); const staff = STAFF.includes(user.role); const keep = !(req.body && req.body.remember === false);
   const hours = staff ? 12 : keep ? 720 : 24;
-  await db.q("INSERT INTO sessions(token,user_id,ua,ip,expires_at,mfa) VALUES($1,$2,$3,$4, now() + ($5 || ' hours')::interval, $6)", [token, user.id, clean(req.headers['user-agent'], 300), clean(req.ip, 80), String(hours), !!opt.mfa]);
+  await db.q("INSERT INTO sessions(token,user_id,ua,ip,expires_at,mfa,bknote) VALUES($1,$2,$3,$4, now() + ($5 || ' hours')::interval, $6, $7)", [token, user.id, clean(req.headers['user-agent'], 300), clean(req.ip, 80), String(hours), !!opt.mfa, !!opt.backup]);
   await db.q('UPDATE users SET last_login=now() WHERE id=$1', [user.id]);
   setCookie(res, token, staff ? 0.5 : keep ? 30 : 0);
 }
@@ -115,7 +115,7 @@ async function login(req, res) {
 }
 const loginFails = new Map();
 const DUMMY_HASH = bcrypt.hashSync('not-a-real-password-' + Date.now(), 10);
-async function mfaLogin(req, res) { const r = await require('./mfa').challenge(req.body.ticket, req.body.code); if (r.user.status === 'banned') bad('This account is closed. Contact support.', 403); if (STAFF.includes(r.user.role) && r.user.status === 'suspended') bad('Your back office access is suspended. Ask an admin to turn it back on.', 403); await startSession(req, res, r.user, { mfa: true, login: true }); return { ok: true, role: r.user.role, backupLeft: r.backup ? r.left : undefined }; }
+async function mfaLogin(req, res) { const r = await require('./mfa').challenge(req.body.ticket, req.body.code); if (r.user.status === 'banned') bad('This account is closed. Contact support.', 403); if (STAFF.includes(r.user.role) && r.user.status === 'suspended') bad('Your back office access is suspended. Ask an admin to turn it back on.', 403); await startSession(req, res, r.user, { mfa: true, login: true, backup: r.backup && r.user.role === 'trader' }); return { ok: true, role: r.user.role, backupLeft: r.backup ? r.left : undefined }; }
 async function logout(req, res) { if (req.sess) await db.q('DELETE FROM sessions WHERE token=$1', [req.sess]); res.setHeader('Set-Cookie', `${COOKIE}=; Path=/; Max-Age=0`); return { ok: true }; }
 async function forgot(req) {
   const email = clean(req.body.email, 200).toLowerCase();

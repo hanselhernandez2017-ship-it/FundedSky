@@ -50,16 +50,25 @@ async function attach(c, user, ticketId, msgId, ids) {
   return keys.length;
 }
 const fileIds = (b) => (b && b.files != null ? b.files : null);
-// File details (never the bytes) for the messages of some tickets: { msgId: [{ id, name, mime, size }] }
-async function forTickets(ticketIds) {
-  if (!ticketIds.length) return {}; const rows = await db.all('SELECT key, msg_id, name, mime, size FROM ticket_files WHERE ticket_id = ANY($1) AND msg_id IS NOT NULL ORDER BY id', [ticketIds]);
-  const out = {}; rows.forEach((f) => { (out[f.msg_id] = out[f.msg_id] || []).push({ id: f.key, name: f.name, mime: f.mime, size: f.size }); }); return out;
+// File details (never the bytes) for the messages of some tickets: { msgId: [{ id, name, mime, size }] }; a file removed by the
+// 6-month rule is { gone: true }. opt.trader: files on internal notes are left out (the trader never sees those).
+async function forTickets(ticketIds, opt = {}) {
+  if (!ticketIds.length) return {}; const rows = await db.all(`SELECT f.key, f.msg_id, f.name, f.mime, f.size, f.removed_at FROM ticket_files f JOIN ticket_msgs m ON m.id=f.msg_id WHERE f.ticket_id = ANY($1)${opt.trader ? ' AND m.internal=false' : ''} ORDER BY f.id`, [ticketIds]);
+  const out = {}; rows.forEach((f) => { (out[f.msg_id] = out[f.msg_id] || []).push(f.removed_at ? { gone: true } : { id: f.key, name: f.name, mime: f.mime, size: f.size }); }); return out;
+}
+// Retention (owner decision, Nov 27): files on tickets solved more than 6 months ago are deleted. The messages stay, and each
+// file leaves a marker so the thread can say "File removed after 6 months." A ticket reopened before then has no solved_at, so it keeps its files.
+const KEEP_MONTHS = 6;
+async function prune() {
+  const r = await db.q(`UPDATE ticket_files f SET data=''::bytea, name='', size=0, sha256='', removed_at=now() FROM tickets t WHERE t.id=f.ticket_id AND f.msg_id IS NOT NULL AND f.removed_at IS NULL
+    AND t.status='solved' AND t.solved_at < now() - ($1 || ' months')::interval`, [String(KEEP_MONTHS)]);
+  return r.rowCount;
 }
 // GET /api/files/:key. Anyone else (another trader, a logged-out visitor, a bad key) gets the same 404.
 async function serve(req, res) {
   const nf = () => res.status(404).set('Cache-Control', 'no-store').json({ error: 'File not found' });
   const key = String(req.params.key || ''); if (!req.user || !/^[a-f0-9]{32}$/.test(key)) return nf();
-  const f = await db.one('SELECT f.*, t.user_id AS tuser, m.internal FROM ticket_files f LEFT JOIN tickets t ON t.id=f.ticket_id LEFT JOIN ticket_msgs m ON m.id=f.msg_id WHERE f.key=$1', [key]); if (!f) return nf();
+  const f = await db.one('SELECT f.*, t.user_id AS tuser, m.internal FROM ticket_files f LEFT JOIN tickets t ON t.id=f.ticket_id LEFT JOIN ticket_msgs m ON m.id=f.msg_id WHERE f.key=$1', [key]); if (!f || f.removed_at) return nf();
   const staff = require('./auth').staffOk(req.user);
   const ok = f.msg_id ? staff || (f.tuser === req.user.id && !f.internal) : f.owner_id === req.user.id; if (!ok) return nf();
   if (!Object.values(TYPES).some((t) => t[0] === f.mime)) return nf();
@@ -69,4 +78,4 @@ async function serve(req, res) {
     'Cache-Control': 'private, max-age=300', 'Cross-Origin-Resource-Policy': 'same-origin', 'Referrer-Policy': 'no-referrer', 'X-Frame-Options': 'DENY', ETag: '"' + f.sha256 + '"' });
   res.end(f.data);
 }
-module.exports = { MAX, PER_MSG, sniff, safeName, upload, remove, attach, fileIds, forTickets, serve };
+module.exports = { MAX, PER_MSG, KEEP_MONTHS, sniff, safeName, upload, remove, attach, fileIds, forTickets, prune, serve };

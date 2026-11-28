@@ -19,6 +19,8 @@ async function run() {
   const hit = (k) => { out[k] = (out[k] || 0) + 1; };
   try { const n = await require('./support').autoClose(); if (n) out.ticketsClosed = n; } catch (e) { console.error('autoClose', e.message); }
   try { const n = await require('./mail').releaseHeld(); if (n) out.mailReleased = n; } catch (e) { console.error('releaseHeld', e.message); }
+  // once a day (Eastern Time): files on tickets solved more than 6 months ago are deleted (the messages stay)
+  try { if (await once('fileprune:' + new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' }))) { const n = await require('./files').prune(); if (n) out.filesRemoved = n; } } catch (e) { console.error('file retention', e.message); }
   const acc = await db.all("SELECT a.*, u.email, u.first, u.status FROM accounts a JOIN users u ON u.id=a.user_id WHERE u.email NOT LIKE '%@demo.fundedsky.test' AND a.phase IN ('active','passed','breached','review')");
   for (const a of acc) {
     if (a.status === 'banned') continue;

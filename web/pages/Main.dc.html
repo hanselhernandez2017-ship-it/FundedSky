@@ -75,6 +75,7 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 .fs-lnk:after{content:'';position:absolute;inset:-13px -8px}
 .fs-more:after,.fs-gval button:after,.fs-bar a[href="#order"]:after{inset:-13px -8px}
 }
+.fs-gcv .pv{filter:none!important}.fs-gpk{border-radius:2px;box-shadow:0 6px 12px rgba(0,0,0,.35),0 1px 3px rgba(0,0,0,.4)}
 </style>
 </helmet>
 <div style="min-height: 1600px; background: #08080A; color: #F4F2F1; font-family: 'Mona Sans', system-ui, sans-serif;">
@@ -179,8 +180,8 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 </div>
 <div class="fs-dots" aria-hidden="true"><sc-for list="{{ ladDots }}" as="d" hint-placeholder-count="4"><i style="width: {{ d.w }}; background: {{ d.c }};"></i></sc-for></div>
 <div class="fs-gc" style="display: flex; flex-wrap: wrap; align-items: center; gap: 18px 28px; padding: 20px 22px; border: 1px dashed {{ goal.line }}; border-radius: 8px; background: {{ goal.bg }};">
-<div class="fs-gcv" aria-hidden="true" style="position: relative; width: 276px; height: 76px; flex: none;">
-<sc-for list="{{ goal.stack }}" as="c" hint-placeholder-count="5"><span style="position: absolute; top: 2px; left: {{ c.x }}; width: 52px; z-index: {{ c.z }}; filter: {{ goal.fx }};"><dc-import name="PackCover" pack="{{ c.id }}" size="xs" hint-size="52px,73px"></dc-import></span></sc-for>
+<div class="fs-gcv" aria-hidden="true" style="position: relative; width: 276px; height: 76px; flex: none; isolation: isolate;">
+<div style="position: absolute; inset: 0; filter: {{ goal.fx }};"><sc-for list="{{ goal.stack }}" as="c" hint-placeholder-count="5"><span class="fs-gpk" style="position: absolute; top: 2px; left: {{ c.x }}; width: 52px; z-index: {{ c.z }};"><dc-import name="PackCover" pack="{{ c.id }}" size="xs" hint-size="52px,73px"></dc-import></span></sc-for></div>
 <sc-if value="{{ goal.locked }}" hint-placeholder-val="{{ true }}"><span style="position: absolute; right: -8px; top: -8px; z-index: 9; width: 28px; height: 28px; border-radius: 14px; box-shadow: 0 4px 10px rgba(0,0,0,.35); background: #08080A; border: 1px solid #3A3A40; color: #F4F2F1; display: flex; align-items: center; justify-content: center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg></span></sc-if>
 <sc-if value="{{ goal.open }}" hint-placeholder-val="{{ false }}"><span style="position: absolute; right: -8px; top: -8px; z-index: 9; width: 28px; height: 28px; border-radius: 14px; box-shadow: 0 4px 10px rgba(0,0,0,.35); background: #7CC4FF; color: #08080A; display: flex; align-items: center; justify-content: center;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"></path></svg></span></sc-if>
 </div>

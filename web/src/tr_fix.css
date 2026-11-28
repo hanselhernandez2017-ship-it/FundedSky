@@ -442,3 +442,16 @@
 @media (max-width:860px){.fsbo .upd{display:none}.fsbo .upt{min-width:0;flex-basis:100%}.fsbo .upc .ib{width:40px;height:40px}.fsbo .att.img{width:120px;height:90px}.fsbo .tfasec{margin-top:32px}}
 .fsbo.light .tfaqr{border:1px solid var(--ln)}
 /* === end tfa === */
+/* === fin5 (Nov 27 owner decisions) === */
+/* attachment retention: a removed file leaves a muted line where it was */
+.fsbo .attgone{margin:8px 0 0;font-size:12.5px;line-height:1.45;color:var(--mu);font-style:italic;white-space:normal}.fsbo .msg>.attgone:first-child{margin-top:0}.fsbo .attgone+.atts{margin-top:8px}
+/* backup-code login notice: text left, Make New Codes + Hide right (wraps under the text on phones) */
+.fsbo .note.bkn{align-items:center}.fsbo .note.bkn svg{margin-top:0}
+.fsbo .note.bkn>div{flex:1;min-width:0;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px 16px}
+.fsbo .note.bkn .bkb{display:flex;align-items:center;gap:14px;flex:none}.fsbo .note.bkn .bkb .lk{margin-left:0}.fsbo .note.bkn .bkb .btn{background:var(--p1);border:1px solid var(--ln)}
+@media (max-width:860px){.fsbo .note.bkn{align-items:flex-start}.fsbo .note.bkn svg{margin-top:1px}.fsbo .note.bkn .bkb .btn{min-height:40px}.fsbo .note.bkn .bkb .lk{min-height:40px;padding:0 4px}}
+/* laptops (861-1360px): the account-card size badge is 28px (was 36px) so account titles stay on one line */
+@media (max-width:1360px) and (min-width:861px){.fsbo .homeg .acard .ach{grid-template-columns:28px minmax(0,1fr) auto;column-gap:10px}.fsbo .homeg .acard .ach .asz{width:28px;height:28px;align-self:center}.fsbo .homeg .asz svg.fs-szb[width="36"]{width:28px;height:28px}}
+/* === end fin5 === */
+/* laptops (861-1360px): the status pill sits on its own line under the title, so the title always has the full width (owner, Nov 28) */
+@media (max-width:1360px) and (min-width:861px){.fsbo .homeg .acard .ach{grid-template-columns:28px minmax(0,1fr);row-gap:6px}.fsbo .homeg .acard .ach .asz{grid-row:1/3;align-self:start;margin-top:1px}.fsbo .homeg .acard .ach .act b{grid-column:2;grid-row:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.fsbo .homeg .acard .ach>.bd{grid-column:2;grid-row:2;justify-self:start;align-self:center}.fsbo .homeg .acard .ach .act span{grid-column:1/3;grid-row:3}}

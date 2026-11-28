@@ -401,3 +401,19 @@ CREATE TABLE IF NOT EXISTS ticket_files (
 );
 CREATE INDEX IF NOT EXISTS ticket_files_ticket ON ticket_files(ticket_id);
 CREATE INDEX IF NOT EXISTS ticket_files_owner ON ticket_files(owner_id) WHERE msg_id IS NULL;
+-- fin5: attachment retention. solved_at = when a ticket was last solved (cleared when it is reopened); files on tickets
+-- solved more than 6 months ago are emptied by the daily job (files.prune) and kept as a "removed" marker (removed_at).
+ALTER TABLE tickets ADD COLUMN IF NOT EXISTS solved_at TIMESTAMPTZ;
+UPDATE tickets SET solved_at=updated_at WHERE status='solved' AND solved_at IS NULL;
+CREATE OR REPLACE FUNCTION tickets_solved_at() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF NEW.status IS DISTINCT FROM 'solved' THEN NEW.solved_at := NULL;
+  ELSIF TG_OP = 'INSERT' OR OLD.status IS DISTINCT FROM 'solved' THEN NEW.solved_at := now();
+  END IF;
+  RETURN NEW;
+END $$;
+DROP TRIGGER IF EXISTS tickets_solved_at ON tickets;
+CREATE TRIGGER tickets_solved_at BEFORE INSERT OR UPDATE OF status ON tickets FOR EACH ROW EXECUTE FUNCTION tickets_solved_at();
+ALTER TABLE ticket_files ADD COLUMN IF NOT EXISTS removed_at TIMESTAMPTZ;
+-- fin5: a login with a backup code shows a one-time notice in the dashboard ("You used a backup code. N left.")
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS bknote BOOLEAN NOT NULL DEFAULT FALSE;

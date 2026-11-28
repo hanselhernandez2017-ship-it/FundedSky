@@ -516,3 +516,7 @@ table.t{width:100%;border-collapse:collapse}
 .upc{display:flex;align-items:center;gap:10px;padding:5px 5px 5px 8px;border:1px solid var(--ln);border-radius:8px;background:var(--p2);min-width:0}.upc img{width:32px;height:32px;border-radius:5px;object-fit:cover;flex:none}.upc>svg{margin:0 7px}.upc.busy{opacity:.7}.upc .ic{flex:none;width:30px;height:30px}
 @media (max-width:860px){.upz{padding:6px;margin-top:6px}.upt{min-width:0;flex:1}.upd{display:none}.upl{display:flex;overflow-x:auto;gap:8px}.upc{flex:0 0 200px}.upc .ic{width:40px;height:40px}.att.img{width:120px;height:90px}}
 /* === end tfa === */
+/* === fin5: a file removed by the 6-month rule leaves a muted line; Attach Files on internal notes and in the New Ticket drawer === */
+.attgone{margin:8px 0 0;font-size:12.5px;line-height:1.45;color:var(--mu);font-style:italic}.msh+.attgone{margin-top:2px}.attgone+.atts{margin-top:8px}
+.drw-b .upz{margin-top:10px}
+/* === end fin5 === */

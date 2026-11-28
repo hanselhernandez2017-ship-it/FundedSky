@@ -82,6 +82,8 @@ app.get('/api/auth/2fa/setup', auth.needUser, h((req) => require('./mfa').setup(
 app.post('/api/auth/2fa/enable', auth.needUser, limit(10, 60000), h((req) => require('./mfa').enable(req.user, req.sess, req.body.code)));
 app.post('/api/auth/2fa/disable', auth.needUser, limit(10, 60000), h((req) => require('./mfa').turnOff(req.user, req.body.password, req.body.code)));
 app.post('/api/auth/2fa/backup', auth.needUser, limit(10, 60000), h((req) => require('./mfa').regen(req.user, req.body.code)));
+// Hides the "You used a backup code. N left." notice for this login
+app.post('/api/auth/2fa/notice', auth.needUser, h(async (req) => { await db.q('UPDATE sessions SET bknote=false WHERE token=$1', [req.sess]); return { ok: true }; }));
 // Ticket attachments (server/files.js): the file is the whole request body, its name in X-File-Name
 const FILES = require('./files');
 const upRaw = express.raw({ type: () => true, limit: FILES.MAX + 1 });
