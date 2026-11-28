@@ -455,3 +455,23 @@
 /* === end fin5 === */
 /* laptops (861-1360px): the status pill sits on its own line under the title, so the title always has the full width (owner, Nov 28) */
 @media (max-width:1360px) and (min-width:861px){.fsbo .homeg .acard .ach{grid-template-columns:28px minmax(0,1fr);row-gap:6px}.fsbo .homeg .acard .ach .asz{grid-row:1/3;align-self:start;margin-top:1px}.fsbo .homeg .acard .ach .act b{grid-column:2;grid-row:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.fsbo .homeg .acard .ach>.bd{grid-column:2;grid-row:2;justify-self:start;align-self:center}.fsbo .homeg .acard .ach .act span{grid-column:1/3;grid-row:3}}
+/* notice close: a quiet × in the top-right corner, so the notice's own action is the only link (owner, Nov 28) */
+.fsbo .note.evn{position:relative;padding-right:48px}.fsbo .note .nx{position:absolute;top:50%;right:10px;transform:translateY(-50%);width:28px;height:28px;display:grid;place-items:center;border-radius:8px;border:0;background:none;color:var(--mu);cursor:pointer;padding:0}.fsbo .note .nx svg{width:14px;height:14px;margin:0;stroke:currentColor;opacity:.8}.fsbo .note .nx:hover{background:color-mix(in srgb,var(--tx) 8%,transparent);color:var(--tx)}.fsbo .note .nx:focus-visible{outline:2px solid var(--sky);outline-offset:1px}
+@media (max-width:860px){.fsbo .note.evn{padding-right:48px}.fsbo .note .nx{top:6px;right:4px;transform:none;width:40px;height:40px}}
+/* notification icons (owner, Nov 28): a tinted tile per type; the unread dot sits on its corner */
+.fsbo .pop .pl>a{grid-template-columns:34px minmax(0,1fr);align-items:start}
+.fsbo .pop .pl .ni{position:relative;width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:color-mix(in srgb,var(--tn) 14%,transparent);color:var(--tn);margin-top:1px}
+.fsbo .pop .pl .ni svg{width:17px;height:17px}
+.fsbo .pop .pl .ni i{position:absolute;top:-3px;right:-3px;width:10px;height:10px;margin:0;border-radius:50%;background:transparent;border:2px solid transparent}
+.fsbo .pop .pl .nw .ni i{background:var(--sky);border-color:var(--p2)}
+.fsbo .pop .pl>a:hover .ni i{border-color:var(--p3)}
+.fsbo .ni.t-sk{--tn:var(--sky)}.fsbo .ni.t-ok{--tn:var(--ok)}.fsbo .ni.t-wa{--tn:var(--wa)}.fsbo .ni.t-no{--tn:var(--no)}.fsbo .ni.t-vi{--tn:#A48BF5}.fsbo .ni.t-gd{--tn:#E0B04A}
+.fsbo.light .ni.t-vi{--tn:#7452D6}.fsbo.light .ni.t-gd{--tn:#A97A0E}
+/* top bar (owner, Nov 28): the search bar takes the free space and ends next to the market clock, with the same 24px gap the clock keeps to the credits */
+@media (min-width:1361px){.fsbo .top .srch{flex:1 1 auto;width:auto;min-width:210px;margin-left:24px;margin-right:12px;padding:0 10px 0 12px;justify-content:flex-start}.fsbo .top .srch span,.fsbo .top .srch kbd{display:revert}.fsbo .top .srch span{flex:1}.fsbo .top .clk{margin-left:0}}
+@media (max-width:1360px) and (min-width:941px){.fsbo .top .srch{margin-left:auto;margin-right:12px}.fsbo .top .clk{margin-left:0}}
+@media (max-width:1560px) and (min-width:1361px){.fsbo .top .srch{min-width:120px;flex-basis:0}.fsbo .top .srch kbd{display:none}}
+@media (max-width:1440px) and (min-width:1361px){.fsbo .top .srch{min-width:90px}}
+/* top-bar buttons (owner, Nov 28): even-sized icons in the 38px circles so nothing lands on a half pixel, and the initials centred on their cap height */
+.fsbo .ib svg{width:18px;height:18px;display:block;flex:none}
+.fsbo .avbtn{line-height:1;font-size:12px;text-box:trim-both cap alphabetic}
