@@ -492,3 +492,24 @@
 .fsbo .pop .pl>a:hover .nic i{border-color:var(--p3)}
 .fsbo .nic.t-sk{--ng:#2F86DE}.fsbo .nic.t-ok{--ng:#1DA56E}.fsbo .nic.t-wa{--ng:#E39A16}.fsbo .nic.t-no{--ng:#DE3F4E}.fsbo .nic.t-vi{--ng:#8B5CF6}.fsbo .nic.t-gd{--ng:#DDAA35}
 .fsbo.light .pop .pl .nic svg{filter:drop-shadow(0 2px 3px color-mix(in srgb,var(--ng) 35%,transparent))}
+/* notifications (owner, Nov 28): account notifications show the size badge with a status pip; unread rows get a sky edge and tint instead of the corner dot; a slim themed scrollbar */
+.fsbo .pop .pl .nic.nacc{background:none!important;box-shadow:none!important;border-radius:11px}
+.fsbo .pop .pl .nic.nacc>svg{width:40px;height:40px;filter:none}
+.fsbo .pop .pl .npip{position:absolute;right:-5px;bottom:-5px;width:18px;height:18px;border-radius:50%;display:grid;place-items:center;background:var(--pp);border:2px solid var(--p2);box-sizing:border-box}
+.fsbo .pop .pl .npip svg{width:14px;height:14px;filter:none!important;display:block}
+.fsbo .pop .pl>a:hover .npip{border-color:var(--p3)}
+.fsbo .npip.t-ok{--pp:#1DA56E}.fsbo .npip.t-gd{--pp:#D49B1F}.fsbo .npip.t-sk{--pp:#2F86DE}.fsbo .npip.t-wa{--pp:#E39A16}.fsbo .npip.t-no{--pp:#DE3F4E}
+.fsbo .pop .pl .nic i,.fsbo .pop .pl .nw .nic i{display:none}
+.fsbo .pop .pl>a{position:relative}
+.fsbo .pop .pl>a.nw{background:color-mix(in srgb,var(--sky) 7%,transparent)}
+.fsbo .pop .pl>a.nw::before{content:'';position:absolute;left:0;top:10px;bottom:10px;width:3px;border-radius:0 3px 3px 0;background:var(--sky)}
+.fsbo .pop .pl>a.nw:hover{background:color-mix(in srgb,var(--sky) 12%,transparent)}
+.fsbo.light .pop .pl>a.nw{background:color-mix(in srgb,var(--sky) 6%,#fff)}
+.fsbo.light .pop .pl>a.nw:hover{background:color-mix(in srgb,var(--sky) 11%,#fff)}
+.fsbo .pop div.pl{scrollbar-width:auto;scrollbar-color:auto}
+@supports not selector(::-webkit-scrollbar){.fsbo .pop div.pl{scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--tx) 22%,transparent) transparent}}
+.fsbo .pop div.pl::-webkit-scrollbar{width:10px}
+.fsbo .pop div.pl::-webkit-scrollbar-track{background:transparent;margin:6px 0}
+.fsbo .pop div.pl::-webkit-scrollbar-thumb{background:color-mix(in srgb,var(--tx) 22%,transparent);border-radius:10px;border:3px solid transparent;background-clip:padding-box}
+.fsbo .pop div.pl::-webkit-scrollbar-thumb:hover{background:color-mix(in srgb,var(--tx) 38%,transparent);background-clip:padding-box}
+.fsbo .pop div.pl::-webkit-scrollbar-button{display:none;height:0}
