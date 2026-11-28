@@ -475,3 +475,10 @@
 /* top-bar buttons (owner, Nov 28): even-sized icons in the 38px circles so nothing lands on a half pixel, and the initials centred on their cap height */
 .fsbo .ib svg{width:18px;height:18px;display:block;flex:none}
 .fsbo .avbtn{line-height:1;font-size:12px;text-box:trim-both cap alphabetic}
+/* notification icons, Foil Tiles (owner pick, Nov 28): glossy tiles in the size-badge colours with a sheen and white glyphs */
+.fsbo .pop .pl>a{grid-template-columns:38px minmax(0,1fr);gap:13px}
+.fsbo .pop .pl .ni{width:38px;height:38px;border-radius:11px;margin-top:0;color:var(--nb);background:linear-gradient(150deg,var(--na) -10%,var(--nb) 55%,var(--nd) 125%);box-shadow:inset 0 1px 0 rgba(255,255,255,.45),inset 0 -1px 0 rgba(0,0,0,.22),0 4px 12px -5px var(--nb)}
+.fsbo .pop .pl .ni::before{content:'';position:absolute;inset:0;border-radius:inherit;background:linear-gradient(115deg,transparent 34%,rgba(255,255,255,.26) 48%,transparent 61%);pointer-events:none}
+.fsbo .pop .pl .ni svg{position:relative;width:21px;height:21px;filter:drop-shadow(0 1px 1px rgba(0,0,0,.22))}
+.fsbo .ni.t-sk{--na:#8FD0FF;--nb:#2F86DE;--nd:#0F3D73}.fsbo .ni.t-ok{--na:#7EEDB8;--nb:#1DA56E;--nd:#0A4A32}.fsbo .ni.t-wa{--na:#FFD88A;--nb:#E39A16;--nd:#6E4405}.fsbo .ni.t-no{--na:#FF9A9A;--nb:#DE3F4E;--nd:#6C1520}.fsbo .ni.t-vi{--na:#CDB8FF;--nb:#8B5CF6;--nd:#3A1E7A}.fsbo .ni.t-gd{--na:#FFE6A3;--nb:#DDAA35;--nd:#6C4A07}
+.fsbo.light .pop .pl .ni{box-shadow:inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(0,0,0,.15),0 3px 8px -4px var(--nb)}
