@@ -38,7 +38,7 @@ module.exports = ({ SRC, DIST, HEAD, out, rd }) => {
     // the Rewards board previews certificates with the shared design module (web/runtime/cert.js, served as /static/cert.js)
     const cert = key === 'rewards';
     const head = `${m.links.join('')}${cert ? '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mona+Sans:wdth,wght@100..125,400..800&family=Instrument+Serif:ital@1&family=Geist+Mono:wght@400;500&display=swap">' : ''}<style>html,body{margin:0;height:100%}${css}${LOADER}${cert ? '.fsbo .certpv{width:100%;max-width:760px;margin:6px auto 10px}.fsbo .certpc{margin-bottom:14px;scroll-margin-top:72px}.fsbo.light .certpv .fsc .fsc-pg{box-shadow:0 1.4cqw 3.2cqw rgba(16,24,40,.22)}' : ''}</style>`;
-    const html = `${HEAD(m.title.replace(/^Funded Sky admin: /, 'Funded Sky Admin: ').replace(/: (\w)/, (x, c) => ': ' + c.toUpperCase()), head)}<body><div class="fsbo" id="fsbo"></div><div class="fsload" id="fsload">Loading the back office…</div>${cert ? '<script src="/static/cert.js"></script>' : ''}
+    const html = `${HEAD(m.title.replace(/^Funded Sky admin: /, 'Funded Sky Admin: ').replace(/: (\w)/, (x, c) => ': ' + c.toUpperCase()), head)}<body><div class="fsbo" id="fsbo"></div><div class="fsload" id="fsload">Loading the back office…</div>${cert ? '<script src="/static/cert.js"></script>' : ''}<script src="/static/sizeart.js"></script>
 <script>
 ${links(js)}
 ${m.boot.includes('startGlobal') ? glob : ''}

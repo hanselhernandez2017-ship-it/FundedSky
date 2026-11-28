@@ -67,6 +67,29 @@ function cleanPrize(p, i) {
   return bad(`Prize ${i + 1}: choose a funded account, a free evaluation, credits or cash.`);
 }
 
+// ---- Rank tiers: five steps set by profit on the competition account. Each has a profit to reach and bonus credits that are
+// paid when the competition ends. Without settings of its own a competition uses a share of its account size
+// (0, 6%, 12%, 18%, 24%: $3,000 steps on a $50K account) and 0 / 500 / 1,000 / 2,500 / 5,000 credits.
+const TIER_KEYS = ['bronze', 'silver', 'gold', 'platinum', 'diamond']; const TIER_NAMES = ['Bronze', 'Silver', 'Gold', 'Platinum', 'Champion'];
+const TIER_SHARE = [0, 0.06, 0.12, 0.18, 0.24]; const TIER_BONUS = [0, 500, 1000, 2500, 5000];
+const defTiers = (size) => TIER_SHARE.map((x, i) => ({ need: Math.round(size * x), bonus: TIER_BONUS[i] }));
+// Settings sent from the Back Office: five rows, Bronze is the entry tier ($0, no bonus), each next tier needs more profit
+// and never pays less. Returns null when they are the standard ones, so the competition keeps following its account size.
+function cleanTiers(v, size, n) {
+  if (v == null) return null; const at = n ? n + ': ' : '';
+  if (!Array.isArray(v) || v.length !== 5 || v.some((x) => !x || typeof x !== 'object' || Array.isArray(x))) bad(`${at}rank tiers need five rows, Bronze to Champion.`);
+  const T = v.map((x, i) => { const need = Number(x.need), bonus = Number(x.bonus == null || x.bonus === '' ? 0 : x.bonus);
+    if (!Number.isInteger(need) || need < 0 || need > 10000000) bad(`${at}${TIER_NAMES[i]} tier: enter the profit needed in whole dollars.`);
+    if (!Number.isInteger(bonus) || bonus < 0 || bonus > 1000000) bad(`${at}${TIER_NAMES[i]} tier: enter the bonus credits as a whole number, 0 to 1,000,000.`);
+    return { need, bonus }; });
+  if (T[0].need !== 0 || T[0].bonus !== 0) bad(`${at}Bronze is the entry tier: it starts at $0 and has no bonus.`);
+  for (let i = 1; i < 5; i++) { if (T[i].need <= T[i - 1].need) bad(`${at}${TIER_NAMES[i]} tier must need more profit than ${TIER_NAMES[i - 1]}.`); if (T[i].bonus < T[i - 1].bonus) bad(`${at}${TIER_NAMES[i]} tier cannot pay fewer credits than ${TIER_NAMES[i - 1]}.`); }
+  const D = defTiers(size); return T.every((x, i) => x.need === D[i].need && x.bonus === D[i].bonus) ? null : T;
+}
+// The tiers a competition really uses, lowest first
+function tiersOf(c) { let T = null; try { T = cleanTiers(c.tiers, sizeOf(c)); } catch (e) { T = null; } return (T || defTiers(sizeOf(c))).map((x, i) => ({ key: TIER_KEYS[i], name: TIER_NAMES[i], need: x.need, bonus: x.bonus })); }
+const tierIdx = (T, pnl) => { let k = 0; T.forEach((x, i) => { if (pnl >= x.need) k = i; }); return k; };
+
 // How ranking works, in the words traders read on the Competitions page
 const RULES_TEXT = ['Traders are ranked by profit on their competition account, highest first.',
   'Traders with the same profit share the same rank.',
@@ -79,8 +102,8 @@ function shape(c, table) {
   const st = isLive(c) ? 'live' : isOver(c) ? 'ended' : 'upcoming';
   const startAt = dayOf(c.startAt) || dayOf(c.start); const endAt = dayOf(c.endAt) || dayOf(c.end);
   let prizes; try { prizes = Array.isArray(c.prizes) ? c.prizes.map(cleanPrize) : prizesFromText(c.prize, table); } catch (e) { prizes = prizesFromText(c.prize, table); }
-  return { id: String(c.id), n: String(c.n || 'Competition'), st, start: startAt ? dayText(startAt) : String(c.start || ''), end: endAt ? dayText(endAt) : String(c.end || ''), startAt, endAt,
-    size: `${K(sizeOf(c))} practice account`, entry: String(c.entry || 'Free'), players: 0, prizes, prize: Array.isArray(c.prizes) || !c.prize ? prizeText(prizes) : String(c.prize), rule: String(c.rule || 'Highest profit with no rule breaks') };
+  return Object.assign({ id: String(c.id), n: String(c.n || 'Competition'), st, start: startAt ? dayText(startAt) : String(c.start || ''), end: endAt ? dayText(endAt) : String(c.end || ''), startAt, endAt,
+    size: `${K(sizeOf(c))} practice account`, entry: String(c.entry || 'Free'), players: 0, prizes, prize: Array.isArray(c.prizes) || !c.prize ? prizeText(prizes) : String(c.prize), rule: String(c.rule || 'Highest profit with no rule breaks') }, (() => { try { const T = cleanTiers(c.tiers, sizeOf(c)); return T ? { tiers: T } : {}; } catch (e) { return {}; } })());
 }
 const shapeAll = (v, C) => (Array.isArray(v) ? v : []).filter((c) => c && typeof c === 'object' && !Array.isArray(c) && c.id != null && c.id !== '').map((c) => shape(c, C.cprizes));
 async function list() { const C = await content.all(); return shapeAll(C.competitions, C); }
@@ -103,8 +126,8 @@ async function validate(value) {
     if (!sizes.has(sizeOf(c))) bad(`${n}: there is no ${K(sizeOf(c))} evaluation to base the practice account on.`);
     const prizes = Array.isArray(c.prizes) ? c.prizes.map(cleanPrize) : prizesFromText(c.prize, table);
     if (prizes.length > 50) bad(`${n}: at most 50 prizes.`);
-    const st = isLive(c) ? 'live' : isOver(c) ? 'ended' : 'upcoming';
-    return { id, n, st, start: dayText(startAt), end: dayText(endAt), startAt, endAt, size: `${K(sizeOf(c))} practice account`, entry: clean(c.entry, 40) || 'Free', players: 0, prizes, prize: prizeText(prizes), rule: clean(c.rule, 160) || 'Highest profit with no rule breaks' }; });
+    const st = isLive(c) ? 'live' : isOver(c) ? 'ended' : 'upcoming'; const tiers = cleanTiers(c.tiers, sizeOf(c), n);
+    return Object.assign({ id, n, st, start: dayText(startAt), end: dayText(endAt), startAt, endAt, size: `${K(sizeOf(c))} practice account`, entry: clean(c.entry, 40) || 'Free', players: 0, prizes, prize: prizeText(prizes), rule: clean(c.rule, 160) || 'Highest profit with no rule breaks' }, tiers ? { tiers } : {}); });
 }
 
 // A plan and size the rule engine knows, as close as possible to the competition's size
@@ -215,6 +238,44 @@ const locked = (id, fn) => db.tx(async (t) => { await t.q('SELECT pg_advisory_xa
 async function saveList(L, t) { await kvPut('content.competitions', L, t); content.reset(); }
 const stored = async (t) => { const v = await kvGet('content.competitions', t); const C = await content.all(); return shapeAll(Array.isArray(v) ? v : C.competitions, C); };
 
+// ---- Tier bonuses. When a competition ends every ranked entrant gets the bonus credits of the tier their profit reached.
+// One ledger row per competition and trader (ref 'comptier:<id>', unique), so ending twice or a retry never pays twice.
+// Entrants who are out (broke a rule, disqualified, closed) and entrants with no trades get nothing.
+const tierRef = (id) => 'comptier:' + id; const tierFixRef = (id) => 'comptierfix:' + id;
+async function payTiers(c, B, t) {
+  const T = tiersOf(c); const fresh = new Map();
+  for (const x of B.rows) { if (x.state !== 'ranked') continue; const tr = T[tierIdx(T, x.pnl)]; if (!(tr.bonus > 0)) continue;
+    const row = await t.one("INSERT INTO points_log(user_id,label,delta,kind,ref) VALUES($1,$2,$3,'earned',$4) ON CONFLICT (user_id, ref) WHERE ref LIKE 'comptier:%' DO NOTHING RETURNING id", [x.uid, `${c.n}: ${tr.name} tier bonus`.slice(0, 160), tr.bonus, tierRef(c.id)]);
+    if (row) { await t.q('UPDATE users SET points=points+$1 WHERE id=$2', [tr.bonus, x.uid]); fresh.set(x.uid, { tier: tr.name, bonus: tr.bonus }); } }
+  return fresh;
+}
+// A result changed after the end (disqualified or put back): the bonus follows. Taken back as far as the balance allows, or paid.
+async function fixTier(c, B, uid, t) {
+  const T = tiersOf(c); const x = B.rows.find((r) => r.uid === uid); const tr = x && x.state === 'ranked' ? T[tierIdx(T, x.pnl)] : null; const due = tr ? tr.bonus : 0;
+  const u = await t.one('SELECT points FROM users WHERE id=$1 FOR UPDATE', [uid]); if (!u) return 0;
+  const net = (await t.one('SELECT COALESCE(sum(delta),0)::int n FROM points_log WHERE user_id=$1 AND ref = ANY($2)', [uid, [tierRef(c.id), tierFixRef(c.id)]])).n;
+  const delta = due > net ? due - net : -Math.min(net - due, Math.max(0, u.points)); if (!delta) return 0;
+  await t.q('INSERT INTO points_log(user_id,label,delta,kind,ref) VALUES($1,$2,$3,$4,$5)', [uid, (delta > 0 ? `${c.n}: ${tr.name} tier bonus` : `${c.n}: tier bonus taken back (disqualified)`).slice(0, 160), delta, delta > 0 ? 'earned' : 'refund', tierFixRef(c.id)]);
+  await t.q('UPDATE users SET points=points+$1 WHERE id=$2', [delta, uid]); return delta;
+}
+// What staff see in a finished competition: each ranked entrant's tier and the credits the ledger really holds for it
+async function tierResults(c, B, t) {
+  const T = tiersOf(c); const net = new Map((await (t || db).all('SELECT user_id, sum(delta)::int n FROM points_log WHERE ref = ANY($1) GROUP BY user_id', [[tierRef(c.id), tierFixRef(c.id)]])).map((r) => [r.user_id, r.n]));
+  return B.rows.filter((x) => x.state === 'ranked' || net.get(x.uid)).map((x) => { const tr = x.state === 'ranked' ? T[tierIdx(T, x.pnl)] : null; return { uid: x.uid, tier: tr ? tr.key : '', name: tr ? tr.name : '', bonus: tr ? tr.bonus : 0, paid: net.get(x.uid) || 0, pnl: x.pnl, rank: x.rank }; });
+}
+
+// ---- Rank history: one row per ranked entrant per day (Eastern Time). The automations run writes today's row for every
+// live competition and overwrites it until the day is over, so each day keeps the rank the trader closed it with.
+async function snapRanks(c, B, day, t) {
+  const R = B.rows.filter((x) => x.state === 'ranked'); if (!R.length) return 0;
+  await (t || db).q(`INSERT INTO comp_ranks(comp,user_id,day,rk,n,pnl) SELECT $1, u, $2::date, r, $3, p FROM unnest($4::int[], $5::int[], $6::numeric[]) AS x(u, r, p)
+    ON CONFLICT (comp,user_id,day) DO UPDATE SET rk=EXCLUDED.rk, n=EXCLUDED.n, pnl=EXCLUDED.pnl`, [c.id, day, R.length, R.map((x) => x.uid), R.map((x) => x.rank), R.map((x) => x.pnl)]);
+  return R.length;
+}
+async function snapshot(day) { const today = dayOf(day) || todayET(); let n = 0;
+  for (const c of (await list()).filter(isLive)) { if ((c.startAt && today < c.startAt) || (c.endAt && today > c.endAt)) continue; n += await snapRanks(c, await board(c.id), today); }
+  return n; }
+
 async function start(id, actor) {
   const made = await locked(id, async (t) => { const L = await stored(t); const c = L.find((x) => x.id === id); if (!c) bad('Competition not found', 404);
     if (isLive(c)) return false; if (isOver(c)) bad('This competition has already ended.');
@@ -234,26 +295,34 @@ async function end(id, actor) {
     if (isOver(c) && W[id]) return null;
     await t.q("UPDATE accounts SET phase='closed', closed_at=now(), breach_reason='Competition ended' WHERE comp=$1 AND phase IN ('active','review')", [id]);
     const B = await board(id, t); const winners = pickWinners(c, B); W[id] = winners; await kvPut('store.competitions.winners', W, t);
-    const today = todayET(); c.st = 'ended'; if (!c.endAt || c.endAt > today) { c.endAt = today; c.end = dayText(today); } if (c.startAt && c.startAt > c.endAt) { c.startAt = c.endAt; c.start = c.end; }
+    const bonus = await payTiers(c, B, t); const TR = (await kvGet('store.competitions.tiers', t)) || {}; TR[id] = await tierResults(c, B, t); await kvPut('store.competitions.tiers', TR, t);
+    const today = todayET(); await snapRanks(c, B, c.endAt && c.endAt < today ? c.endAt : today, t); c.st = 'ended'; if (!c.endAt || c.endAt > today) { c.endAt = today; c.end = dayText(today); } if (c.startAt && c.startAt > c.endAt) { c.startAt = c.endAt; c.start = c.end; }
     await saveList(L, t);
-    return { c, B, winners }; });
+    return { c, B, winners, bonus }; });
   content.reset();
   if (!r) return { ended: false, winners: ((await kvGet('store.competitions.winners')) || {})[id] || [] };
-  await core.audit(actor || null, 'competition.end', id, { auto: !actor, winners: r.winners.map((w) => [w.place, w.uid, w.prize]) });
-  await tellEnd(r.c, r.B, r.winners).catch((e) => console.error('comps tellEnd', e.message));
+  await core.audit(actor || null, 'competition.end', id, { auto: !actor, winners: r.winners.map((w) => [w.place, w.uid, w.prize]), tierBonuses: r.bonus.size, tierCredits: [...r.bonus.values()].reduce((s2, x) => s2 + x.bonus, 0) });
+  await tellEnd(r.c, r.B, r.winners, r.bonus).catch((e) => console.error('comps tellEnd', e.message));
   return { ended: true, winners: r.winners };
 }
+// A prize place comes with a certificate (server/certs.js builds it from the stored winner): its ID and public link, or null when
+// competition certificates are switched off in Back Office › Rewards › Templates or this one was revoked
+async function certOf(cid, pos) { const C = require('./certs'); const id = C.compCertId(cid, pos); if ((await C.certOff()).Competition || (await C.revoked()).includes(id)) return null; return { id, url: require('./auth').BASE() + '/cert/' + encodeURIComponent(id) }; }
+// "Your certificate is ready": its own notification, which opens the certificate in Rewards › Certificates (sent just before the prize
+// notification, so the prize stays on top of the list)
+async function tellCert(uid, c, w, ce) { if (ce) await core.notify(null, uid, 'Your certificate is ready', `Your ${w.place} Place certificate for ${c.n} is ready to view and share.`, 'rewards?tab=certs&cert=' + encodeURIComponent(ce.id)); }
 // Notification and email to every entrant when it ends, and to each winner about their prize
-async function tellEnd(c, B, winners) {
+async function tellEnd(c, B, winners, bonus) {
   const mail = require('./mail'); const base = require('./auth').BASE(); const url = base + '/app#competitions'; const set = await settings(); const won = new Map(winners.map((w) => [w.uid, w]));
   const first = B.rows.find((x) => x.pos === 1 && x.pnl > 0); const top = first ? `${nameOf(first, set)} finished first.` : 'Nobody finished in profit, so no prizes were won.';
   const noMail = new Set((await db.all("SELECT id FROM users WHERE id = ANY($1) AND (settings->>'nComp')='false'", [B.rows.map((x) => x.uid)])).map((x) => x.id));
   for (const x of B.rows) { const w = won.get(x.uid);
-    const res = x.state === 'ranked' ? `You finished ${ordinal(x.rank)} of ${B.total.ranked}${x.tied ? ' (tied)' : ''}.` : x.state === 'out' ? `Your entry was out of the ranking (${x.why.toLowerCase()}).` : 'You did not place a trade, so you were not ranked.';
-    if (w) { const kyc = set.kycWin !== false && x.kyc !== 'verified';
+    const tb = bonus && bonus.get(x.uid);
+    const res = (x.state === 'ranked' ? `You finished ${ordinal(x.rank)} of ${B.total.ranked}${x.tied ? ' (tied)' : ''}.` : x.state === 'out' ? `Your entry was out of the ranking (${x.why.toLowerCase()}).` : 'You did not place a trade, so you were not ranked.') + (tb ? ` You reached the ${tb.tier} tier, so ${tb.bonus.toLocaleString('en-US')} bonus credits were added to your balance.` : '');
+    if (w) { const kyc = set.kycWin !== false && x.kyc !== 'verified'; const ce = await certOf(c.id, w.pos).catch(() => null);
       const next = kyc ? 'Verify your identity in Settings so we can send it.' : 'We will send it shortly. Nothing else is needed from you right now.';
-      await core.notify(null, x.uid, `You won ${aPrize(w.prize)} in ${c.n}`, `${res} Your prize for ${w.place} place is ${aPrize(w.prize)}. ${next}`, kyc ? 'settings?tab=identity' : 'competitions');
-      mail.t('compwin', x.uid, { competition: c.n, place: w.place, prize: w.prize, won: aPrize(w.prize), result: res, next, url: kyc ? base + '/app#settings?tab=identity' : url });
+      await tellCert(x.uid, c, w, ce); await core.notify(null, x.uid, `You won ${aPrize(w.prize)} in ${c.n}`, `${res} Your prize for ${w.place} place is ${aPrize(w.prize)}. ${next}`, kyc ? 'settings?tab=identity' : 'competitions');
+      mail.t('compwin', x.uid, { competition: c.n, place: w.place, prize: w.prize, won: aPrize(w.prize), result: res, next, cert: ce ? 'Your certificate is ready: ' + ce.url : '', url: kyc ? base + '/app#settings?tab=identity' : url });
     } else {
       await core.notify(null, x.uid, `${c.n} has ended`, `${res} ${top}${x.acct ? ` Your competition account ${x.acct} is now closed.` : ''}`, 'competitions');
       if (!noMail.has(x.uid)) mail.t('compend', x.uid, { competition: c.n, result: res, winner: top, url });
@@ -264,6 +333,7 @@ async function reopen(c, t) {
   const W = (await kvGet('store.competitions.winners', t)) || {};
   if ((W[c.id] || []).some((w) => w.status === 'Sent')) bad(`${c.n} cannot be reopened: a prize has already been sent.`);
   if (W[c.id]) { delete W[c.id]; await kvPut('store.competitions.winners', W, t); }
+  { const TR = (await kvGet('store.competitions.tiers', t)) || {}; if (TR[c.id]) { delete TR[c.id]; await kvPut('store.competitions.tiers', TR, t); } } // the ledger rows stay, so a second ending never pays twice
   if (isLive(c)) await t.q("UPDATE accounts SET phase='active', closed_at=NULL, breach_reason=NULL WHERE comp=$1 AND phase='closed' AND breach_reason='Competition ended'", [c.id]);
 }
 // Save the whole list (Back Office content editor). Status changes made this way go through the same steps as the buttons.
@@ -292,9 +362,16 @@ async function create(b, actor) {
   if (endAt < startAt) bad('The end date is before the start date.');
   if (endAt < todayET()) bad('The end date is in the past.');
   if (!Array.isArray(b.prizes) || !b.prizes.length) bad('Add at least one prize.');
-  const next = await validate([{ id, n: b.n, st: 'upcoming', startAt, endAt, size: b.size, entry: b.entry, prizes: b.prizes, rule: b.rule }].concat(L));
+  const next = await validate([{ id, n: b.n, st: 'upcoming', startAt, endAt, size: b.size, entry: b.entry, prizes: b.prizes, rule: b.rule, tiers: b.tiers }].concat(L));
   await saveList(next); await core.audit(actor || null, 'competition.create', id, { n: next[0].n });
   return next[0];
+}
+// Rank tiers of one competition, from its Back Office drawer. Not once it has ended: the bonuses were paid on those tiers.
+async function setTiers(id, tiers, actor) {
+  const out = await locked(id, async (t) => { const L = await stored(t); const c = L.find((x) => x.id === id); if (!c) bad('Competition not found', 404);
+    if (isOver(c)) bad('This competition has ended, so its rank tiers are final.');
+    const T = cleanTiers(tiers, sizeOf(c), c.n); if (T) c.tiers = T; else delete c.tiers; await saveList(L, t); return tiersOf(c); });
+  content.reset(); await core.audit(actor || null, 'competition.tiers', id, { tiers: out.map((x) => [x.name, x.need, x.bonus]) }); return { tiers: out };
 }
 // Started and ended on their dates (Eastern Time) by the automations run
 async function schedule() {
@@ -318,13 +395,15 @@ async function disqualify(id, uid, on, actor) {
     else if (isLive(c)) await t.q("UPDATE accounts SET phase='active', closed_at=NULL, breach_reason=NULL WHERE comp=$1 AND user_id=$2 AND phase='closed' AND breach_reason='Disqualified'", [id, uid]);
     else await t.q("UPDATE accounts SET breach_reason='Competition ended' WHERE comp=$1 AND user_id=$2 AND phase='closed' AND breach_reason='Disqualified'", [id, uid]);
     let fresh = [];
-    if (isOver(c) && W[id]) { const before = new Set(W[id].map((w) => w.uid)); W[id] = pickWinners(c, await board(id, t)); await kvPut('store.competitions.winners', W, t); fresh = W[id].filter((w) => !before.has(w.uid)); }
-    return { c, fresh }; });
+    let tierDelta = 0;
+    if (isOver(c) && W[id]) { const before = new Set(W[id].map((w) => w.uid)); const B2 = await board(id, t); W[id] = pickWinners(c, B2); await kvPut('store.competitions.winners', W, t); fresh = W[id].filter((w) => !before.has(w.uid));
+      tierDelta = await fixTier(c, B2, uid, t); const TR = (await kvGet('store.competitions.tiers', t)) || {}; TR[id] = await tierResults(c, B2, t); await kvPut('store.competitions.tiers', TR, t); }
+    return { c, fresh, tierDelta }; });
   if (r.same) return { ok: true };
-  await core.audit(actor || null, on ? 'competition.disqualify' : 'competition.reinstate', id, { uid });
-  if (on) await core.notify(null, uid, `You were removed from ${r.c.n}`, 'Your entry broke the competition rules, so your competition account is closed. Contact support if you think this is a mistake.', 'competitions');
-  else await core.notify(null, uid, `You are back in ${r.c.n}`, isLive(r.c) ? 'Your disqualification was reversed. Your competition account is open again and you are back on the leaderboard.' : 'Your disqualification was reversed and your result counts again.', 'competitions');
-  for (const w of r.fresh || []) { await core.notify(null, w.uid, `You won ${aPrize(w.prize)} in ${r.c.n}`, `The results were updated and you now hold ${w.place} place. Your prize is ${aPrize(w.prize)}.`, 'competitions'); require('./mail').t('compwin', w.uid, { competition: r.c.n, place: w.place, prize: w.prize, won: aPrize(w.prize), result: `The results were updated and you now hold ${w.place} place.`, next: 'We will be in touch about your prize.', url: require('./auth').BASE() + '/app#competitions' }); }
+  await core.audit(actor || null, on ? 'competition.disqualify' : 'competition.reinstate', id, Object.assign({ uid }, r.tierDelta ? { tierCredits: r.tierDelta } : {}));
+  if (on) await core.notify(null, uid, `You were removed from ${r.c.n}`, `Your entry broke the competition rules, so your competition account is closed.${r.tierDelta < 0 ? ` The tier bonus of ${(-r.tierDelta).toLocaleString('en-US')} credits was taken back.` : ''} Contact support if you think this is a mistake.`, 'competitions');
+  else await core.notify(null, uid, `You are back in ${r.c.n}`, isLive(r.c) ? 'Your disqualification was reversed. Your competition account is open again and you are back on the leaderboard.' : `Your disqualification was reversed and your result counts again.${r.tierDelta > 0 ? ` Your tier bonus of ${r.tierDelta.toLocaleString('en-US')} credits was added to your balance.` : ''}`, 'competitions');
+  for (const w of r.fresh || []) { const ce = await certOf(r.c.id, w.pos).catch(() => null); await tellCert(w.uid, r.c, w, ce); await core.notify(null, w.uid, `You won ${aPrize(w.prize)} in ${r.c.n}`, `The results were updated and you now hold ${w.place} place. Your prize is ${aPrize(w.prize)}.`, 'competitions'); require('./mail').t('compwin', w.uid, { competition: r.c.n, place: w.place, prize: w.prize, won: aPrize(w.prize), result: `The results were updated and you now hold ${w.place} place.`, next: 'We will be in touch about your prize.', cert: ce ? 'Your certificate is ready: ' + ce.url : '', url: require('./auth').BASE() + '/app#competitions' }); }
   return { ok: true };
 }
 
@@ -362,17 +441,43 @@ async function sendPrize(id, pos, actor) {
 
 // ---- What each screen reads
 const placeRows = (c) => c.prizes.map((p, i) => ({ place: ordinal(i + 1), label: prizeLabel(p), type: p.type }));
+// ---- The clock traders see: whole days are Eastern Time, a competition runs from the start of its first day to the end of its last
+const WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const dayNum = (iso) => Math.round(Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10)) / 864e5);
+const wdText = (iso) => `${WD[new Date(iso + 'T12:00:00Z').getUTCDay()]} ${dayText(iso)}`;
+function clockOf(c, now = new Date()) {
+  if (!c.startAt || !c.endAt) return null; const today = todayET(now); const p = require('./util').etParts(now); const dayFrac = (p.h * 60 + p.m) / 1440;
+  const total = dayNum(c.endAt) - dayNum(c.startAt) + 1; const gone = dayNum(today) - dayNum(c.startAt) + dayFrac; const left = dayNum(c.endAt) - dayNum(today); const toStart = dayNum(c.startAt) - dayNum(today);
+  return { total, day: Math.max(1, Math.min(total, dayNum(today) - dayNum(c.startAt) + 1)), left: Math.max(0, left), hours: left <= 0 ? Math.max(0, Math.ceil(24 - dayFrac * 24 + left * 24)) : null, pct: Math.max(0, Math.min(100, Math.round(gone / total * 100))), toStart: Math.max(0, toStart),
+    starts: `${wdText(c.startAt)}, 12:00 AM ET`, ends: `${wdText(c.endAt)}, 11:59 PM ET` };
+}
+// The trader's own competition account: max loss used and limit from the rule engine, and profit at the end of each contest day
+async function mineOf(c, acctId, cat) {
+  const a = await db.one('SELECT * FROM accounts WHERE id=$1', [acctId]); if (!a) return {};
+  const r = require('./rules').rulesFor(cat, a); const start = Number(a.start_bal), bal = Number(a.balance); const lim = Number(r.maxLoss) || 0;
+  const days = await db.all('SELECT day::text d, eod_balance::float b FROM days WHERE account_id=$1 ORDER BY day', [acctId]);
+  const run = days.map((d) => ({ d: dayText(d.d.slice(0, 10)), v: Math.round((d.b - start) * 100) / 100 })); const now = Math.round((bal - start) * 100) / 100;
+  if (isLive(c) && (!run.length || Math.abs(run[run.length - 1].v - now) >= 0.005)) run.push({ d: 'Today', v: now });
+  return { ddUsed: lim ? Math.round(Math.max(0, Math.min(lim, lim - (bal - Number(a.floor)))) * 100) / 100 : 0, ddLimit: lim, run };
+}
 const pubRow = (x, set, me) => ({ rank: x.rank, pos: x.pos, tied: !!x.tied, name: nameOf(x, set), country: set.showCtry === false ? '' : x.country, pnl: x.pnl, pct: x.pct, dd: x.dd, out: x.state === 'out', state: x.state, why: x.why, me: !!me });
 const TOP = 50;
 // Trader page: every competition, with the top 50, the trader's own row and true totals for the live and finished ones
 async function forTrader(uid) {
   const rows = await db.all("SELECT key, count(*)::int n FROM users, jsonb_each(COALESCE(settings->'comps','{}'::jsonb)) WHERE value = 'true'::jsonb GROUP BY key"); const n = Object.fromEntries(rows.map((r) => [r.key, r.n]));
-  const set = await settings(); const W = (await kvGet('store.competitions.winners')) || {}; const out = [];
-  for (const c of await list()) { const o = Object.assign({}, c, { players: n[c.id] || 0, prizes: placeRows(c), rules: RULES_TEXT });
+  const set = await settings(); const W = (await kvGet('store.competitions.winners')) || {}; const TR = (await kvGet('store.competitions.tiers')) || {}; const cat = await core.catalog(); const out = [];
+  for (const c of await list()) { const T = tiersOf(c); const o = Object.assign({}, c, { players: n[c.id] || 0, prizes: placeRows(c), rules: RULES_TEXT, tiers: T, clock: clockOf(c) });
     if (isLive(c) || isOver(c)) { const B = await board(c.id); const mine = B.rows.find((x) => x.uid === uid); const top = B.rows.slice(0, TOP);
-      o.lb = top.map((x) => pubRow(x, set, x.uid === uid)); if (mine && !top.includes(mine)) o.lb.push(pubRow(mine, set, true));
+      const row = (x, me) => Object.assign(pubRow(x, set, me), { tier: x.state === 'ranked' ? T[tierIdx(T, x.pnl)].key : '' });
+      o.lb = top.map((x) => row(x, x.uid === uid)); if (mine && !top.includes(mine)) o.lb.push(row(mine, true));
+      // the last prize place and the profit that holds it right now (prizes need a profit, so never below zero)
+      { const R = B.rows.filter((x) => x.state === 'ranked'); const N = c.prizes.length; o.cut = N ? { place: N, label: ordinal(N), pnl: R.length >= N ? Math.max(0, R[N - 1].pnl) : 0, full: R.length >= N } : null; }
       o.total = B.total; o.shown = top.length; o.players = Math.max(o.players, B.total.entrants);
-      o.me = mine ? { rank: mine.rank, pos: mine.pos, tied: !!mine.tied, gap: mine.gap || 0, above: mine.above, pnl: mine.pnl, pct: mine.pct, dd: mine.dd, out: mine.state === 'out', state: mine.state, why: mine.why, acct: mine.acct, of: B.total.ranked } : null;
+      o.me = mine ? { rank: mine.rank, pos: mine.pos, tied: !!mine.tied, gap: mine.gap || 0, above: mine.above, pnl: mine.pnl, pct: mine.pct, dd: mine.dd, out: mine.state === 'out', state: mine.state, why: mine.why, acct: mine.acct, of: B.total.ranked, trades: mine.trades,
+        tier: mine.state === 'ranked' ? T[tierIdx(T, mine.pnl)].key : '', top: mine.pos ? Math.max(1, Math.ceil(mine.pos / B.total.ranked * 100)) : null, behind: mine.pos && o.cut && mine.pos > o.cut.place ? Math.round((o.cut.pnl - mine.pnl) * 100) / 100 : 0, inPrize: !!(mine.pos && o.cut && mine.pos <= o.cut.place && mine.pnl > 0) } : null;
+      if (mine && mine.acct) Object.assign(o.me, await mineOf(c, mine.acct, cat));
+      if (mine) o.me.ranks = (await db.all('SELECT day::text d, rk, n FROM comp_ranks WHERE comp=$1 AND user_id=$2 ORDER BY day', [c.id, uid])).map((r) => ({ d: dayText(r.d.slice(0, 10)), rank: r.rk, of: r.n }));
+      if (isOver(c) && mine) { const tr = (TR[c.id] || []).find((x) => x.uid === uid); if (tr && tr.paid > 0) o.me.bonus = { tier: tr.tier, name: tr.name, credits: tr.paid }; }
       if (isOver(c)) { const by = new Map(B.rows.map((x) => [x.uid, x])); o.winners = (W[c.id] || []).map((w) => ({ place: w.place, prize: w.prize, name: by.has(w.uid) ? nameOf(by.get(w.uid), set) : 'Trader', me: w.uid === uid, sent: w.status === 'Sent' })); const mw = (W[c.id] || []).find((w) => w.uid === uid); if (mw && o.me) o.me.prize = { place: mw.place, prize: mw.prize, sent: mw.status === 'Sent', account: mw.account || '', code: mw.code || '' }; } }
     out.push(o); }
   return out;
@@ -389,10 +494,11 @@ async function forPublic() {
 async function forAdmin() {
   const W = (await kvGet('store.competitions.winners')) || {}; const out = [];
   const dup = new Set((await db.all("SELECT u.id FROM users u WHERE u.kyc->>'name' IS NOT NULL AND u.kyc->>'dob' IS NOT NULL AND EXISTS (SELECT 1 FROM users y WHERE y.id<>u.id AND y.kyc->>'name' = u.kyc->>'name' AND y.kyc->>'dob' = u.kyc->>'dob')").catch(() => [])).map((r) => r.id));
-  for (const c of await list()) { const B = await board(c.id);
-    out.push(Object.assign({}, c, { players: B.total.entrants, total: B.total, prizeRows: placeRows(c), winners: W[c.id] || [],
-      rows: B.rows.map((x) => ({ uid: x.uid, acct: x.acct, n: `${x.first} ${(x.last || '').slice(0, 1)}.`, ctry: x.country, kyc: x.kyc, rank: x.rank, pos: x.pos, tied: !!x.tied, pnl: x.pnl, pct: x.pct, dd: x.dd, days: x.days, trades: x.trades, state: x.state, why: x.why, dq: x.dq, flag: dup.has(x.uid) ? 'Same identity as another entrant' : '' })) })); }
+  const TR = (await kvGet('store.competitions.tiers')) || {};
+  for (const c of await list()) { const B = await board(c.id); const T = tiersOf(c);
+    out.push(Object.assign({}, c, { players: B.total.entrants, total: B.total, prizeRows: placeRows(c), winners: W[c.id] || [], tiers: T, tiersCustom: !!c.tiers, tierPaid: TR[c.id] || [],
+      rows: B.rows.map((x) => ({ uid: x.uid, acct: x.acct, n: `${x.first} ${(x.last || '').slice(0, 1)}.`, ctry: x.country, kyc: x.kyc, rank: x.rank, pos: x.pos, tied: !!x.tied, tier: x.state === 'ranked' ? T[tierIdx(T, x.pnl)].name : '', pnl: x.pnl, pct: x.pct, dd: x.dd, days: x.days, trades: x.trades, state: x.state, why: x.why, dq: x.dq, flag: dup.has(x.uid) ? 'Same identity as another entrant' : '' })) })); }
   return { comps: out, settings: await settings(), rules: RULES_TEXT, today: todayET() };
 }
 
-module.exports = { sync, join, joined: join, leaderboard, board, isLive, isOver, sizeOf, planFor, list, validate, save, create, start, end, schedule, disqualify, sendPrize, forTrader, forPublic, forAdmin, settings, prizeLabel, prizeText, dayOf, RULES_TEXT };
+module.exports = { sync, join, joined: join, leaderboard, board, isLive, isOver, sizeOf, planFor, list, validate, save, create, start, end, schedule, disqualify, sendPrize, forTrader, forPublic, forAdmin, settings, prizeLabel, prizeText, dayOf, RULES_TEXT, setTiers, tiersOf, defTiers, snapshot, clockOf };

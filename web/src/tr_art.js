@@ -32,4 +32,4 @@
   const CUPK = [['gold', 'star'], ['obsidian', 'bolt'], ['ice', 'snow'], ['silver', 'star'], ['bronze', 'bars']];
   const CUPOF = { 'C-07': ['gold', 'star'], 'C-08': ['obsidian', 'bolt'], 'C-09': ['ice', 'snow'], 'C-06': ['bronze', 'bars'], 'C-05': ['silver', 'star'] };
   const cupKind = (c) => CUPOF[c.id] || CUPK[Array.from(String(c.id || c.n || '')).reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7) % CUPK.length];
-  const cupFor = (c, s) => ART.cup(cupKind(c)[0], cupKind(c)[1], s, c.n);
+  const cupFor = (c, s) => ART.cup(cupKind(c)[0], cupKind(c)[1], s, esc(c.n)); // the name is staff text and lands in an aria-label

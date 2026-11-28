@@ -28,3 +28,5 @@ select{-webkit-appearance:none!important;-moz-appearance:none!important;appearan
 .fsbo .capnote{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin:0 0 14px;padding:10px 14px;border:1px solid var(--ln);border-radius:10px;background:var(--p1);font-size:13px;line-height:1.45;color:var(--mu)}
 .fsbo .capnote b{color:var(--tx)}.fsbo .capnote span{flex:1;min-width:220px}
 .fsbo .main.flowv>.capnote{margin:12px 16px 0}
+/* account-size badges (/static/sizeart.js) at the start of a table cell */
+.fsbo .szo{display:flex;align-items:center;gap:10px;min-width:0}

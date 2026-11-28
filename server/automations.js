@@ -13,6 +13,8 @@ async function run() {
   // competitions start and end on their dates (Eastern Time)
   const sched = await require('./comps').schedule().catch((e) => { console.error('comps schedule', e.message); return {}; });
   await require('./comps').sync().catch((e) => console.error('comps sync', e.message));
+  // today's rank of every ranked entrant (Rank Over Time on the Competitions page); the same day is overwritten, never added twice
+  await require('./comps').snapshot().catch((e) => console.error('comps snapshot', e.message));
   const cat = await core.catalog(); const out = {}; if (sched.started) out.compsStarted = sched.started; if (sched.ended) out.compsEnded = sched.ended; const mrules = (await mail.cfg()).rules;
   const hit = (k) => { out[k] = (out[k] || 0) + 1; };
   try { const n = await require('./support').autoClose(); if (n) out.ticketsClosed = n; } catch (e) { console.error('autoClose', e.message); }

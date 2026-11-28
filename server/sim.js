@@ -80,7 +80,7 @@ async function closeAccountDay(c, a, dayIso) {
     await core.notify(c, a.user_id, `You passed ${a.id}!`, fee ? `Sign the funded agreement and pay the $${fee} activation fee to get your funded account.` : 'Sign the funded agreement to get your funded account.', 'account?acct=' + a.id);
     await core.points(c, a.user_id, 500, 'Passed ' + a.id);
     require('./mail').t('passed', a.user_id, { account: a.id, size: core.kLabel(a.size), platform: a.platform, ...require('./fills').passVars(fee), url: require('./auth').BASE() + '/app#account?acct=' + a.id });
-    { const u = await c.one('SELECT kyc_status FROM users WHERE id=$1', [a.user_id]); if (u && u.kyc_status === 'verified') await core.agreementReady(c, a); }
+    await core.agreementReady(c, a); // the agreement can be signed right after passing; identity is checked before the first payout
     { const wu = await c.one('SELECT tid, email FROM users WHERE id=$1', [a.user_id]); require('./integrations').alert('pass', `:tada: ${a.id} passed the evaluation`, { account: a.id, plan: a.plan, size: a.size, platform: a.platform, balance: Number(na.balance != null ? na.balance : a.balance), daysTraded: na.days_traded, passedAt: na.passed_at || new Date().toISOString(), user: wu ? { id: wu.tid, email: wu.email } : null }); }
   }
   return { ...na, today_pnl: 0, halted_today: false };

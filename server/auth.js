@@ -108,7 +108,8 @@ async function login(req, res) {
   if (u.status === 'banned') bad('This account is closed. Contact support.', 403);
   if (STAFF.includes(u.role) && u.status === 'suspended') bad('Your back office access is suspended. Ask an admin to turn it back on.', 403);
   if (u.status === 'suspended') bad(`This account is locked while our team reviews it. Reply to the email we sent you, or write to ${(await mail.cfg()).brand.support}.`, 403);
-  if (STAFF.includes(u.role) && u.mfa_on) { const ticket = await makeToken(u.id, 'mfa', 0.1); return { ok: true, mfa: true, ticket, role: u.role }; }
+  // Staff always, traders when they turned on Two-Step Login in Settings > Security: the code step comes next
+  if (u.mfa_on) { const ticket = await makeToken(u.id, 'mfa', 0.1); return { ok: true, mfa: true, ticket, role: u.role }; }
   await startSession(req, res, u, { login: true });
   return { ok: true, role: u.role, mfaSetup: STAFF.includes(u.role) };
 }
@@ -134,8 +135,8 @@ async function resetPassword(req, res) {
   const u = await db.one('SELECT * FROM users WHERE id=$1', [t.user_id]); loginFails.delete(String(u.email).toLowerCase());
   mail.t('pwchanged', u.id, { time: new Date().toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) + ' ET', device: require('./util').uaLabel(req.get('user-agent')), location: req.get('cf-ipcountry') || req.get('x-vercel-ip-country') || 'Unknown', url: BASE() + '/forgot-password' });
   if (u.status === 'banned' || u.status === 'suspended') return { ok: true, relogin: true };
-  // Staff with two-step login sign in again with their code instead of landing on a half-signed-in page
-  if (STAFF.includes(u.role) && u.mfa_on) return { ok: true, relogin: true };
+  // Anyone with two-step login (staff, and traders who turned it on) logs in again with their code: a reset link alone never skips the code
+  if (u.mfa_on) return { ok: true, relogin: true };
   await startSession(req, res, u);
   return { ok: true };
 }

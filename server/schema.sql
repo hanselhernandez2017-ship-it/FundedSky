@@ -362,6 +362,10 @@ ALTER TABLE payouts ADD COLUMN IF NOT EXISTS approvers JSONB NOT NULL DEFAULT '[
 
 -- Course credits: one ledger row per trader per course, ever (ref = 'course:<id>')
 CREATE UNIQUE INDEX IF NOT EXISTS points_log_course_once ON points_log(user_id, ref) WHERE ref LIKE 'course:%';
+-- Competition tier bonus: one ledger row per competition and trader (ref 'comptier:<competition id>')
+CREATE UNIQUE INDEX IF NOT EXISTS points_log_comptier_once ON points_log(user_id, ref) WHERE ref LIKE 'comptier:%';
+-- Competition rank history: the rank each ranked entrant held at the end of each day (Eastern Time)
+CREATE TABLE IF NOT EXISTS comp_ranks (comp TEXT NOT NULL, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, day DATE NOT NULL, rk INTEGER NOT NULL, n INTEGER NOT NULL, pnl NUMERIC(14,2) NOT NULL DEFAULT 0, PRIMARY KEY (comp, user_id, day));
 -- Free evaluation codes carry the account size they are for (NULL = $25K, the size of the rewards-store code)
 ALTER TABLE coupons ADD COLUMN IF NOT EXISTS size INTEGER;
 -- A trade above the max position size keeps the limit it broke (NULL: within the limit)
@@ -380,3 +384,20 @@ CREATE INDEX IF NOT EXISTS sessions_user ON sessions(user_id);
 CREATE INDEX IF NOT EXISTS coupons_user ON coupons(user_id);
 CREATE INDEX IF NOT EXISTS payout_methods_user ON payout_methods(user_id);
 CREATE INDEX IF NOT EXISTS user_cards_status ON user_cards(user_id, status);
+-- Support ticket attachments (server/files.js): the file itself is kept here, since the app's disk does not survive a deploy.
+-- msg_id is NULL while an upload waits to be sent with a message. key is the random id used in /api/files/<key>.
+CREATE TABLE IF NOT EXISTS ticket_files (
+  id SERIAL PRIMARY KEY,
+  key TEXT NOT NULL UNIQUE,
+  ticket_id INTEGER REFERENCES tickets(id) ON DELETE CASCADE,
+  msg_id INTEGER REFERENCES ticket_msgs(id) ON DELETE CASCADE,
+  owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  mime TEXT NOT NULL,
+  size INTEGER NOT NULL,
+  sha256 TEXT NOT NULL,
+  data BYTEA NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS ticket_files_ticket ON ticket_files(ticket_id);
+CREATE INDEX IF NOT EXISTS ticket_files_owner ON ticket_files(owner_id) WHERE msg_id IS NULL;

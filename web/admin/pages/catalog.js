@@ -9,6 +9,8 @@ function startCatalog(root) {
   let seq = 100; const uid = (p) => p + Date.now().toString(36) + (++seq);
   const fmtD = (d) => d ? new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
   // ---------- live catalog: the server's catalog plus the design-only settings kept in catalog.x ----------
+  // account-size badge (/static/sizeart.js); it follows the board's light and dark theme
+  const SZB = (z, px, key, off) => (window.FSSIZE ? FSSIZE.sizeBadge(z, { px, key, deco: true, off: !!off, theme: root.classList.contains('light') ? 'light' : 'dark' }) : ''); if (window.FSSIZE) FSSIZE.follow(root);
   const F = window.FSG; const BO = F.BO; const LIVE = JSON.parse(JSON.stringify(BO.catalog));
   const SIZES = [...new Set([25000, 50000, 100000, 150000].concat(...LIVE.plans.map((p) => p.sizes.map((z) => z.size))))].sort((a, b) => a - b);
   const PLAT_ID = { Tradovate: 'tradovate', NinjaTrader: 'ninja', TradingView: 'tv', Rithmic: 'rithmic' }; const PLAT_NAME = Object.fromEntries(Object.entries(PLAT_ID).map(([n, i]) => [i, n]));
@@ -256,7 +258,7 @@ function startCatalog(root) {
 
   function vPlan() {
     const p = plan(S.planId); if (!p) return vPlans();
-    const sizeRows = p.sizes.map((z, i) => { const r = liveRule(p.id, z.size); return `<tr><td class="swc">${sw(z.active, 'sizeActive', `data-i="${i}"`, 'Sell ' + K(z.size))}</td><td><b>${K(z.size)}</b><div class="hint mono nw">${p.slug.toUpperCase().replace('PLAN-', 'PLAN')}-${z.size / 1000}K</div></td>
+    const sizeRows = p.sizes.map((z, i) => { const r = liveRule(p.id, z.size); return `<tr><td class="swc">${sw(z.active, 'sizeActive', `data-i="${i}"`, 'Sell ' + K(z.size))}</td><td><div class="szo">${SZB(z.size, 32, 'c' + p.id, !z.active)}<div><b>${K(z.size)}</b><div class="hint mono nw">${p.slug.toUpperCase().replace('PLAN-', 'PLAN')}-${z.size / 1000}K</div></div></div></td>
       <td style="width:110px"><input type="number" min="0" value="${z.price || ''}" placeholder="Price" data-bind="size.price" data-i="${i}" style="width:80px" aria-label="Price ${K(z.size)}"></td>
       <td style="width:110px"><input type="number" min="0" value="${z.compare || ''}" placeholder="None" data-bind="size.compare" data-i="${i}" style="width:80px" aria-label="Compare-at ${K(z.size)}"></td>
       <td style="width:110px"><input type="number" min="0" value="${z.floor || ''}" placeholder="None" data-bind="size.floor" data-i="${i}" style="width:80px" aria-label="Floor ${K(z.size)}"></td>

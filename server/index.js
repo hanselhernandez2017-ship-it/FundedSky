@@ -77,6 +77,17 @@ app.post('/api/auth/mfa', limit(10, 60000), h((req, res) => auth.mfaLogin(req, r
 const needStaffUser = (req, res, next) => (req.user && auth.STAFF.includes(req.user.role) ? next() : res.status(403).json({ error: 'Staff only' }));
 app.get('/api/auth/mfa/setup', needStaffUser, h((req) => require('./mfa').setup(req.user)));
 app.post('/api/auth/mfa/enable', needStaffUser, limit(10, 60000), h((req) => require('./mfa').enable(req.user, req.sess, req.body.code)));
+// Trader Two-Step Login (Settings > Security): optional, the same authenticator codes and backup codes as staff
+app.get('/api/auth/2fa/setup', auth.needUser, h((req) => require('./mfa').setup(req.user)));
+app.post('/api/auth/2fa/enable', auth.needUser, limit(10, 60000), h((req) => require('./mfa').enable(req.user, req.sess, req.body.code)));
+app.post('/api/auth/2fa/disable', auth.needUser, limit(10, 60000), h((req) => require('./mfa').turnOff(req.user, req.body.password, req.body.code)));
+app.post('/api/auth/2fa/backup', auth.needUser, limit(10, 60000), h((req) => require('./mfa').regen(req.user, req.body.code)));
+// Ticket attachments (server/files.js): the file is the whole request body, its name in X-File-Name
+const FILES = require('./files');
+const upRaw = express.raw({ type: () => true, limit: FILES.MAX + 1 });
+app.post('/api/uploads', auth.needUser, limit(30, 60000), (req, res, next) => upRaw(req, res, (err) => (err ? res.status(err.status === 413 || err.type === 'entity.too.large' ? 413 : 400).json({ error: err.status === 413 || err.type === 'entity.too.large' ? 'That file is larger than 5 MB. Make it smaller and try again.' : 'That upload did not arrive. Try again.' }) : next())), h((req) => FILES.upload(req.user, req.body, req.get('x-file-name'))));
+app.post('/api/uploads/:key/remove', auth.needUser, h((req) => FILES.remove(req.user, req.params.key)));
+app.get('/api/files/:key', (req, res, next) => FILES.serve(req, res).catch(next));
 app.post('/api/auth/logout', h((req, res) => auth.logout(req, res)));
 app.post('/api/auth/forgot', limit(5, 60000), h((req) => auth.forgot(req)));
 app.post('/api/auth/reset', limit(10, 60000), h((req, res) => auth.resetPassword(req, res)));
@@ -159,7 +170,7 @@ T.post('/tickets', h(async (req) => {
   if (req.body.body != null && typeof req.body.body !== 'string') bad('Add a few details so we can help.'); const body = clean(req.body.body, 5000); if (!body) bad('Add a few details so we can help.');
   const cat = await SUP.topic(req.body.category); if (!cat) bad('Pick a topic from the list.');
   // The ticket and its first message are saved together, so a ticket can never exist without a message
-  const t = await db.tx(async (c) => { const x = await c.one('INSERT INTO tickets(user_id,subject,category,channel) VALUES($1,$2,$3,$4) RETURNING id', [req.user.id, s, cat, 'Web']); await c.q('INSERT INTO ticket_msgs(ticket_id,author_id,body) VALUES($1,$2,$3)', [x.id, req.user.id, body]); return x; });
+  const t = await db.tx(async (c) => { const x = await c.one('INSERT INTO tickets(user_id,subject,category,channel) VALUES($1,$2,$3,$4) RETURNING id', [req.user.id, s, cat, 'Web']); const m = await c.one('INSERT INTO ticket_msgs(ticket_id,author_id,body) VALUES($1,$2,$3) RETURNING id', [x.id, req.user.id, body]); await FILES.attach(c, req.user, x.id, m.id, FILES.fileIds(req.body)); return x; });
   const r = await SUP.onTraderMessage(t.id, body, { isNew: true }); const ss = await SUP.settings();
   require('./mail').t('ticket', req.user.id, { ticket: t.id, subject: s, reply_time: r.afterHours ? (ss.ahText || SUP.replyText(ss)) : SUP.replyText(ss), url: require('./auth').BASE() + '/app#support?tkt=' + t.id });
   I.alert('ticket', `:speech_balloon: New ticket #${t.id}${r.urgent ? ' (urgent)' : ''}: ${s}`);
@@ -167,8 +178,8 @@ T.post('/tickets', h(async (req) => {
 }));
 T.post('/tickets/:id/reply', h(async (req) => {
   const t = await db.one('SELECT * FROM tickets WHERE id=$1 AND user_id=$2', [+req.params.id, req.user.id]); if (!t) bad('Ticket not found', 404);
-  const body = typeof req.body.body === 'string' ? clean(req.body.body, 5000) : ''; if (!body) bad('Write a reply first.');
-  await db.q('INSERT INTO ticket_msgs(ticket_id,author_id,body) VALUES($1,$2,$3)', [t.id, req.user.id, body]);
+  const body = typeof req.body.body === 'string' ? clean(req.body.body, 5000) : ''; const nf = Array.isArray(req.body.files) ? req.body.files.length : 0; if (!body && !nf) bad('Write a reply first.');
+  await db.tx(async (c) => { const m = await c.one('INSERT INTO ticket_msgs(ticket_id,author_id,body) VALUES($1,$2,$3) RETURNING id', [t.id, req.user.id, body]); await FILES.attach(c, req.user, t.id, m.id, FILES.fileIds(req.body)); });
   await db.q("UPDATE tickets SET status='open', updated_at=now() WHERE id=$1", [t.id]);
   await require('./support').onTraderMessage(t.id, body);
 }));

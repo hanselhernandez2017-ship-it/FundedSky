@@ -85,6 +85,11 @@ async function priceCart(items, { promo, coupon, userId, country, kind, ref, noC
   const elig = (pid, bid) => { const pl = planDef(cat, pid); return !(pl && pl.bundleOff && pl.bundleOff[bid]); };
   const bundleDefs = (cat.bundles || []).length ? [{ id: 'tier', type: 'tier', name: (cat.bundleName || 'Multi-Account Savings'), samePlan: !!cat.bundleSamePlan, tiers: cat.bundles.map((b) => ({ min: b.min, pct: b.pct, buy: b.buy })) }] : [];
   (cat.bundleRules || []).forEach((b) => bundleDefs.push(b));
+  // one code field at checkout: a promo code, an affiliate's code, or one of the trader's own reward or card codes. A reward code is recognised here, before bundles.
+  if (promo && !coupon && !(cat.promos || []).some((x) => String(x.code).toUpperCase() === String(promo).trim().toUpperCase())) {
+    const own = await db.one('SELECT code FROM coupons WHERE upper(code)=upper($1)', [String(promo).trim()]);
+    if (own) { if (!userId) bad('Log in to use your reward code.'); coupon = own.code; promo = null; }
+  }
   // a free account from a reward code doesn't count toward a bundle (owner decision Nov 27): one account of the reward's size is left out
   let bAccts = accts;
   if (coupon && userId) { const c0 = await db.one("SELECT kind, size, meta FROM coupons WHERE upper(code)=upper($1) AND user_id=$2", [String(coupon).trim(), userId]);
@@ -111,11 +116,7 @@ async function priceCart(items, { promo, coupon, userId, country, kind, ref, noC
   const autos = (cat.autos || []).map((p) => Object.assign(normPromo(p), { auto: true })).filter((p) => liveOn(p, today) && (!p.first || firstBuy) && (!p.minCart || sub >= p.minCart) && (!p.countries.length || p.countries.includes(ctry))).sort((a, b) => a.priority - b.priority);
   // the code a trader typed: a catalog promotion, or an affiliate's code
   const AFF = require('./affiliates'); let codeP = null; let affRow = null; let promoRow = null;
-  // one code field at checkout: a promo code, an affiliate's code, or one of the trader's own reward or card codes. Work out which it is here.
-  if (promo && !coupon && !(cat.promos || []).some((x) => String(x.code).toUpperCase() === String(promo).trim().toUpperCase())) {
-    const own = await db.one('SELECT code FROM coupons WHERE upper(code)=upper($1)', [String(promo).trim()]);
-    if (own) { if (!userId) bad('Log in to use your reward code.'); coupon = own.code; promo = null; }
-  }
+  // (a reward code typed into the code field is recognised earlier, before bundles, so a free account never counts toward a bundle)
   if (promo) {
     promoRow = (cat.promos || []).find((x) => String(x.code).toUpperCase() === String(promo).toUpperCase());
     if (promoRow) { const pr = normPromo(promoRow);

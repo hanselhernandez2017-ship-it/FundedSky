@@ -15,6 +15,8 @@ const HEAD = (title, extra = '') => `<!doctype html><html lang="en"><head><meta 
 // other runtime files and loaded by the trader app and the Back Office Rewards board. Its name is set in a serif italic and its
 // headline in weights up to 800, so pages that draw certificates load these on top of the site fonts.
 const CERT_FONT = '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mona+Sans:wdth,wght@100..125,400..800&family=Instrument+Serif:ital@1&display=swap">';
+// The account-size badges (web/runtime/sizeart.js, /static/sizeart.js) are drawn in the browser as inline SVG: the trader app, the checkout
+// pages that use <dc-import name="SizeBadge"> and the back office load it.
 // Files under /static are cached by browsers for an hour, so every page asks for them with this build's stamp and a new deploy shows at once
 const STAMP = Date.now().toString(36);
 const out = (f, s) => { if (/\.html$/.test(f)) s = s.replace(/((?:src|href)="\/static\/[\w./-]+\.(?:js|css))"/g, `$1?v=${STAMP}"`); fs.writeFileSync(path.join(DIST, f), s); console.log('built', f, Math.round(s.length / 1024) + 'KB'); };
@@ -26,7 +28,7 @@ const out = (f, s) => { if (/\.html$/.test(f)) s = s.replace(/((?:src|href)="\/s
   const html = `${HEAD('Funded Sky', `<style>html,body{margin:0;background:#08080A}html[data-theme=light],html[data-theme=light] body{background:#F6F5F3}${css}
 .fsload{position:fixed;inset:0;display:grid;place-items:center;font:500 14px 'Mona Sans',system-ui;color:#9C9693}</style>${CERT_FONT}`)}
 <body><div class="fsbo" id="fsbo"></div><div class="fsload" id="fsload">Loading your dashboard…</div>
-<script src="/static/pay.js"></script><script src="/static/morphdom.js"></script><script src="/static/packart.js"></script><script src="/static/cert.js"></script>
+<script src="/static/pay.js"></script><script src="/static/morphdom.js"></script><script src="/static/packart.js"></script><script src="/static/cert.js"></script><script src="/static/sizeart.js"></script>
 <script>
 (function () {
   var t = 'dark'; try { t = localStorage.getItem('fs_theme') || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'); } catch (e) {}
@@ -105,7 +107,7 @@ for (const [src0, dst0] of Object.entries(DCP).concat(Object.keys(LIGHTP).map((k
   const jsStart = s.indexOf('class Component'); const js = s.slice(jsStart, s.indexOf('</script>', jsStart));
   const helmNoFont = helm.replace(/<link[^>]+fonts\.googleapis[^>]+>/g, '');
   out(dst, `${HEAD(title.replace(/^Funded Sky( mobile)?( checkout)?:\s*/i, 'Funded Sky: '), (LIGHTP[src] ? THEME_JS(lightV ? 'light' : 'dark') : '') + helmNoFont + `<style>${SELECT_CSS(lightV ? '5E636C' : '9C9693')}${src === 'AdminPacks.dc.html' ? ADMIN_PACKS_CSS : ''}</style>`)}<body><div id="dc-root"></div>${src.startsWith('Admin') ? `<script type="text/x-dc-tpl" id="dc-tpl">${tpl}</script>` : `<template id="dc-tpl">${tpl}</template>`}
-<script src="/static/morphdom.js"></script><script src="/static/dc.js"></script>${src.startsWith('Admin') ? '' : '<script src="/static/site.js"></script><script src="/static/pay.js"></script>'}${/dc-import/.test(tpl) ? '<script src="/static/packart.js"></script>' : ''}
+<script src="/static/morphdom.js"></script><script src="/static/dc.js"></script>${src.startsWith('Admin') ? '' : '<script src="/static/site.js"></script><script src="/static/pay.js"></script>'}${/dc-import/.test(tpl) ? '<script src="/static/packart.js"></script>' : ''}${/name="SizeBadge"/.test(tpl) ? '<script src="/static/sizeart.js"></script>' : ''}
 <script>
 ${js}
 DC.mount(Component, { mobileLinks: false });

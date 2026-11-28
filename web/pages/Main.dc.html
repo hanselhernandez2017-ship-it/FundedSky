@@ -62,6 +62,7 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 .fs-lead{font-size:15px!important;line-height:22px!important}
 .fs-g3{grid-template-columns:minmax(0,1fr)!important}
 .fs-g4{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+.fs-g4 .fs-opt{gap:10px!important;padding:0 8px!important}.fs-sztx>span:last-child{white-space:normal!important;line-height:15px!important}
 .fs-pills{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important}
 .fs-aside{position:static!important;padding:20px!important}
 .fs-cta{display:none!important}
@@ -131,7 +132,7 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #7CC4
 <h2 style="margin: 0; font-size: 18px; line-height: 24px; font-weight: 600; letter-spacing: -0.01em;">Account Size</h2>
 <div class="fs-g4" style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px;">
 <sc-for list="{{ sizes }}" as="s" hint-placeholder-count="4">
-<button type="button" class="fs-opt" aria-pressed="{{ s.on }}" onClick="{{ s.pick }}" style="height: 68px; background: {{ s.bg }}; border: 1px solid {{ s.bd }}; border-radius: 8px; color: #F4F2F1; font: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer;"><span style="font-family: 'Geist Mono', monospace; font-size: 20px; line-height: 24px; font-weight: 500;">{{ s.label }}</span><span style="font-size: 12px; line-height: 16px; color: {{ s.sub }};"><sc-if value="{{ s.compare }}"><s style="opacity: 0.6; margin-right: 4px;">{{ s.compare }}</s></sc-if>{{ s.price }}</span></button>
+<button type="button" class="fs-opt" aria-pressed="{{ s.on }}" onClick="{{ s.pick }}" style="height: 68px; background: {{ s.bg }}; border: 1px solid {{ s.bd }}; border-radius: 8px; color: #F4F2F1; font: inherit; display: flex; align-items: center; justify-content: center; gap: 12px; padding: 0 10px; min-width: 0; cursor: pointer;"><span class="fs-szb-w" style="width: 40px; height: 40px; flex: none;"><dc-import name="SizeBadge" size="{{ s.size }}" px="40" deco="true" hint-size="40px,40px"></dc-import></span><span class="fs-sztx" style="display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0;"><span style="font-family: 'Geist Mono', monospace; font-size: 20px; line-height: 24px; font-weight: 500;">{{ s.label }}</span><span style="font-size: 12px; line-height: 16px; color: {{ s.sub }}; white-space: nowrap;"><sc-if value="{{ s.compare }}"><s style="opacity: 0.6; margin-right: 4px;">{{ s.compare }}</s></sc-if>{{ s.price }}</span></span></button>
 </sc-for>
 </div>
 </div>
@@ -316,7 +317,7 @@ class Component extends DCLogic {
     const K = (z) => '$' + z / 1000 + 'K';
     const plans = cat.plans.map((p) => Object.assign({ id: p.id, name: p.name, desc: p.desc, badge: p.badge || '' }, cur.plan === p.id ? on : off, { on: cur.plan === p.id, pick: () => this.updActive(() => ({ plan: p.id })) }));
     const promo = (cat.promos || []).find((x) => st.promoOk && st.promo && x.code === st.promo.toUpperCase());
-    const sizes = pc.sizes.map((z) => Object.assign({ label: K(z.size), compare: z.compare ? M(z.compare) : '', price: M(z.price) + (z.activation ? ' + ' + M(z.activation) + ' later' : '') }, cur.size === z.size ? on : off, { on: cur.size === z.size, pick: () => this.updActive(() => ({ size: z.size })) }));
+    const sizes = pc.sizes.map((z) => Object.assign({ size: z.size, label: K(z.size), compare: z.compare ? M(z.compare) : '', price: M(z.price) + (z.activation ? ' + ' + M(z.activation) + ' later' : '') }, cur.size === z.size ? on : off, { on: cur.size === z.size, pick: () => this.updActive(() => ({ size: z.size })) }));
     const platforms = pc.platforms.map((s) => Object.assign({ label: s }, cur.platform === s ? on : off, { on: cur.platform === s, pick: () => this.updActive(() => ({ platform: s })) }));
     const addons = pc.addons.map((k) => { const a = cat.addons[k]; const sel = !!cur.addons[k]; return Object.assign({ id: k, name: a.name, desc: a.desc, price: '+' + M(a.flat != null && Number(a.flat) > 0 ? Number(a.flat) : Math.round(sd.price * (a.pct || 0) / 100)) }, sel ? on : off, { on: sel, toggle: () => this.updActive((c) => ({ addons: Object.assign({}, c.addons, { [k]: !sel }) })) }); });
     const count = st.cart.reduce((n, c) => n + c.qty, 0);

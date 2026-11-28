@@ -47,7 +47,7 @@ function render(e, vars, brand) {
 <div style="padding:16px 26px 28px">
 ${e.e ? `<div style="font-size:13px;color:${C.mu};margin-bottom:8px">${fe(e.e)}</div>` : ''}
 <h1 style="margin:0 0 16px;font-size:26px;line-height:1.18;letter-spacing:-.025em;font-weight:600;color:${C.tx}">${fe(e.h)}${e.a ? ` <span style="color:${C.sky}">${fe(e.a)}</span>` : ''}</h1>
-${al}${paras.map((p) => `<p style="margin:0 0 14px;font-size:14.5px;line-height:1.6;color:${C.t2}">${fe(p).replace(/\n/g, '<br>')}</p>`).join('')}
+${al}${paras.filter((p) => f(p).trim()).map((p) => `<p style="margin:0 0 14px;font-size:14.5px;line-height:1.6;color:${C.t2}">${fe(p).replace(/\n/g, '<br>').replace(/https?:\/\/[^\s<&"]+[^\s<&".,)]/g, (u) => `<a href="${u}" style="color:${C.sky}">${u}</a>`)}</p>`).join('')}
 ${e.c ? `<div style="font-family:ui-monospace,Menlo,monospace;font-size:30px;font-weight:600;letter-spacing:.2em;text-align:center;padding:18px 0;border:1px solid ${C.ln};border-radius:10px;background:${C.p2};margin:4px 0 16px;color:${C.tx}">${fe(e.c)}</div>` : ''}
 ${pg}
 ${rows.length ? `<table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid ${C.ln};border-radius:10px;margin:4px 0 18px;background:${C.p2};border-collapse:separate">${rows.map(([k, v], i) => `<tr><td style="padding:10px 14px;font-size:13.5px;color:${C.mu};${i < rows.length - 1 ? `border-bottom:1px solid ${C.ln2}` : ''}">${esc(k)}</td><td align="right" style="padding:10px 14px;font-size:13.5px;font-weight:600;color:${C.tx};${i < rows.length - 1 ? `border-bottom:1px solid ${C.ln2}` : ''}">${esc(v)}</td></tr>`).join('')}</table>` : ''}

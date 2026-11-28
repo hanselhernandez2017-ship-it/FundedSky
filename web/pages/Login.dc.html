@@ -113,14 +113,14 @@ class Component extends DCLogic {
     const st = this.state; this.setState({ submitted: true, err: '' });
     if (!/.+@.+\..+/.test(st.email) || !st.pw) return;
     this.setState({ busy: true });
-    try { const r = await DC.api('/api/auth/login', { email: st.email.trim(), password: st.pw, remember: st.remember }); if (r.mfa) { this.setState({ busy: false, mfa: true, ticket: r.ticket, code: '', codeErr: '' }); setTimeout(() => { const c = document.getElementById('code'); if (c) c.focus(); }, 50); return; } this.go(r); }
+    try { const r = await DC.api('/api/auth/login', { email: st.email.trim(), password: st.pw, remember: st.remember }); if (r.mfa) { this.setState({ busy: false, mfa: true, ticket: r.ticket, mfaRole: r.role, code: '', codeErr: '' }); setTimeout(() => { const c = document.getElementById('code'); if (c) c.focus(); }, 50); return; } this.go(r); }
     catch (e) { this.setState({ busy: false, err: e.message }); }
   }
   go(r) { this.setState({ done: true, mfa: false }); const n = DC.qs('next'); location.href = n && /^\/(?![\/\\])/.test(n) && !/[\u0000-\u001f\\]/.test(n) ? n : (r.role && r.role !== 'trader' && (DC.qs('admin') || r.mfa !== undefined || r.mfaSetup) ? '/admin' : '/app'); }
   async submitCode() {
     const st = this.state; const c = st.code.trim(); if (!c) { this.setState({ codeErr: 'Enter the code from your app.' }); return; }
     if (st.busy) return; this.setState({ busy: true, codeErr: '' });
-    try { const r = await DC.api('/api/auth/mfa', { ticket: st.ticket, code: c }); this.go(Object.assign({ mfa: true }, r)); }
+    try { const r = await DC.api('/api/auth/mfa', { ticket: st.ticket, code: c, remember: st.remember }); this.go(Object.assign({ mfa: true }, r)); }
     catch (e) { const timedOut = /timed out/i.test(e.message); this.setState({ busy: false, codeErr: e.message, code: '', mfa: !timedOut, err: timedOut ? e.message : '' }); }
   }
   componentDidMount() { this.root = document.getElementById('dc-root'); this.root.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.tagName === 'INPUT') { if (this.state.mfa) this.submitCode(); else this.submit(); } }); }
@@ -130,7 +130,7 @@ class Component extends DCLogic {
     const emailBad = st.submitted && !emailOk; const pwBad = (st.submitted && !pwOk) || !!st.err;
     return {
       // Say why they are here: confirming an email from a link, opening the Back Office, or the staff code step
-      title: st.mfa ? 'Two-Step Login.' : 'Welcome Back.', lead: st.mfa ? 'One more step to open the Back Office.' : /^\/verify-email/.test(DC.qs('next') || '') ? 'Log in to confirm your email.' : /^\/admin/.test(DC.qs('next') || '') ? 'Log in to the Back Office.' : 'Log in to your trader dashboard.',
+      title: st.mfa ? 'Two-Step Login.' : 'Welcome Back.', lead: st.mfa ? (st.mfaRole === 'trader' ? 'One more step to open your dashboard.' : 'One more step to open the Back Office.') : /^\/verify-email/.test(DC.qs('next') || '') ? 'Log in to confirm your email.' : /^\/admin/.test(DC.qs('next') || '') ? 'Log in to the Back Office.' : 'Log in to your trader dashboard.',
       social: false, email: st.email, pw: st.pw, remember: st.remember, done: st.done, notDone: !st.done && !st.mfa, mfaStep: st.mfa && !st.done,
       code: st.code, setCode: (e) => this.setState({ code: e.target.value, codeErr: '' }), codeBad: !!st.codeErr, codeBd: st.codeErr ? '#F2777F' : '', codeErr: st.codeErr,
       submitCode: () => this.submitCode(), backToPw: () => this.setState({ mfa: false, ticket: '', code: '', pw: '' }),
